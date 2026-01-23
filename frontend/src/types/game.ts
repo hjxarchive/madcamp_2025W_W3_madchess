@@ -8,6 +8,33 @@ export interface Piece {
   color: PieceColor
 }
 
+// 기물 점수
+export const PIECE_COSTS: Record<PieceType, number> = {
+  p: 1,
+  n: 3,
+  b: 3,
+  r: 5,
+  q: 9,
+  k: 0,
+}
+
+// 기물 최대 개수
+export const PIECE_MAX_COUNT: Record<PieceType, number> = {
+  p: 8,
+  n: 2,
+  b: 2,
+  r: 2,
+  q: 1,
+  k: 1,
+}
+
+// 배치 기물 인터페이스 (좌표 포함)
+export interface PlacedPiece {
+  type: PieceType
+  row: number
+  col: number
+}
+
 // 덱 구성 인터페이스
 export interface DeckComposition {
   p: number // 폰 (0-8)

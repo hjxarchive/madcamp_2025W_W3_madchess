@@ -1,14 +1,92 @@
 import { useParams } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import ChessBoard from '../components/ChessBoard'
 import PlayerInfo from '../components/PlayerInfo'
-import { Move, Piece } from '../types/game'
+import { Move, Piece, PlacedPiece, PieceColor } from '../types/game'
 
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
-  const { gameState, makeMove } = useGameStore()
-  const [useImages, setUseImages] = useState(false)  // 기물 이미지 사용 여부
+  const { gameState, setGameState, makeMove } = useGameStore()
+  const [useImages, setUseImages] = useState(true)  // 기본값: 이미지로 표시
+  const [myColor, setMyColor] = useState<PieceColor>('white')
+
+  // sessionStorage에서 배치 정보 로드
+  useEffect(() => {
+    const savedColor = sessionStorage.getItem('myColor') as PieceColor | null
+    if (savedColor) {
+      setMyColor(savedColor)
+    }
+
+    // 배치 정보가 있으면 보드 초기화
+    const placedPiecesStr = sessionStorage.getItem('placedPieces')
+    if (placedPiecesStr) {
+      const placedPieces = JSON.parse(placedPiecesStr) as PlacedPiece[]
+      
+      // 보드에 배치된 기물 배치
+      const newBoard = Array(8).fill(null).map(() => Array(8).fill(null))
+      
+      // 내 기물 배치
+      placedPieces.forEach((piece) => {
+        newBoard[piece.row][piece.col] = {
+          type: piece.type,
+          color: savedColor || myColor,
+        }
+      })
+
+      // 상대 기물 배치
+      const opponentPlacementStr = sessionStorage.getItem('opponentPlacement')
+      if (opponentPlacementStr) {
+        const opponentPlacement = JSON.parse(opponentPlacementStr) as PlacedPiece[]
+        const opponentColor = (savedColor || myColor) === 'white' ? 'black' : 'white'
+        
+        opponentPlacement.forEach((piece) => {
+          newBoard[piece.row][piece.col] = {
+            type: piece.type,
+            color: opponentColor,
+          }
+        })
+      }
+
+      // gameStore 업데이트
+      const opponentColor = (savedColor || myColor) === 'white' ? 'black' : 'white'
+      setGameState({
+        roomId: gameId || 'test-room',
+        white: {
+          userId: 'white-player',
+          username: 'White Player',
+          rating: 1500,
+          deckId: 'deck-1',
+          color: 'white',
+        },
+        black: {
+          userId: 'black-player',
+          username: 'Black Player',
+          rating: 1500,
+          deckId: 'deck-2',
+          color: 'black',
+        },
+        board: newBoard,
+        currentTurn: 'white',
+        moveCount: 0,
+        pgn: '',
+        status: 'playing',
+        isCheck: false,
+        capturedPieces: {
+          white: [],
+          black: [],
+        },
+      })
+
+      console.log('Loaded board:', newBoard)
+      console.log('My color:', savedColor || myColor)
+
+      // 사용한 데이터는 제거 (한 번만 사용)
+      sessionStorage.removeItem('placedPieces')
+      sessionStorage.removeItem('opponentPlacement')
+      sessionStorage.removeItem('myColor')
+    }
+  }, [])
 
   if (!gameState) {
     return (
@@ -21,8 +99,7 @@ export default function GamePage() {
     )
   }
 
-  // 임시로 백 플레이어로 설정
-  const myColor = gameState.white.color
+  // myColor를 사용하여 설정
   const isMyTurn = gameState.currentTurn === myColor
 
   const opponent = myColor === 'white' ? gameState.black : gameState.white
@@ -35,21 +112,65 @@ export default function GamePage() {
   }
 
   // 백엔드 연동 시 fetchLegalMoves를 교체하세요.
-  // 임시 목업: 기본 체스 폰과 나이트 이동만 단순 계산
+  // 모든 기물의 합법적 수를 계산하는 함수
   const fetchLegalMovesMock = async ({ row, col, piece }: { row: number; col: number; piece: Piece }) => {
     const moves: { row: number; col: number }[] = []
-    const forward = piece.color === 'white' ? -1 : 1 // 현재 배열 기준으로 white는 row 감소(아래 → 위), black은 증가
+    const forward = piece.color === 'white' ? -1 : 1
 
-    if (piece.type === 'p') {
-      const one = row + forward
-      const two = row + forward * 2
-      if (one >= 0 && one < 8) moves.push({ row: one, col })
-      // 첫 수 더블 무브
-      const startRank = piece.color === 'white' ? 6 : 1
-      if (row === startRank && two >= 0 && two < 8) moves.push({ row: two, col })
+    // 도움 함수: 직선 이동 (룩, 비숍, 퀸용)
+    const addLineMoves = (directions: [number, number][]) => {
+      directions.forEach(([dr, dc]) => {
+        let r = row + dr
+        let c = col + dc
+        while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+          const target = gameState.board[r][c]
+          if (!target) {
+            // 빈 칸이면 추가
+            moves.push({ row: r, col: c })
+          } else if (target.color !== piece.color) {
+            // 상대 기물이면 추가하고 중단
+            moves.push({ row: r, col: c })
+            break
+          } else {
+            // 자신의 기물이면 중단
+            break
+          }
+          r += dr
+          c += dc
+        }
+      })
     }
 
-    if (piece.type === 'n') {
+    if (piece.type === 'p') {
+      // 폰: 전진 1칸 또는 2칸 (빈 칸만), 대각선 캡처
+      const one = row + forward
+      const two = row + forward * 2
+      
+      // 전진
+      if (one >= 0 && one < 8 && !gameState.board[one][col]) {
+        moves.push({ row: one, col })
+        
+        // 첫 수 더블 무브
+        const startRank = piece.color === 'white' ? 6 : 1
+        if (row === startRank && !gameState.board[two][col]) {
+          moves.push({ row: two, col })
+        }
+      }
+
+      // 대각선 캡처
+      if (one >= 0 && one < 8) {
+        for (const dc of [-1, 1]) {
+          const nc = col + dc
+          if (nc >= 0 && nc < 8) {
+            const target = gameState.board[one][nc]
+            if (target && target.color !== piece.color) {
+              moves.push({ row: one, col: nc })
+            }
+          }
+        }
+      }
+    } else if (piece.type === 'n') {
+      // 나이트: 8가지 L자 이동
       const deltas = [
         [-2, -1], [-2, 1], [-1, -2], [-1, 2],
         [1, -2], [1, 2], [2, -1], [2, 1],
@@ -57,11 +178,47 @@ export default function GamePage() {
       deltas.forEach(([dr, dc]) => {
         const r = row + dr
         const c = col + dc
-        if (r >= 0 && r < 8 && c >= 0 && c < 8) moves.push({ row: r, col: c })
+        if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+          const target = gameState.board[r][c]
+          if (!target || target.color !== piece.color) {
+            moves.push({ row: r, col: c })
+          }
+        }
       })
+    } else if (piece.type === 'b') {
+      // 비숍: 4대각선 방향
+      addLineMoves([
+        [-1, -1], [-1, 1], [1, -1], [1, 1],
+      ])
+    } else if (piece.type === 'r') {
+      // 룩: 4수평/수직 방향
+      addLineMoves([
+        [-1, 0], [1, 0], [0, -1], [0, 1],
+      ])
+    } else if (piece.type === 'q') {
+      // 퀸: 8방향 (룩 + 비숍)
+      addLineMoves([
+        [-1, -1], [-1, 0], [-1, 1],
+        [0, -1], [0, 1],
+        [1, -1], [1, 0], [1, 1],
+      ])
+    } else if (piece.type === 'k') {
+      // 킹: 한 칸씩 8방향
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue
+          const r = row + dr
+          const c = col + dc
+          if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+            const target = gameState.board[r][c]
+            if (!target || target.color !== piece.color) {
+              moves.push({ row: r, col: c })
+            }
+          }
+        }
+      }
     }
 
-    // TODO: 백엔드 응답으로 교체
     return moves
   }
 

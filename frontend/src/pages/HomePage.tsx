@@ -1,12 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 export default function HomePage() {
   const navigate = useNavigate()
 
   const handleStartGame = () => {
-    // 임시 게임 ID 생성 (실제로는 매칭 시스템에서 받아야 함)
-    const gameId = `game-${Date.now()}`
-    navigate(`/game/${gameId}`)
+    navigate('/matchmaking')
   }
 
   return (
@@ -18,12 +16,6 @@ export default function HomePage() {
         전략적인 덱 빌딩과 체스를 결합한 PVP 게임
       </p>
       <div className="flex gap-4">
-        <Link 
-          to="/deck-builder" 
-          className="px-8 py-4 bg-purple-600 hover:bg-purple-700 rounded-lg text-lg font-semibold transition-colors"
-        >
-          덱 빌더
-        </Link>
         <button 
           onClick={handleStartGame}
           className="px-8 py-4 bg-pink-600 hover:bg-pink-700 rounded-lg text-lg font-semibold transition-colors"

@@ -149,6 +149,13 @@ export default function ChessBoard({
     return legalMoves.some(move => move.row === actual.row && move.col === actual.col)
   }
 
+  const isSquareCapture = (displayRow: number, displayCol: number) => {
+    const actual = getActualPosition(displayRow, displayCol)
+    const isLegal = legalMoves.some(move => move.row === actual.row && move.col === actual.col)
+    const piece = board[actual.row][actual.col]
+    return isLegal && piece !== null && piece.color !== myColor
+  }
+
   const isSquareLastMove = (displayRow: number, displayCol: number) => {
     if (!lastMove) return false
     const actual = getActualPosition(displayRow, displayCol)
@@ -203,6 +210,7 @@ export default function ChessBoard({
                 const isLight = (rowIndex + colIndex) % 2 === 0
                 const selected = isSquareSelected(rowIndex, colIndex)
                 const legalMove = isSquareLegalMove(rowIndex, colIndex)
+                const isCapture = isSquareCapture(rowIndex, colIndex)
                 const lastMoveHighlight = isSquareLastMove(rowIndex, colIndex)
                 const kingCheck = isKingInCheck(rowIndex, colIndex)
 
@@ -220,12 +228,14 @@ export default function ChessBoard({
                       ${isMyTurn ? 'hover:brightness-90' : 'cursor-not-allowed'}
                     `}
                   >
-                    {/* 합법적인 이동 표시 */}
-                    {legalMove && (
-                      <div className={`
-                        absolute rounded-full
-                        ${piece ? 'w-12 h-12 border-4 border-green-500' : 'w-4 h-4 bg-green-500 bg-opacity-60'}
-                      `} />
+                    {/* 합법적인 이동 표시 - 빈 칸에만 초록 점 */}
+                    {legalMove && !isCapture && !piece && (
+                      <div className="absolute w-4 h-4 rounded-full bg-green-500 bg-opacity-70" />
+                    )}
+                    
+                    {/* 캡처 가능한 칸 표시 (기물을 둘러싼) */}
+                    {isCapture && (
+                      <div className="absolute w-14 h-14 rounded-full border-[3px] border-red-500 opacity-90" style={{ pointerEvents: 'none' }} />
                     )}
 
                     {/* 기물 */}
@@ -234,13 +244,13 @@ export default function ChessBoard({
                         <img
                           src={PIECE_IMAGES[piece.color][piece.type]}
                           alt={`${piece.color} ${piece.type}`}
-                          className="w-12 h-12 select-none z-10 pointer-events-none"
+                          className="w-12 h-12 select-none relative z-10 pointer-events-none"
                           draggable={false}
                         />
                       ) : (
                         <span 
                           className={`
-                            text-5xl select-none z-10
+                            text-5xl select-none relative z-10
                             ${piece.color === 'white' ? 'text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]' : 'text-gray-900'}
                           `}
                         >
