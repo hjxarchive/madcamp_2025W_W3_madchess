@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { PieceType, PieceColor, PIECE_COSTS, PIECE_MAX_COUNT, PlacedPiece } from '../types/game'
+import { PieceType, PieceColor, PIECE_COSTS, PIECE_MAX_COUNT, PlacedPiece, File, Rank } from '../types/game'
+import { socketService } from '../services/socket'
 
 interface AvailablePiece {
   type: PieceType
@@ -27,6 +28,8 @@ const PIECE_IMAGES: Record<PieceColor, Record<PieceType, string>> = {
   },
 }
 
+const FILES: File[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+
 export default function PlacementPage() {
   const navigate = useNavigate()
   const { gameId } = useParams<{ gameId: string }>()
@@ -43,16 +46,15 @@ export default function PlacementPage() {
       setMyColor(savedColor)
       sessionStorage.removeItem('selectedColor')
       
-      // 킹을 자동으로 배치
-      const kingRow = savedColor === 'white' ? 7 : 0
-      const kingCol = 4
-      setPlacedPieces([{ type: 'k', row: kingRow, col: kingCol }])
+      // 킹을 자동으로 배치 (e1 또는 e8)
+      const kingRank: Rank = savedColor === 'white' ? 1 : 8
+      setPlacedPieces([{ type: 'k', file: 'e', rank: kingRank }])
     }
   }, [])
 
-  // 배치 가능한 구역 (8*4) - white: 4~7행, black: 0~3행
-  const placementRows = myColor === 'white' ? [4, 5, 6, 7] : [0, 1, 2, 3]
-  const isPlacementArea = (row: number) => placementRows.includes(row)
+  // 배치 가능한 구역 - white: 1~4행, black: 5~8행
+  const placementRanks = myColor === 'white' ? [1, 2, 3, 4] : [5, 6, 7, 8]
+  const isPlacementArea = (rank: Rank) => placementRanks.includes(rank)
 
   // 사용 가능한 기물 목록
   const getAvailablePieces = (): AvailablePiece[] => {
@@ -91,21 +93,20 @@ export default function PlacementPage() {
   }
 
   // 드롭
-  const handleDrop = (row: number, col: number, e: React.DragEvent) => {
+  const handleDrop = (file: File, rank: Rank, e: React.DragEvent) => {
     e.preventDefault()
 
     if (!draggedPiece) return
 
     // 배치 가능 구역 확인
-    if (!isPlacementArea(row)) {
+    if (!isPlacementArea(rank)) {
       alert('자신의 진영에만 배치할 수 있습니다')
       return
     }
 
     // 킹 위치 체크
-    const myKingRow = myColor === 'white' ? 7 : 0
-    const kingCol = 4 // e열
-    const isKingPosition = row === myKingRow && col === kingCol
+    const kingRank: Rank = myColor === 'white' ? 1 : 8
+    const isKingPosition = file === 'e' && rank === kingRank
 
     // 킹은 e1/e8에만 배치 가능
     if (draggedPiece.type === 'k') {
@@ -123,14 +124,14 @@ export default function PlacementPage() {
 
     // 이미 기물이 있으면 제거
     setPlacedPieces(prev =>
-      prev.filter(p => !(p.row === row && p.col === col))
+      prev.filter(p => !(p.file === file && p.rank === rank))
     )
 
     // 새 기물 배치
     const newPiece: PlacedPiece = {
       type: draggedPiece.type,
-      row,
-      col,
+      file,
+      rank,
     }
 
     setPlacedPieces(prev => [...prev, newPiece])
@@ -138,8 +139,8 @@ export default function PlacementPage() {
   }
 
   // 보드 칸 클릭해서 기물 제거
-  const handleSquareClick = (row: number, col: number) => {
-    const clickedPiece = placedPieces.find(p => p.row === row && p.col === col)
+  const handleSquareClick = (file: File, rank: Rank) => {
+    const clickedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
     
     // 킹은 제거할 수 없음
     if (clickedPiece?.type === 'k') {
@@ -148,9 +149,39 @@ export default function PlacementPage() {
     }
     
     setPlacedPieces(prev =>
-      prev.filter(p => !(p.row === row && p.col === col))
+      prev.filter(p => !(p.file === file && p.rank === rank))
     )
   }
+
+  // WebSocket 이벤트 리스너 설정
+  useEffect(() => {
+    const socket = socketService.getSocket()
+    if (!socket) return
+
+    // 상대방 배치가 완료되고 게임 시작
+    socket.on('placement:complete', (data: { opponentPlacement: PlacedPiece[] }) => {
+      console.log('Both placements complete, starting game:', data)
+      
+      // sessionStorage에 저장
+      sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
+      sessionStorage.setItem('myColor', myColor)
+      sessionStorage.setItem('opponentPlacement', JSON.stringify(data.opponentPlacement))
+      
+      // 게임 페이지로 이동
+      navigate(`/game/${gameId}`)
+    })
+
+    // 상대가 배치 중임을 알림
+    socket.on('placement:waiting', () => {
+      console.log('Waiting for opponent placement...')
+      alert('배치를 제출했습니다. 상대방의 배치를 기다리는 중...')
+    })
+
+    return () => {
+      socket.off('placement:complete')
+      socket.off('placement:waiting')
+    }
+  }, [placedPieces, myColor, gameId, navigate])
 
   // 배치 완료
   const handleConfirmPlacement = () => {
@@ -161,30 +192,14 @@ export default function PlacementPage() {
       return
     }
 
-    // 더미 상대 배치 생성 (백엔드에서 나중에 받아올 예정)
-    const opponentColor = myColor === 'white' ? 'black' : 'white'
-    const dummyOpponentPlacement: PlacedPiece[] = [
-      { type: 'k', row: opponentColor === 'white' ? 7 : 0, col: 4 }, // 킹
-      { type: 'r', row: opponentColor === 'white' ? 7 : 0, col: 0 },
-      { type: 'r', row: opponentColor === 'white' ? 7 : 0, col: 7 },
-      { type: 'n', row: opponentColor === 'white' ? 7 : 0, col: 1 },
-      { type: 'n', row: opponentColor === 'white' ? 7 : 0, col: 6 },
-      { type: 'b', row: opponentColor === 'white' ? 7 : 0, col: 2 },
-      { type: 'b', row: opponentColor === 'white' ? 7 : 0, col: 5 },
-      { type: 'q', row: opponentColor === 'white' ? 7 : 0, col: 3 },
-      ...Array.from({ length: 8 }).map((_, i) => ({
-        type: 'p' as PieceType,
-        row: opponentColor === 'white' ? 6 : 1,
-        col: i,
-      })),
-    ]
-
-    // sessionStorage에 배치 정보 저장
-    sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
-    sessionStorage.setItem('myColor', myColor)
-    sessionStorage.setItem('opponentPlacement', JSON.stringify(dummyOpponentPlacement))
-    
-    navigate(`/game/${gameId}`)
+    // 서버로 배치 정보 전송
+    if (gameId) {
+      socketService.sendPlacement(gameId, {
+        color: myColor,
+        placement: placedPieces,
+      })
+      console.log('Placement sent to server:', { color: myColor, placement: placedPieces })
+    }
   }
 
   const availablePieces = getAvailablePieces()
@@ -206,30 +221,32 @@ export default function PlacementPage() {
           <div className="bg-gray-800 rounded-lg p-6">
             <div className="inline-block border-4 border-gray-700">
               {/* 보드 */}
-              {Array.from({ length: 8 }).map((_, rowIdx) => {
-                const row = myColor === 'black' ? 7 - rowIdx : rowIdx
-                const isPlacementRow = isPlacementArea(row)
+              {Array.from({ length: 8 }).map((_, rankIdx) => {
+                const rank = (myColor === 'black' ? rankIdx + 1 : 8 - rankIdx) as Rank
+                const isPlacementRank = isPlacementArea(rank)
                 
                 return (
-                  <div key={row} className="flex">
-                    {Array.from({ length: 8 }).map((_, colIdx) => {
-                      const col = myColor === 'black' ? 7 - colIdx : colIdx
-                      const isLight = (row + col) % 2 === 0
-                      const placedPiece = placedPieces.find(p => p.row === row && p.col === col)
-                      const isMyKingSpot = row === (myColor === 'white' ? 7 : 0) && col === 4
-                      const isOppKingSpot = row === (myColor === 'white' ? 0 : 7) && col === 4
+                  <div key={rank} className="flex">
+                    {FILES.map((file) => {
+                      const displayFile = myColor === 'black' ? FILES[7 - FILES.indexOf(file)] : file
+                      const isLight = (FILES.indexOf(file) + (8 - rank)) % 2 === 0
+                      const placedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
+                      const kingRank: Rank = myColor === 'white' ? 1 : 8
+                      const isMyKingSpot = file === 'e' && rank === kingRank
+                      const oppKingRank: Rank = myColor === 'white' ? 8 : 1
+                      const isOppKingSpot = file === 'e' && rank === oppKingRank
 
                       return (
                         <div
-                          key={`${row}-${col}`}
+                          key={`${file}-${rank}`}
                           onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(row, col, e)}
-                          onClick={() => placedPiece && handleSquareClick(row, col)}
+                          onDrop={(e) => handleDrop(file, rank, e)}
+                          onClick={() => placedPiece && handleSquareClick(file, rank)}
                           className={`
                             w-16 h-16 flex items-center justify-center cursor-move relative
                             transition-all duration-200
                             ${isLight ? 'bg-amber-100' : 'bg-amber-700'}
-                            ${!isPlacementRow ? 'opacity-30' : ''}
+                            ${!isPlacementRank ? 'opacity-30' : ''}
                             ${placedPiece ? 'ring-2 ring-yellow-400' : ''}
                             ${isMyKingSpot && placedPiece?.type === 'k' ? 'ring-4 ring-green-500' : ''}
                             ${isOppKingSpot ? 'ring-4 ring-red-500' : ''}

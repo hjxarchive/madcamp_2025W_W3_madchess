@@ -2,6 +2,56 @@
 export type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k'
 export type PieceColor = 'white' | 'black'
 
+// 체스 좌표 (파일: a-h, 랭크: 1-8)
+export type File = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h'
+export type Rank = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+
+export interface Square {
+  file: File
+  rank: Rank
+}
+
+// 좌표 변환 유틸
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
+const RANKS = [1, 2, 3, 4, 5, 6, 7, 8] as const
+
+export const rowColToSquare = (row: number, col: number): Square => {
+  return {
+    file: FILES[col],
+    rank: (8 - row) as Rank
+  }
+}
+
+export const squareToRowCol = (square: Square): { row: number; col: number } => {
+  const col = FILES.indexOf(square.file)
+  const row = 8 - square.rank
+  return { row, col }
+}
+
+// UCI 변환 유틸
+export const squareToUci = (square: Square): string => {
+  return `${square.file}${square.rank}`
+}
+
+export const uciToSquare = (uci: string): Square => {
+  return {
+    file: uci[0] as File,
+    rank: parseInt(uci[1]) as Rank
+  }
+}
+
+export const moveToUci = (from: Square, to: Square, promotion?: PieceType): string => {
+  const uci = `${squareToUci(from)}${squareToUci(to)}`
+  return promotion ? `${uci}${promotion}` : uci
+}
+
+export const parseUci = (uci: string): { from: Square; to: Square; promotion?: PieceType } => {
+  const from = uciToSquare(uci.substring(0, 2))
+  const to = uciToSquare(uci.substring(2, 4))
+  const promotion = uci.length === 5 ? uci[4] as PieceType : undefined
+  return { from, to, promotion }
+}
+
 // 체스 기물 인터페이스
 export interface Piece {
   type: PieceType
@@ -31,8 +81,14 @@ export const PIECE_MAX_COUNT: Record<PieceType, number> = {
 // 배치 기물 인터페이스 (좌표 포함)
 export interface PlacedPiece {
   type: PieceType
-  row: number
-  col: number
+  file: File
+  rank: Rank
+}
+
+// 배치 데이터 (WebSocket 전송용)
+export interface PlacementData {
+  color: PieceColor
+  placement: PlacedPiece[]
 }
 
 // 덱 구성 인터페이스
@@ -63,12 +119,12 @@ export interface PlayerInfo {
   color: PieceColor
 }
 
-// 이동 인터페이스
+// 이동 인터페이스 (UCI 표기법)
 export interface Move {
-  from: { row: number; col: number }
-  to: { row: number; col: number }
+  uci: string  // UCI 표기법: "e2e4", "e7e8q" (프로모션 포함)
   piece: PieceType
   captured?: PieceType
+  playerId?: string  // 누가 이동했는지 식별 (WebSocket 처리용)
 }
 
 // 게임 상태

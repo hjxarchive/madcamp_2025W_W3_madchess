@@ -3,13 +3,29 @@ import { useState, useEffect } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import ChessBoard from '../components/ChessBoard'
 import PlayerInfo from '../components/PlayerInfo'
-import { Move, Piece, PlacedPiece, PieceColor } from '../types/game'
+import { Move, Piece, PlacedPiece, PieceColor, squareToRowCol } from '../types/game'
+import { socketService } from '../services/socket'
 
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
-  const { gameState, setGameState, makeMove } = useGameStore()
+  const { gameState, setGameState, makeMove, applyOpponentMove } = useGameStore()
   const [useImages, setUseImages] = useState(true)  // 기본값: 이미지로 표시
   const [myColor, setMyColor] = useState<PieceColor>('white')
+
+  // 개발 모드에서 전역 접근을 위해 window에 노출
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as any).testMove = (uci: string, piece: string, captured?: string) => {
+        applyOpponentMove({ uci, piece: piece as any, captured: captured as any })
+      }
+      console.log('🎮 테스트 함수 사용 가능: testMove("e2e4", "p")')
+    }
+    return () => {
+      if (import.meta.env.DEV) {
+        delete (window as any).testMove
+      }
+    }
+  }, [applyOpponentMove])
 
   // sessionStorage에서 배치 정보 로드
   useEffect(() => {
@@ -28,7 +44,8 @@ export default function GamePage() {
       
       // 내 기물 배치
       placedPieces.forEach((piece) => {
-        newBoard[piece.row][piece.col] = {
+        const { row, col } = squareToRowCol({ file: piece.file, rank: piece.rank })
+        newBoard[row][col] = {
           type: piece.type,
           color: savedColor || myColor,
         }
@@ -41,7 +58,8 @@ export default function GamePage() {
         const opponentColor = (savedColor || myColor) === 'white' ? 'black' : 'white'
         
         opponentPlacement.forEach((piece) => {
-          newBoard[piece.row][piece.col] = {
+          const { row, col } = squareToRowCol({ file: piece.file, rank: piece.rank })
+          newBoard[row][col] = {
             type: piece.type,
             color: opponentColor,
           }
@@ -49,7 +67,7 @@ export default function GamePage() {
       }
 
       // gameStore 업데이트
-      const opponentColor = (savedColor || myColor) === 'white' ? 'black' : 'white'
+
       setGameState({
         roomId: gameId || 'test-room',
         white: {
@@ -88,6 +106,42 @@ export default function GamePage() {
     }
   }, [])
 
+  // WebSocket 이벤트 리스너 설정
+  useEffect(() => {
+    const socket = socketService.getSocket()
+    if (!socket) return
+
+    // 상대의 수를 받았을 때 (레거시)
+    socket.on('opponent:move', (move: Move) => {
+      console.log('Received opponent move:', move)
+      applyOpponentMove(move)
+    })
+
+    // 서버에서 브로드캐스트된 수를 받았을 때
+    socket.on('move-made', (data: { move: Move; gameState: any; socketId?: string }) => {
+      console.log('Received move-made from server:', data)
+      // 내가 보낸 수가 아닌 경우에만 적용 (socketId가 다르거나 playerId가 다른 경우)
+      const mySocketId = socket.id
+      const isMyMove = data.socketId ? data.socketId === mySocketId : data.move.playerId === mySocketId
+      if (!isMyMove) {
+        applyOpponentMove(data.move)
+      }
+    })
+
+    // 이동 에러
+    socket.on('move-error', (data: { message: string }) => {
+      console.error('Move error:', data.message)
+      alert(`이동 오류: ${data.message}`)
+    })
+
+    // 정리
+    return () => {
+      socket.off('opponent:move')
+      socket.off('move-made')
+      socket.off('move-error')
+    }
+  }, [applyOpponentMove])
+
   if (!gameState) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -107,8 +161,11 @@ export default function GamePage() {
 
   const handleMove = (move: Move) => {
     makeMove(move)
-    // TODO: Socket.io를 통해 서버로 이동 전송
-    console.log('Move made:', move)
+    // Socket.io를 통해 서버로 이동 전송
+    if (gameState) {
+      socketService.sendMove(gameState.roomId, move)
+      console.log('Move sent to server:', move)
+    }
   }
 
   // 백엔드 연동 시 fetchLegalMoves를 교체하세요.
@@ -350,21 +407,38 @@ export default function GamePage() {
                   <h3 className="text-sm font-semibold text-gray-400 mb-2">기물 가치</h3>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">백 (당신)</span>
+                      <span className="text-sm">{myColor === 'white' ? '백 (당신)' : '흑 (당신)'}</span>
                       <span className="font-semibold">
-                        {39 - gameState.capturedPieces.white.reduce((sum, p) => {
+                        {(() => {
                           const vals = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 }
-                          return sum + vals[p]
-                        }, 0)}
+                          let total = 0
+                          gameState.board.forEach(row => {
+                            row.forEach(piece => {
+                              if (piece && piece.color === myColor) {
+                                total += vals[piece.type]
+                              }
+                            })
+                          })
+                          return total
+                        })()}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">흑 (상대)</span>
+                      <span className="text-sm">{myColor === 'white' ? '흑 (상대)' : '백 (상대)'}</span>
                       <span className="font-semibold">
-                        {39 - gameState.capturedPieces.black.reduce((sum, p) => {
+                        {(() => {
                           const vals = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 }
-                          return sum + vals[p]
-                        }, 0)}
+                          const opponentColor = myColor === 'white' ? 'black' : 'white'
+                          let total = 0
+                          gameState.board.forEach(row => {
+                            row.forEach(piece => {
+                              if (piece && piece.color === opponentColor) {
+                                total += vals[piece.type]
+                              }
+                            })
+                          })
+                          return total
+                        })()}
                       </span>
                     </div>
                   </div>

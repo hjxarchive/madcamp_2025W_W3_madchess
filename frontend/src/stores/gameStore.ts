@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { GameState, Move, Piece, PieceColor, PieceType, PlayerInfo } from '../types/game'
+import { GameState, Move, Piece, PieceColor, PieceType, PlayerInfo, squareToRowCol, parseUci } from '../types/game'
 
 interface GameStoreState {
   gameState: GameState | null
@@ -13,6 +13,7 @@ interface GameStoreState {
   clearSelection: () => void
   setLegalMoves: (moves: { row: number; col: number }[]) => void
   makeMove: (move: Move) => void
+  applyOpponentMove: (move: Move) => void
   addCapturedPiece: (color: PieceColor, piece: PieceType) => void
 }
 
@@ -110,11 +111,14 @@ export const useGameStore = create<GameStoreState>((set) => ({
       if (!state.gameState) return state
       
       const newBoard = state.gameState.board.map(row => [...row])
-      const piece = newBoard[move.from.row][move.from.col]
+      const { from, to } = parseUci(move.uci)
+      const { row: fromRow, col: fromCol } = squareToRowCol(from)
+      const { row: toRow, col: toCol } = squareToRowCol(to)
+      const piece = newBoard[fromRow][fromCol]
       
       // 이동 실행
-      newBoard[move.to.row][move.to.col] = piece
-      newBoard[move.from.row][move.from.col] = null
+      newBoard[toRow][toCol] = piece
+      newBoard[fromRow][fromCol] = null
       
       // 턴 변경
       const newTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
@@ -126,6 +130,46 @@ export const useGameStore = create<GameStoreState>((set) => ({
           currentTurn: newTurn,
           moveCount: state.gameState.moveCount + 1,
           lastMove: move,
+        },
+        selectedSquare: null,
+        legalMoves: [],
+      }
+    }),
+  
+  applyOpponentMove: (move) =>
+    set((state) => {
+      if (!state.gameState) return state
+      
+      const newBoard = state.gameState.board.map(row => [...row])
+      const { from, to } = parseUci(move.uci)
+      const { row: fromRow, col: fromCol } = squareToRowCol(from)
+      const { row: toRow, col: toCol } = squareToRowCol(to)
+      const piece = newBoard[fromRow][fromCol]
+      
+      // 상대 기물 이동
+      newBoard[toRow][toCol] = piece
+      newBoard[fromRow][fromCol] = null
+      
+      // 캡처된 기물 기록
+      let newCapturedPieces = { ...state.gameState.capturedPieces }
+      if (move.captured) {
+        const capturingColor = state.gameState.currentTurn
+        newCapturedPieces[capturingColor] = [...newCapturedPieces[capturingColor], move.captured]
+      }
+      
+      // 턴 변경 (내 차례로)
+      const newTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
+      
+      console.log('Opponent move applied:', move)
+      
+      return {
+        gameState: {
+          ...state.gameState,
+          board: newBoard,
+          currentTurn: newTurn,
+          moveCount: state.gameState.moveCount + 1,
+          lastMove: move,
+          capturedPieces: newCapturedPieces,
         },
         selectedSquare: null,
         legalMoves: [],
@@ -147,3 +191,10 @@ export const useGameStore = create<GameStoreState>((set) => ({
       }
     }),
 }))
+
+// 테스트용 헬퍼 함수: 콘솔에서 상대의 수를 시뮬레이션할 수 있음
+export const simulateOpponentMove = (move: Move) => {
+  console.log('Simulating opponent move:', move)
+  const store = useGameStore.getState()
+  store.applyOpponentMove(move)
+}

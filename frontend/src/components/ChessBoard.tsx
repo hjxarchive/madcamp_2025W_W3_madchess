@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Piece, PieceType, PieceColor, Move } from '../types/game'
+import { Piece, PieceType, PieceColor, Move, Square, rowColToSquare, squareToRowCol, moveToUci, parseUci } from '../types/game'
 
 interface ChessBoardProps {
   board: (Piece | null)[][]
@@ -123,9 +123,10 @@ export default function ChessBoard({
       if (isLegalMove) {
         const movingPiece = board[selectedSquare.row][selectedSquare.col]
         if (movingPiece) {
+          const fromSquare = rowColToSquare(selectedSquare.row, selectedSquare.col)
+          const toSquare = rowColToSquare(actual.row, actual.col)
           const move: Move = {
-            from: selectedSquare,
-            to: actual,
+            uci: moveToUci(fromSquare, toSquare),
             piece: movingPiece.type,
             captured: piece?.type,
           }
@@ -159,9 +160,12 @@ export default function ChessBoard({
   const isSquareLastMove = (displayRow: number, displayCol: number) => {
     if (!lastMove) return false
     const actual = getActualPosition(displayRow, displayCol)
+    const { from, to } = parseUci(lastMove.uci)
+    const fromPos = squareToRowCol(from)
+    const toPos = squareToRowCol(to)
     return (
-      (lastMove.from.row === actual.row && lastMove.from.col === actual.col) ||
-      (lastMove.to.row === actual.row && lastMove.to.col === actual.col)
+      (fromPos.row === actual.row && fromPos.col === actual.col) ||
+      (toPos.row === actual.row && toPos.col === actual.col)
     )
   }
 
