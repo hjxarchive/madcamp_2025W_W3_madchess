@@ -54,21 +54,26 @@ deck-chess/
 ### 필수 요구사항
 
 - Node.js 18 이상
-- PostgreSQL 14 이상
+- PostgreSQL 14 이상 (선택사항)
 - npm 또는 yarn
 
 ### 설치
 
-1. **저장소 클론 및 의존성 설치**
+1. **Frontend 의존성 설치**
 
 ```bash
-# 루트 디렉토리에서
+cd frontend
 npm install
-
-# Frontend 및 Backend 의존성 자동 설치 (workspaces)
 ```
 
-2. **환경 변수 설정**
+2. **Backend 의존성 설치**
+
+```bash
+cd backend
+npm install
+```
+
+3. **환경 변수 설정 (선택사항)**
 
 ```bash
 # Backend 환경 변수 설정
@@ -79,54 +84,78 @@ cp .env.example .env
 # DATABASE_URL="postgresql://user:password@localhost:5432/deckchess"
 ```
 
-3. **데이터베이스 설정**
-
-```bash
-# Backend 디렉토리에서
-npm run prisma:generate  # Prisma 클라이언트 생성
-npm run prisma:migrate   # 데이터베이스 마이그레이션
-```
-
 ### 개발 서버 실행
 
-#### 모든 서비스 동시 실행 (권장)
+#### Frontend 실행
 
 ```bash
-# 루트 디렉토리에서
+cd frontend
 npm run dev
 ```
 
-이 명령은 Frontend와 Backend를 동시에 실행합니다:
-- Frontend: http://localhost:3000
-- Backend: http://localhost:5000
+Frontend 서버가 http://localhost:5173 에서 실행됩니다.
 
-#### 개별 실행
+#### Backend 실행 (선택사항)
 
 ```bash
-# Frontend만 실행
-npm run dev:frontend
-
-# Backend만 실행
-npm run dev:backend
+cd backend
+npm run dev
 ```
 
-### 프로덕션 빌드
+Backend 서버가 http://localhost:3001 에서 실행됩니다.
 
-```bash
-# 모든 프로젝트 빌드
-npm run build
+### 체스보드 UI 테스트
 
-# 개별 빌드
-npm run build:frontend
-npm run build:backend
+1. Frontend 개발 서버를 실행합니다
+2. 브라우저에서 http://localhost:5173 를 엽니다
+3. `/game/test` 경로로 이동하면 체스보드 UI를 확인할 수 있습니다
+
+## 🎯 구현된 기능
+
+### ✅ 완료된 기능
+- **체스보드 UI**: 8x8 체스보드 렌더링
+- **기물 표시**: 유니코드 체스 기물 심볼
+- **기물 선택 및 이동**: 클릭하여 기물 선택 및 이동
+- **합법적인 수 표시**: 이동 가능한 칸 하이라이트
+- **플레이어 정보**: 플레이어 이름, 레이팅, 잡은 기물 표시
+- **턴 관리**: 현재 차례 표시 및 턴 변경
+- **보드 회전**: 플레이어 색상에 따라 보드 회전
+- **반응형 디자인**: Tailwind CSS 기반 반응형 UI
+
+### 🚧 개발 예정
+- **덱 빌딩 시스템**: 30점 예산으로 기물 구성
+- **기물 배치 페이지**: 게임 시작 전 기물 배치
+- **엔트로피 시스템**: 배치 위치에 따른 비용 가중치
+- **실시간 PVP**: Socket.io 기반 멀티플레이어
+- **매치메이킹**: 레이팅 기반 자동 매칭
+- **체스 엔진**: 완전한 체스 룰 검증
+- **Glicko 레이팅 시스템**: 레이팅 업데이트
+
+## 🎮 게임 규칙 (예정)
+
+### 덱 빌딩
+- **예산**: 30점
+- **배치 영역**: 백(1-2행), 흑(7-8행)
+- **킹**: 필수 배치 (0점, 1행 고정)
+
+### 기물 점수
+```
+폰(p): 1점 (최대 8개)
+나이트(n): 3점 (최대 2개)
+비숍(b): 3점 (최대 2개)
+룩(r): 5점 (최대 2개)
+퀸(q): 9점 (최대 1개)
+킹(k): 0점 (필수 1개)
 ```
 
-## 🎯 주요 기능
+### 엔트로피 가중치
+```
+1행 배치: 기본 점수 × 1.0
+2행 배치: 기본 점수 × 1.3 (공격적)
+```
 
-- **덱 빌딩 시스템**: 다양한 체스 기물 카드로 나만의 덱 구성
-- **실시간 PVP**: Socket.io를 통한 실시간 대전
-- **전략적 플레이**: 체스의 전술과 카드 게임의 전략이 결합
-- **매치메이킹**: 자동 상대 매칭 시스템
+### 특수 규칙
+- 처음 4수(양측 2수) 체크/캡처 금지
 
 ## 🗄️ 데이터베이스 스키마
 
