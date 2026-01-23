@@ -38,6 +38,7 @@ export default function PlacementPage() {
   const [placedPieces, setPlacedPieces] = useState<PlacedPiece[]>([])
   const [draggedPiece, setDraggedPiece] = useState<{ type: PieceType; index: number } | null>(null)
   const [usedBudget, setUsedBudget] = useState(0)
+  const [waitingForOpponent, setWaitingForOpponent] = useState(false)
 
   // 초기화: sessionStorage에서 색상 정보 읽기 및 킹 자동 배치
   useEffect(() => {
@@ -51,6 +52,125 @@ export default function PlacementPage() {
       setPlacedPieces([{ type: 'k', file: 'e', rank: kingRank }])
     }
   }, [])
+
+  // 개발 모드에서 테스트 함수 노출
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      // 더미 배치 생성
+      const createDummyPlacement = (color: PieceColor): PlacedPiece[] => {
+        const baseRank = color === 'white' ? 1 : 8
+        const pawnRank = color === 'white' ? 2 : 7
+        return [
+          { type: 'k', file: 'e', rank: baseRank },
+          { type: 'q', file: 'd', rank: baseRank },
+          { type: 'r', file: 'a', rank: baseRank },
+          { type: 'r', file: 'h', rank: baseRank },
+          { type: 'b', file: 'c', rank: baseRank },
+          { type: 'b', file: 'f', rank: baseRank },
+          { type: 'n', file: 'b', rank: baseRank },
+          { type: 'n', file: 'g', rank: baseRank },
+          ...(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as File[]).map((file) => ({
+            type: 'p' as PieceType,
+            file,
+            rank: pawnRank as Rank,
+          })),
+        ]
+      }
+
+      // 테스트: 내 배치 자동 완성
+      (window as any).testAutoPlacement = () => {
+        const dummyPlacement = createDummyPlacement(myColor)
+        setPlacedPieces(dummyPlacement)
+        console.log('✅ 자동 배치 완료:', dummyPlacement)
+      }
+
+      // 테스트: 배치 전송 (서버로)
+      (window as any).testSendPlacement = () => {
+        if (!gameId) {
+          console.error('❌ gameId가 없습니다')
+          return
+        }
+        if (placedPieces.length === 0) {
+          console.error('❌ 배치된 기물이 없습니다')
+          return
+        }
+        socketService.sendPlacement(gameId, {
+          color: myColor,
+          placement: placedPieces,
+        })
+        console.log('📤 배치 전송:', { color: myColor, placement: placedPieces, gameId })
+      }
+
+      // 테스트: 상대 배치 수신 시뮬레이션
+      (window as any).testReceivePlacement = () => {
+        const opponentColor = myColor === 'white' ? 'black' : 'white'
+        const opponentPlacement = createDummyPlacement(opponentColor)
+        
+        // placement:complete 이벤트 시뮬레이션
+        sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
+        sessionStorage.setItem('myColor', myColor)
+        sessionStorage.setItem('opponentPlacement', JSON.stringify(opponentPlacement))
+        
+        console.log('📥 상대 배치 수신 시뮬레이션:', opponentPlacement)
+        console.log('🎮 게임 페이지로 이동:', `/game/${gameId}`)
+        
+        if (gameId) {
+          navigate(`/game/${gameId}`)
+        }
+      }
+
+      // 테스트: 상대 배치 완료 이벤트 시뮬레이션 (내가 보낸 후 상대 배치 수신)
+      (window as any).testSimulateOpponentComplete = () => {
+        if (!waitingForOpponent) {
+          console.warn('⚠️ 먼저 testSendPlacement()로 내 배치를 보내세요')
+          return
+        }
+
+        const opponentColor = myColor === 'white' ? 'black' : 'white'
+        const opponentPlacement = createDummyPlacement(opponentColor)
+        
+        console.log('✅ 상대가 배치 완료! placement:complete 이벤트 시뮬레이션')
+        console.log('📥 상대 배치:', opponentPlacement)
+        
+        // placement:complete 이벤트 핸들러와 동일하게 처리
+        sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
+        sessionStorage.setItem('myColor', myColor)
+        sessionStorage.setItem('opponentPlacement', JSON.stringify(opponentPlacement))
+        
+        setWaitingForOpponent(false)
+        
+        if (gameId) {
+          console.log('🎮 게임 시작! 페이지 이동:', `/game/${gameId}`)
+          navigate(`/game/${gameId}`)
+        }
+      }
+
+      // 테스트: placement:waiting 이벤트 시뮬레이션
+      (window as any).testPlacementWaiting = () => {
+        console.log('⏳ placement:waiting 이벤트 시뮬레이션')
+        alert('배치를 제출했습니다. 상대방의 배치를 기다리는 중...')
+      }
+
+      console.log('🎮 배치 테스트 함수 사용 가능:')
+      console.log('  testAutoPlacement() - 자동으로 모든 기물 배치')
+      console.log('  testSendPlacement() - 현재 배치를 서버로 전송 (대기 상태로 전환)')
+      console.log('  testSimulateOpponentComplete() - 상대 배치 수신 시뮬레이션 (게임 시작)')
+      console.log('  testReceivePlacement() - 전체 플로우 시뮬레이션 (바로 게임 페이지)')
+      console.log('  testPlacementWaiting() - 대기 알림 시뮬레이션')
+      console.log('')
+      console.log('🔄 정상 플로우: testAutoPlacement() → testSendPlacement() → testSimulateOpponentComplete()')
+    }
+
+    return () => {
+      if (import.meta.env.DEV) {
+        delete (window as any).testAutoPlacement
+        delete (window as any).testSendPlacement
+        delete (window as any).testReceivePlacement
+        delete (window as any).testSimulateOpponentComplete
+        delete (window as any).testPlacementWaiting
+      }
+    }
+  }, [myColor, placedPieces, gameId, navigate, waitingForOpponent])
 
   // 배치 가능한 구역 - white: 1~4행, black: 5~8행
   const placementRanks = myColor === 'white' ? [1, 2, 3, 4] : [5, 6, 7, 8]
@@ -160,12 +280,14 @@ export default function PlacementPage() {
 
     // 상대방 배치가 완료되고 게임 시작
     socket.on('placement:complete', (data: { opponentPlacement: PlacedPiece[] }) => {
-      console.log('Both placements complete, starting game:', data)
+      console.log('✅ Both placements complete, starting game:', data)
       
       // sessionStorage에 저장
       sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
       sessionStorage.setItem('myColor', myColor)
       sessionStorage.setItem('opponentPlacement', JSON.stringify(data.opponentPlacement))
+      
+      setWaitingForOpponent(false)
       
       // 게임 페이지로 이동
       navigate(`/game/${gameId}`)
@@ -173,8 +295,8 @@ export default function PlacementPage() {
 
     // 상대가 배치 중임을 알림
     socket.on('placement:waiting', () => {
-      console.log('Waiting for opponent placement...')
-      alert('배치를 제출했습니다. 상대방의 배치를 기다리는 중...')
+      console.log('⏳ Waiting for opponent placement...')
+      setWaitingForOpponent(true)
     })
 
     return () => {
@@ -198,7 +320,11 @@ export default function PlacementPage() {
         color: myColor,
         placement: placedPieces,
       })
-      console.log('Placement sent to server:', { color: myColor, placement: placedPieces })
+      console.log('📤 배치 전송:', { color: myColor, placement: placedPieces })
+      
+      // 대기 상태로 전환 (상대 배치를 기다림)
+      // placement:complete 이벤트를 받아야 게임 페이지로 이동
+      setWaitingForOpponent(true)
     }
   }
 
@@ -350,20 +476,29 @@ export default function PlacementPage() {
             <div className="mt-6 space-y-2">
               <button
                 onClick={handleConfirmPlacement}
-                disabled={!placedPieces.some(p => p.type === 'k')}
+                disabled={!placedPieces.some(p => p.type === 'k') || waitingForOpponent}
                 className={`
                   w-full py-2 rounded-lg font-semibold transition-colors
-                  ${placedPieces.some(p => p.type === 'k')
+                  ${waitingForOpponent
+                    ? 'bg-yellow-600 text-white cursor-wait'
+                    : placedPieces.some(p => p.type === 'k')
                     ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
                     : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                   }
                 `}
               >
-                배치 완료
+                {waitingForOpponent ? '⏳ 상대방 배치 대기 중...' : '배치 완료'}
               </button>
               <button
                 onClick={() => navigate('/')}
-                className="w-full py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold transition-colors"
+                disabled={waitingForOpponent}
+                className={`
+                  w-full py-2 rounded-lg font-semibold transition-colors
+                  ${waitingForOpponent
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                  }
+                `}
               >
                 취소
               </button>
