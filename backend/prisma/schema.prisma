@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,85 +7,90 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  email     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model deck {
+  id                            Int                @id @default(autoincrement())
+  user_id                       Int
+  win_cnt                       Int                @default(0)
+  lose_cnt                      Int                @default(0)
+  total_p_val                   Int                @default(0)
+  created_at                    DateTime           @default(now()) @db.Timestamp(6)
+  user                          user               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_deck_user")
+  deck_composition              deck_composition[]
+  game_game_black_deck_idTodeck game[]             @relation("game_black_deck_idTodeck")
+  game_game_white_deck_idTodeck game[]             @relation("game_white_deck_idTodeck")
 
-  // Relations
-  deck      Deck[]
-  games     GamePlayer[]
-  matches   Match[]
+  @@index([user_id], map: "idx_deck_user_id")
 }
 
-model Deck {
-  id        String   @id @default(uuid())
-  name      String
-  userId    String
-  cards     DeckCard[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model deck_composition {
+  deck_id  Int
+  piece_id Int
+  quantity Int   @default(1)
+  deck     deck  @relation(fields: [deck_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_deck_composition_deck")
+  piece    piece @relation(fields: [piece_id], references: [id], onUpdate: NoAction, map: "fk_deck_composition_piece")
 
-  // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([deck_id, piece_id])
+  @@index([deck_id], map: "idx_deck_composition_deck")
 }
 
-model Card {
-  id          String   @id @default(uuid())
-  name        String
-  type        String   // piece type: pawn, knight, bishop, rook, queen, king
-  cost        Int      // deck cost
-  attack      Int
-  defense     Int
-  movement    String   // movement pattern
-  special     String?  // special abilities
-  description String?
-  rarity      String   // common, rare, epic, legendary
-  createdAt   DateTime @default(now())
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model game {
+  id                              Int            @id @default(autoincrement())
+  white_player_id                 Int
+  black_player_id                 Int
+  initial_fen                     String?        @db.VarChar(255)
+  pgn                             String?
+  result                          String?        @db.VarChar(20)
+  white_deck_id                   Int
+  black_deck_id                   Int
+  played_at                       DateTime       @default(now()) @db.Timestamp(6)
+  deck_game_black_deck_idTodeck   deck           @relation("game_black_deck_idTodeck", fields: [black_deck_id], references: [id], onUpdate: NoAction, map: "fk_game_black_deck")
+  user_game_black_player_idTouser user           @relation("game_black_player_idTouser", fields: [black_player_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_game_black_player")
+  deck_game_white_deck_idTodeck   deck           @relation("game_white_deck_idTodeck", fields: [white_deck_id], references: [id], onUpdate: NoAction, map: "fk_game_white_deck")
+  user_game_white_player_idTouser user           @relation("game_white_player_idTouser", fields: [white_player_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_game_white_player")
+  game_history                    game_history[]
 
-  // Relations
-  deckCards   DeckCard[]
+  @@index([black_player_id], map: "idx_game_black_player")
+  @@index([played_at(sort: Desc)], map: "idx_game_played_at")
+  @@index([white_player_id], map: "idx_game_white_player")
 }
 
-model DeckCard {
-  id        String   @id @default(uuid())
-  deckId    String
-  cardId    String
-  quantity  Int      @default(1)
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model game_history {
+  user_id       Int
+  game_id       Int
+  role          String  @db.VarChar(20)
+  result        String? @db.VarChar(20)
+  rating_change Int?    @default(0)
+  game          game    @relation(fields: [game_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_game_history_game")
+  user          user    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_game_history_user")
 
-  // Relations
-  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
-  card      Card     @relation(fields: [cardId], references: [id])
-
-  @@unique([deckId, cardId])
+  @@id([user_id, game_id])
+  @@index([user_id], map: "idx_game_history_user")
 }
 
-model Match {
-  id          String   @id @default(uuid())
-  player1Id   String
-  player2Id   String
-  winnerId    String?
-  status      String   // waiting, in_progress, completed, cancelled
-  startedAt   DateTime @default(now())
-  endedAt     DateTime?
-
-  // Relations
-  player1     User     @relation(fields: [player1Id], references: [id])
-  players     GamePlayer[]
+model piece {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique(map: "idx_piece_name") @db.VarChar(50)
+  value            Int
+  action           String             @db.VarChar(255)
+  img_url          String?            @db.VarChar(500)
+  deck_composition deck_composition[]
 }
 
-model GamePlayer {
-  id        String   @id @default(uuid())
-  matchId   String
-  userId    String
-  deckId    String
-  position  Int      // 1 or 2
+model user {
+  id                              Int            @id @default(autoincrement())
+  username                        String         @unique @db.VarChar(255)
+  rating                          Int            @default(1500)
+  volatility                      Float          @default(0.06)
+  rd                              Float          @default(350)
+  created_at                      DateTime       @default(now()) @db.Timestamp(6)
+  deck                            deck[]
+  game_game_black_player_idTouser game[]         @relation("game_black_player_idTouser")
+  game_game_white_player_idTouser game[]         @relation("game_white_player_idTouser")
+  game_history                    game_history[]
 
-  // Relations
-  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
-
-  @@unique([matchId, userId])
+  @@index([rating(sort: Desc)], map: "idx_user_rating")
+  @@index([username], map: "idx_user_username")
 }
