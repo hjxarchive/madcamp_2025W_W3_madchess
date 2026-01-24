@@ -1,11 +1,11 @@
 import { create } from 'zustand'
-import { GameState, Move, Piece, PieceColor, PieceType, PlayerInfo, squareToRowCol, parseUci } from '../types/game'
+import { GameState, Move, Piece, PieceColor, PieceType, squareToRowCol, parseUci } from '../types/game'
 
 interface GameStoreState {
   gameState: GameState | null
   selectedSquare: { row: number; col: number } | null
   legalMoves: { row: number; col: number }[]
-  
+
   // Actions
   setGameState: (state: GameState) => void
   updateBoard: (board: (Piece | null)[][]) => void
@@ -25,9 +25,9 @@ const createEmptyBoard = (): (Piece | null)[][] => {
 // 테스트용 초기 체스 보드 생성
 const createInitialBoard = (): (Piece | null)[][] => {
   const board = createEmptyBoard()
-  
+
   // 체스 배열 인덱스: board[0] = 8행(위), board[7] = 1행(아래)
-  
+
   // 흑 기물 배치 (상단, 8행과 7행)
   board[0] = [
     { type: 'r', color: 'black' },  // a8
@@ -40,7 +40,7 @@ const createInitialBoard = (): (Piece | null)[][] => {
     { type: 'r', color: 'black' },  // h8
   ]
   board[1] = Array(8).fill(null).map(() => ({ type: 'p' as PieceType, color: 'black' as PieceColor }))
-  
+
   // 백 기물 배치 (하단, 2행과 1행)
   board[6] = Array(8).fill(null).map(() => ({ type: 'p' as PieceType, color: 'white' as PieceColor }))
   board[7] = [
@@ -53,7 +53,7 @@ const createInitialBoard = (): (Piece | null)[][] => {
     { type: 'n', color: 'white' },  // g1
     { type: 'r', color: 'white' },  // h1
   ]
-  
+
   return board
 }
 
@@ -87,42 +87,42 @@ export const useGameStore = create<GameStoreState>((set) => ({
   },
   selectedSquare: null,
   legalMoves: [],
-  
+
   setGameState: (state) => set({ gameState: state }),
-  
-  updateBoard: (board) => 
+
+  updateBoard: (board) =>
     set((state) => ({
-      gameState: state.gameState 
+      gameState: state.gameState
         ? { ...state.gameState, board }
         : null,
     })),
-  
-  selectSquare: (row, col) => 
+
+  selectSquare: (row, col) =>
     set({ selectedSquare: { row, col } }),
-  
-  clearSelection: () => 
+
+  clearSelection: () =>
     set({ selectedSquare: null, legalMoves: [] }),
-  
-  setLegalMoves: (moves) => 
+
+  setLegalMoves: (moves) =>
     set({ legalMoves: moves }),
-  
+
   makeMove: (move) =>
     set((state) => {
       if (!state.gameState) return state
-      
+
       const newBoard = state.gameState.board.map(row => [...row])
       const { from, to } = parseUci(move.uci)
       const { row: fromRow, col: fromCol } = squareToRowCol(from)
       const { row: toRow, col: toCol } = squareToRowCol(to)
       const piece = newBoard[fromRow][fromCol]
-      
+
       // 이동 실행
       newBoard[toRow][toCol] = piece
       newBoard[fromRow][fromCol] = null
-      
+
       // 턴 변경
       const newTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
-      
+
       return {
         gameState: {
           ...state.gameState,
@@ -135,33 +135,33 @@ export const useGameStore = create<GameStoreState>((set) => ({
         legalMoves: [],
       }
     }),
-  
+
   applyOpponentMove: (move) =>
     set((state) => {
       if (!state.gameState) return state
-      
+
       const newBoard = state.gameState.board.map(row => [...row])
       const { from, to } = parseUci(move.uci)
       const { row: fromRow, col: fromCol } = squareToRowCol(from)
       const { row: toRow, col: toCol } = squareToRowCol(to)
       const piece = newBoard[fromRow][fromCol]
-      
+
       // 상대 기물 이동
       newBoard[toRow][toCol] = piece
       newBoard[fromRow][fromCol] = null
-      
+
       // 캡처된 기물 기록
       let newCapturedPieces = { ...state.gameState.capturedPieces }
       if (move.captured) {
         const capturingColor = state.gameState.currentTurn
         newCapturedPieces[capturingColor] = [...newCapturedPieces[capturingColor], move.captured]
       }
-      
+
       // 턴 변경 (내 차례로)
       const newTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
-      
+
       console.log('Opponent move applied:', move)
-      
+
       return {
         gameState: {
           ...state.gameState,
@@ -175,11 +175,11 @@ export const useGameStore = create<GameStoreState>((set) => ({
         legalMoves: [],
       }
     }),
-  
+
   addCapturedPiece: (color, piece) =>
     set((state) => {
       if (!state.gameState) return state
-      
+
       return {
         gameState: {
           ...state.gameState,

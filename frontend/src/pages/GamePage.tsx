@@ -38,10 +38,10 @@ export default function GamePage() {
     const placedPiecesStr = sessionStorage.getItem('placedPieces')
     if (placedPiecesStr) {
       const placedPieces = JSON.parse(placedPiecesStr) as PlacedPiece[]
-      
+
       // 보드에 배치된 기물 배치
       const newBoard = Array(8).fill(null).map(() => Array(8).fill(null))
-      
+
       // 내 기물 배치
       placedPieces.forEach((piece) => {
         const { row, col } = squareToRowCol({ file: piece.file, rank: piece.rank })
@@ -56,7 +56,7 @@ export default function GamePage() {
       if (opponentPlacementStr) {
         const opponentPlacement = JSON.parse(opponentPlacementStr) as PlacedPiece[]
         const opponentColor = (savedColor || myColor) === 'white' ? 'black' : 'white'
-        
+
         opponentPlacement.forEach((piece) => {
           const { row, col } = squareToRowCol({ file: piece.file, rank: piece.rank })
           newBoard[row][col] = {
@@ -108,20 +108,11 @@ export default function GamePage() {
 
   // WebSocket 이벤트 리스너 설정
   useEffect(() => {
-    const socket = socketService.getSocket()
-    if (!socket) return
-
-    // 상대의 수를 받았을 때 (레거시)
-    socket.on('opponent:move', (move: Move) => {
-      console.log('Received opponent move:', move)
-      applyOpponentMove(move)
-    })
-
     // 서버에서 브로드캐스트된 수를 받았을 때
-    socket.on('move-made', (data: { move: Move; gameState: any; socketId?: string }) => {
+    socketService.onMoveMade((data) => {
       console.log('Received move-made from server:', data)
       // 내가 보낸 수가 아닌 경우에만 적용 (socketId가 다르거나 playerId가 다른 경우)
-      const mySocketId = socket.id
+      const mySocketId = socketService.getSocket()?.id
       const isMyMove = data.socketId ? data.socketId === mySocketId : data.move.playerId === mySocketId
       if (!isMyMove) {
         applyOpponentMove(data.move)
@@ -129,16 +120,15 @@ export default function GamePage() {
     })
 
     // 이동 에러
-    socket.on('move-error', (data: { message: string }) => {
+    socketService.onMoveError((data) => {
       console.error('Move error:', data.message)
       alert(`이동 오류: ${data.message}`)
     })
 
     // 정리
     return () => {
-      socket.off('opponent:move')
-      socket.off('move-made')
-      socket.off('move-error')
+      socketService.offMoveMade()
+      socketService.offMoveError()
     }
   }, [applyOpponentMove])
 
@@ -202,11 +192,11 @@ export default function GamePage() {
       // 폰: 전진 1칸 또는 2칸 (빈 칸만), 대각선 캡처
       const one = row + forward
       const two = row + forward * 2
-      
+
       // 전진
       if (one >= 0 && one < 8 && !gameState.board[one][col]) {
         moves.push({ row: one, col })
-        
+
         // 첫 수 더블 무브
         const startRank = piece.color === 'white' ? 6 : 1
         if (row === startRank && !gameState.board[two][col]) {
@@ -295,7 +285,7 @@ export default function GamePage() {
             <h1 className="text-3xl font-bold mb-1">덱 체스</h1>
             <div className="text-gray-400 text-sm">Game ID: {gameId}</div>
           </div>
-          
+
           {/* 게임 컨트롤 */}
           <div className="flex gap-3">
             <button
@@ -335,7 +325,7 @@ export default function GamePage() {
                   </div>
                 )}
               </div>
-              
+
               {/* 게임 정보 */}
               <div className="mt-6 pt-4 border-t border-gray-700">
                 <div className="space-y-2 text-sm">
@@ -345,9 +335,8 @@ export default function GamePage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">상태:</span>
-                    <span className={`font-semibold ${
-                      gameState.isCheck ? 'text-red-500' : 'text-green-500'
-                    }`}>
+                    <span className={`font-semibold ${gameState.isCheck ? 'text-red-500' : 'text-green-500'
+                      }`}>
                       {gameState.isCheck ? '체크!' : '정상'}
                     </span>
                   </div>
@@ -400,7 +389,7 @@ export default function GamePage() {
           <div className="order-3 xl:order-3">
             <div className="bg-gray-800 rounded-lg p-4 h-full">
               <h2 className="text-xl font-bold mb-4">게임 통계</h2>
-              
+
               <div className="space-y-4">
                 {/* 머티리얼 카운트 */}
                 <div>

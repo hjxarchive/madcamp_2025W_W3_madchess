@@ -1,0 +1,134 @@
+// API Response Types
+
+export interface ApiResponse<T> {
+    success: boolean
+    data?: T
+    error?: {
+        code: string
+        message: string
+    }
+}
+
+// User Types
+export interface User {
+    id: number
+    username: string
+    rating: number
+    createdAt: string
+}
+
+export interface UserStats {
+    totalGames: number
+    wins: number
+    losses: number
+    draws: number
+    winRate: number
+    currentWinStreak: number
+    longestWinStreak: number
+    recentGames: RecentGame[]
+}
+
+export interface RecentGame {
+    gameId: number
+    opponent: string
+    result: 'WIN' | 'LOSE' | 'DRAW'
+    ratingChange: number
+    playedAt: string
+}
+
+// Deck Types
+export interface DeckPiece {
+    pieceId: number
+    count: number
+}
+
+export interface Deck {
+    id: number
+    name: string
+    userId: number
+    pieces: DeckPiece[]
+    totalCost: number
+    createdAt: string
+    updatedAt: string
+}
+
+export interface DeckWithStats extends Deck {
+    winCnt: number
+    loseCnt: number
+    winRate: number
+}
+
+export interface CreateDeckRequest {
+    userId: number
+    name: string
+    pieces: DeckPiece[]
+}
+
+export interface UpdateDeckRequest {
+    name?: string
+    pieces?: DeckPiece[]
+}
+
+export interface ValidateDeckRequest {
+    pieces: DeckPiece[]
+}
+
+export interface ValidateDeckResponse {
+    valid: boolean
+    errors?: string[]
+}
+
+// Piece Types
+export interface Piece {
+    id: number
+    name: string
+    type: string
+    value: number
+    action: string
+    maxCount: number
+    description: string
+    imgUrl: string
+}
+
+export interface PieceDetail extends Piece {
+    movePattern?: number[][]
+    specialRules?: string[]
+}
+
+// Game Types
+export interface CreateGameRequest {
+    player1Id: number
+    player2Id: number
+    deckId1: number
+    deckId2: number
+}
+
+export interface GamePlayer {
+    userId: number
+    username: string
+    rating: number
+    deckId: number
+}
+
+export interface Game {
+    id: number
+    player1: GamePlayer
+    player2: GamePlayer
+    status: string
+    currentTurn: string
+    pgn: string
+    isCheck: boolean
+    createdAt: string
+}
+
+export interface ResignGameRequest {
+    userId: number
+}
+
+export interface UserGame {
+    gameId: number
+    opponent: string
+    result: 'WIN' | 'LOSE' | 'DRAW'
+    ratingChange: number
+    playedAt: string
+}
