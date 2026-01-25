@@ -117,6 +117,7 @@ export class GameManager {
     isCheckmate?: boolean
     isStalemate?: boolean
     isDraw?: boolean
+    drawReason?: string
     winner?: string
   } {
     const match = this.matches.get(matchId)
@@ -155,15 +156,16 @@ export class GameManager {
       winner = match.player1SocketId === socketId ? 'white' : 'black'
     }
 
-    console.log(`✅ Move validated: ${move.uci}, Check: ${result.isCheck}, Checkmate: ${result.isCheckmate}`)
+    console.log(`✅ Move validated: ${move.uci}, Check: ${result.isCheck}, Checkmate: ${result.isCheckmate}, Stalemate: ${result.isStalemate}, Draw: ${result.isDraw}${result.drawReason ? ` (${result.drawReason})` : ''}`)
 
     return {
       success: true,
       gameState: match.gameState,
       isCheck: result.isCheck,
       isCheckmate: result.isCheckmate,
-      isStalemate: false, // TODO: implement stalemate
-      isDraw: false, // TODO: implement draw
+      isStalemate: result.isStalemate,
+      isDraw: result.isDraw,
+      drawReason: result.drawReason,
       winner,
     }
   }

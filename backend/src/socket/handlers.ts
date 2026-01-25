@@ -160,10 +160,10 @@ export function setupSocketHandlers(io: Server) {
         }
         // Handle draw
         else if (result.isDraw) {
-          console.log(`🤝 Draw!`)
+          console.log(`🤝 Draw by ${result.drawReason}!`)
           io.to(data.matchId).emit('game-over', {
             winner: 'draw',
-            reason: 'draw',
+            reason: result.drawReason || 'draw',
           })
         }
       } else {
