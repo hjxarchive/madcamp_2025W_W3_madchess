@@ -5,6 +5,9 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import swaggerUi from 'swagger-ui-express'
 import swaggerJsdoc from 'swagger-jsdoc'
+import session from 'express-session'
+import passport from './config/passport.js'
+import authRoutes from './routes/auth.js'
 import { setupSocketHandlers } from './socket/handlers.js'
 
 // Routes
@@ -22,12 +25,35 @@ const io = new Server(httpServer, {
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     methods: ['GET', 'POST'],
+    credentials: true
   },
 })
 
 // Middleware
-app.use(cors())
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true
+}))
 app.use(express.json())
+
+// Session 설정
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'madcamp_chess_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS에서만 true, 현재는 false 추천 (Nginx SSL Offloading 고려)
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24시간
+  }
+}))
+
+// Passport 초기화
+app.use(passport.initialize())
+app.use(passport.session())
+
+// Auth Routres
+app.use('/api/auth', authRoutes)
 
 io.on('connection', (socket) => {
   console.log('🔌 새로운 유저 접속:', socket.id);
@@ -40,7 +66,7 @@ io.on('connection', (socket) => {
 
     // 나를 제외한 방 안의 다른 사람들에게 알림을 보냅니다.
     socket.to(roomName).emit('notification', `${socket.id} 님이 입장하셨습니다.`);
-    
+
     // 입장한 나 자신에게도 환영 메시지를 보냅니다.
     socket.emit('notification', `방 [${roomName}]에 입장 성공!`);
   });
@@ -79,7 +105,7 @@ const swaggerOptions = {
 }
 
 // Swagger 문서 생성
-  console.log(`📚 API Docs available at http://localhost:${PORT}/api-docs`)
+console.log(`📚 API Docs available at http://localhost:${PORT}/api-docs`)
 const swaggerDocs = swaggerJsdoc(swaggerOptions)
 
 // Swagger UI 라우트
