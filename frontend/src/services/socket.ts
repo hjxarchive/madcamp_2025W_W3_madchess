@@ -81,6 +81,14 @@ class SocketService {
     }
   }
 
+  // 합법수 요청
+  requestLegalMoves(roomId: string) {
+    if (this.socket) {
+      this.socket.emit('request-legal-moves', { matchId: roomId })
+      console.log('Requested legal moves:', { matchId: roomId })
+    }
+  }
+
   // 기물 배치 전송
   sendPlacement(roomId: string, placement: any) {
     if (this.socket) {
@@ -181,6 +189,19 @@ class SocketService {
     }
   }
 
+  // 합법수 응답
+  onLegalMoves(callback: (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }> }) => void) {
+    if (this.socket) {
+      this.socket.on('legal-moves', callback)
+    }
+  }
+
+  onLegalMovesError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('legal-moves-error', callback)
+    }
+  }
+
   // Remove event listeners
   offGameFound() {
     if (this.socket) {
@@ -251,6 +272,18 @@ class SocketService {
   offMoveError() {
     if (this.socket) {
       this.socket.off('move-error')
+    }
+  }
+
+  offLegalMoves() {
+    if (this.socket) {
+      this.socket.off('legal-moves')
+    }
+  }
+
+  offLegalMovesError() {
+    if (this.socket) {
+      this.socket.off('legal-moves-error')
     }
   }
 }

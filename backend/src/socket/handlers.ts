@@ -171,6 +171,16 @@ export function setupSocketHandlers(io: Server) {
       }
     })
 
+    // Request legal moves for current position (server-authoritative)
+    socket.on('request-legal-moves', (data: { matchId: string }) => {
+      const result = gameManager.getLegalMoves(data.matchId, socket.id)
+      if (result.success) {
+        socket.emit('legal-moves', { legalMoves: result.legalMoves })
+      } else {
+        socket.emit('legal-moves-error', { message: result.error || 'Failed to fetch legal moves' })
+      }
+    })
+
     // Leave queue
     socket.on('leave-queue', () => {
       gameManager.removeFromQueue(socket.id)

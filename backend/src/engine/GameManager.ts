@@ -17,8 +17,12 @@ interface Match {
   player2SocketId: string
   player1: { userId: string; deckId: string }
   player2: { userId: string; deckId: string }
+  player1Color: 'white' | 'black'
+  player2Color: 'white' | 'black'
   player1Placement?: Array<{ type: string; file: string; rank: number }>
   player2Placement?: Array<{ type: string; file: string; rank: number }>
+  whitePlacement?: Array<{ type: string; file: string; rank: number }>
+  blackPlacement?: Array<{ type: string; file: string; rank: number }>
   gameState: any
   chessEngine: ChessService
 }
@@ -64,6 +68,8 @@ export class GameManager {
       player2SocketId: player2.socketId,
       player1: { userId: player1.userId, deckId: player1.deckId },
       player2: { userId: player2.userId, deckId: player2.deckId },
+      player1Color: 'white',
+      player2Color: 'black',
       chessEngine,
       gameState: this.initializeGame(),
     }
@@ -86,23 +92,35 @@ export class GameManager {
       return { error: 'Player not in match' }
     }
 
-    // 배치 정보 저장
+    // 플레이어별 색상 결정 (서버 신뢰)
+    const expectedColor: 'white' | 'black' = isPlayer1 ? match.player1Color : match.player2Color
+
+    // 배치 정보 저장 (플레이어/색상 모두 기록)
     if (isPlayer1) {
       match.player1Placement = placementData.placement
     } else {
       match.player2Placement = placementData.placement
     }
 
-    // 양쪽 모두 배치 완료 확인
-    if (match.player1Placement && match.player2Placement) {
-      // Initialize chess engine with both placements
-      match.chessEngine.initializeFromPlacement(match.player1Placement, match.player2Placement)
-      console.log('✅ Chess engine initialized with custom placements')
+    if (expectedColor === 'white') {
+      match.whitePlacement = placementData.placement
+    } else {
+      match.blackPlacement = placementData.placement
+    }
+
+    // 양쪽 모두 배치 완료 확인 (색상 기준)
+    if (match.whitePlacement && match.blackPlacement) {
+      // Initialize chess engine with correct color placements
+      match.chessEngine.initializeFromPlacement(match.whitePlacement, match.blackPlacement)
+      console.log('✅ Chess engine initialized with custom placements (white/black mapped)')
+
+      // Reset turn to white at game start
+      match.gameState = { ...match.gameState, currentTurn: 'white' }
 
       return { success: true }
-    } else {
-      return { waiting: true }
     }
+
+    return { waiting: true }
   }
 
   getMatch(matchId: string): Match | undefined {
@@ -152,8 +170,8 @@ export class GameManager {
     // Determine winner if checkmate
     let winner: string | undefined
     if (result.isCheckmate) {
-      // The player who just moved wins
-      winner = match.player1SocketId === socketId ? 'white' : 'black'
+      const moverColor = match.player1SocketId === socketId ? match.player1Color : match.player2Color
+      winner = moverColor
     }
 
     console.log(`✅ Move validated: ${move.uci}, Check: ${result.isCheck}, Checkmate: ${result.isCheckmate}, Stalemate: ${result.isStalemate}, Draw: ${result.isDraw}${result.drawReason ? ` (${result.drawReason})` : ''}`)
@@ -168,6 +186,26 @@ export class GameManager {
       drawReason: result.drawReason,
       winner,
     }
+  }
+
+  getLegalMoves(matchId: string, socketId: string): { success: boolean; legalMoves?: Array<{ from: string; to: string; promotion?: string }>; error?: string } {
+    const match = this.matches.get(matchId)
+    if (!match) {
+      return { success: false, error: 'Match not found' }
+    }
+
+    // Determine requester color
+    let color: 'white' | 'black'
+    if (match.player1SocketId === socketId) {
+      color = match.player1Color
+    } else if (match.player2SocketId === socketId) {
+      color = match.player2Color
+    } else {
+      return { success: false, error: 'Player not in match' }
+    }
+
+    const legalMoves = match.chessEngine.getLegalMovesForColor(color)
+    return { success: true, legalMoves }
   }
 
   // ===== Room Management =====
@@ -240,6 +278,8 @@ export class GameManager {
       player2SocketId: guestSocketId,
       player1: { userId: room.host.userId, deckId: room.host.deckId },
       player2: { userId, deckId },
+      player1Color: room.host.color,
+      player2Color: guestColor,
       gameState: this.initializeGame(),
       chessEngine,
     }
@@ -290,7 +330,7 @@ export class GameManager {
 
     return {
       board,
-      currentTurn: 'player1',
+      currentTurn: 'white',
       status: 'in_progress',
     }
   }
