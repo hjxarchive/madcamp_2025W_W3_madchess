@@ -36,6 +36,9 @@ app.use(cors({
 }))
 app.use(express.json())
 
+// Trust Proxy for Nginx
+app.set('trust proxy', 1)
+
 // Session 설정
 app.use(session({
   secret: process.env.SESSION_SECRET || 'madcamp_chess_secret',
