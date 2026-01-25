@@ -36,7 +36,8 @@ export default function PlacementPage() {
 
   const [myColor, setMyColor] = useState<PieceColor>('white')
   const [placedPieces, setPlacedPieces] = useState<PlacedPiece[]>([])
-  const [draggedPiece, setDraggedPiece] = useState<{ type: PieceType; index: number } | null>(null)
+  const [selectedPieceType, setSelectedPieceType] = useState<PieceType | null>(null)
+  const [hoverSquare, setHoverSquare] = useState<{ file: File; rank: Rank } | null>(null)
   const [usedBudget, setUsedBudget] = useState(0)
   const [waitingForOpponent, setWaitingForOpponent] = useState(false)
 
@@ -202,21 +203,34 @@ export default function PlacementPage() {
     setUsedBudget(total)
   }, [placedPieces])
 
-  // 드래그 시작
-  const handleDragStart = (type: PieceType, index: number) => {
-    setDraggedPiece({ type, index })
+  // 기물 클릭으로 선택
+  const handlePieceSelect = (type: PieceType) => {
+    if (type === 'k') return // 킹은 선택 불가
+    // 이미 선택된 기물을 다시 클릭하면 선택 해제
+    if (selectedPieceType === type) {
+      setSelectedPieceType(null)
+    } else {
+      setSelectedPieceType(type)
+    }
   }
 
-  // 드래그 오버
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
+  // 보드 칸 클릭으로 배치 또는 제거
+  const handleSquareClick = (file: File, rank: Rank) => {
+    const clickedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
 
-  // 드롭
-  const handleDrop = (file: File, rank: Rank, e: React.DragEvent) => {
-    e.preventDefault()
+    // 기존 기물이 있으면 제거하고 선택 상태로 만들기
+    if (clickedPiece) {
+      if (clickedPiece.type === 'k') {
+        alert('킹은 제거할 수 없습니다')
+        return
+      }
+      setPlacedPieces(prev => prev.filter(p => !(p.file === file && p.rank === rank)))
+      setSelectedPieceType(clickedPiece.type) // 제거한 기물을 선택 상태로
+      return
+    }
 
-    if (!draggedPiece) return
+    // 선택된 기물이 없으면 리턴
+    if (!selectedPieceType) return
 
     // 배치 가능 구역 확인
     if (!isPlacementArea(rank)) {
@@ -229,7 +243,7 @@ export default function PlacementPage() {
     const isKingPosition = file === 'e' && rank === kingRank
 
     // 킹은 e1/e8에만 배치 가능
-    if (draggedPiece.type === 'k') {
+    if (selectedPieceType === 'k') {
       if (!isKingPosition) {
         alert('킹은 e1 또는 e8에만 배치할 수 있습니다')
         return
@@ -243,45 +257,23 @@ export default function PlacementPage() {
     }
 
     // 예산 검증: 30점 초과 확인
-    const existingPiece = placedPieces.find(p => p.file === file && p.rank === rank)
-    const existingPieceCost = existingPiece ? PIECE_COSTS[existingPiece.type] : 0
-    const newPieceCost = PIECE_COSTS[draggedPiece.type]
-    const newBudget = usedBudget - existingPieceCost + newPieceCost
+    const newPieceCost = PIECE_COSTS[selectedPieceType]
+    const newBudget = usedBudget + newPieceCost
 
     if (newBudget > 30) {
       alert(`기물 점수가 30점을 초과할 수 없습니다 (현재: ${usedBudget}점, 추가 시: ${newBudget}점)`)
       return
     }
 
-    // 이미 기물이 있으면 제거
-    setPlacedPieces(prev =>
-      prev.filter(p => !(p.file === file && p.rank === rank))
-    )
-
     // 새 기물 배치
     const newPiece: PlacedPiece = {
-      type: draggedPiece.type,
+      type: selectedPieceType,
       file,
       rank,
     }
 
     setPlacedPieces(prev => [...prev, newPiece])
-    setDraggedPiece(null)
-  }
-
-  // 보드 칸 클릭해서 기물 제거
-  const handleSquareClick = (file: File, rank: Rank) => {
-    const clickedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
-
-    // 킹은 제거할 수 없음
-    if (clickedPiece?.type === 'k') {
-      alert('킹은 제거할 수 없습니다')
-      return
-    }
-
-    setPlacedPieces(prev =>
-      prev.filter(p => !(p.file === file && p.rank === rank))
-    )
+    setSelectedPieceType(null) // 배치 후 선택 해제
   }
 
   // WebSocket 이벤트 리스너 설정
@@ -347,23 +339,38 @@ export default function PlacementPage() {
   }
 
   const availablePieces = getAvailablePieces()
-  const remainingBudget = 30 - usedBudget
+
+  // 배치된 기물 요약
+  const placedSummary: Record<PieceType, number> = placedPieces.reduce((acc, p) => {
+    acc[p.type] = (acc[p.type] || 0) + 1
+    return acc
+  }, {} as Record<PieceType, number>)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* 헤더 */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">기물 배치</h1>
-          <p className="text-gray-400">
-            {myColor === 'white' ? '백' : '흑'}으로 플레이합니다. 기물을 배치해주세요.
-          </p>
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* 헤더 */}
+      <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-900/80 backdrop-blur">
+        <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 grid place-items-center rounded-sm bg-orange-500 text-white font-black text-xs">📦</div>
+            <span className="font-semibold">Mad Chess</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-slate-400">배치 단계</div>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-slate-800">
+              <span className="text-xs">남은 시간:</span>
+              <span className="font-semibold text-orange-400">0:58</span>
+            </div>
+            <button className="h-8 w-8 grid place-items-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors">⚙</button>
+          </div>
         </div>
+      </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
+      <main className="mx-auto max-w-7xl px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6">
           {/* 보드 영역 */}
-          <div className="bg-gray-800 rounded-lg p-6">
-            <div className="inline-block border-4 border-gray-700">
+          <div className="flex flex-col gap-4">
+            <div className="inline-block border-2 border-gray-700 rounded-lg overflow-hidden">
               {/* 보드 */}
               {Array.from({ length: 8 }).map((_, rankIdx) => {
                 const rank = (myColor === 'black' ? rankIdx + 1 : 8 - rankIdx) as Rank
@@ -372,41 +379,62 @@ export default function PlacementPage() {
                 return (
                   <div key={rank} className="flex">
                     {FILES.map((file) => {
-                      // const displayFile = myColor === 'black' ? FILES[7 - FILES.indexOf(file)] : file
                       const isLight = (FILES.indexOf(file) + (8 - rank)) % 2 === 0
                       const placedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
-                      const kingRank: Rank = myColor === 'white' ? 1 : 8
-                      const isMyKingSpot = file === 'e' && rank === kingRank
                       const oppKingRank: Rank = myColor === 'white' ? 8 : 1
                       const isOppKingSpot = file === 'e' && rank === oppKingRank
+                      const myKingRank: Rank = myColor === 'white' ? 1 : 8
+                      const isMyKingSpot = file === 'e' && rank === myKingRank
+                      const isHovered = hoverSquare?.file === file && hoverSquare?.rank === rank
+                      const canPlaceHere = isPlacementRank && !placedPiece && selectedPieceType
 
                       return (
                         <div
                           key={`${file}-${rank}`}
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(file, rank, e)}
-                          onClick={() => placedPiece && handleSquareClick(file, rank)}
+                          onMouseEnter={() => setHoverSquare({ file, rank })}
+                          onMouseLeave={() => setHoverSquare(null)}
+                          onClick={() => handleSquareClick(file, rank)}
                           className={`
-                            w-16 h-16 flex items-center justify-center cursor-move relative
+                            w-14 h-14 flex items-center justify-center relative
                             transition-all duration-200
-                            ${isLight ? 'bg-amber-100' : 'bg-amber-700'}
-                            ${!isPlacementRank ? 'opacity-30' : ''}
-                            ${placedPiece ? 'ring-2 ring-yellow-400' : ''}
-                            ${isMyKingSpot && placedPiece?.type === 'k' ? 'ring-4 ring-green-500' : ''}
-                            ${isOppKingSpot ? 'ring-4 ring-red-500' : ''}
+                            ${isLight ? 'bg-slate-200' : 'bg-slate-600'}
+                            ${isPlacementRank ? (isLight ? 'bg-amber-100' : 'bg-amber-700') : 'opacity-40'}
+                            ${placedPiece ? 'cursor-pointer hover:opacity-80' : isPlacementRank && selectedPieceType ? 'cursor-pointer' : isPlacementRank ? 'cursor-default' : 'cursor-not-allowed'}
+                            ${isOppKingSpot ? 'ring-2 ring-inset ring-red-500' : ''}
+                            ${isMyKingSpot ? 'ring-4 ring-inset ring-blue-500' : ''}
+                            ${isHovered && canPlaceHere ? 'ring-2 ring-blue-400' : ''}
                           `}
                         >
                           {/* 자신의 킹 위치 표시 */}
                           {isMyKingSpot && !placedPiece && (
-                            <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-                              <span className="text-4xl">♚</span>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
+                              <img
+                                src={PIECE_IMAGES[myColor]['k']}
+                                alt="my king"
+                                className="w-10 h-10"
+                              />
                             </div>
                           )}
 
-                          {/* 상대 킹 위치 표시 (빨간 테두리로 표시) */}
+                          {/* 상대 킹 위치 표시 */}
                           {isOppKingSpot && !placedPiece && (
-                            <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-                              <span className="text-4xl">♔</span>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
+                              <img
+                                src={PIECE_IMAGES[myColor === 'white' ? 'black' : 'white']['k']}
+                                alt="opponent king"
+                                className="w-10 h-10"
+                              />
+                            </div>
+                          )}
+
+                          {/* 호버 프리뷰: 선택된 기물을 흐리게 표시 */}
+                          {isHovered && canPlaceHere && (
+                            <div className="absolute inset-0 flex items-center justify-center opacity-50 pointer-events-none">
+                              <img
+                                src={PIECE_IMAGES[myColor][selectedPieceType]}
+                                alt="preview"
+                                className="w-10 h-10"
+                              />
                             </div>
                           )}
 
@@ -415,7 +443,7 @@ export default function PlacementPage() {
                             <img
                               src={PIECE_IMAGES[myColor][placedPiece.type]}
                               alt={placedPiece.type}
-                              className="w-12 h-12 cursor-pointer hover:opacity-75"
+                              className="w-10 h-10"
                               draggable={false}
                             />
                           )}
@@ -427,103 +455,131 @@ export default function PlacementPage() {
               })}
             </div>
 
-            {/* 배치 정보 */}
-            <div className="mt-6 p-4 bg-gray-700 rounded-lg">
-              <div className="flex justify-between mb-2">
-                <span className="font-semibold">예산 사용: {usedBudget}/30</span>
-                <span className="text-blue-400">
-                  {remainingBudget > 0 ? `${remainingBudget}점 남음` : '예산 모두 사용'}
-                </span>
-              </div>
-              <div className="w-full bg-gray-600 rounded-full h-2">
-                <div
-                  className="h-2 rounded-full transition-all bg-blue-500"
-                  style={{ width: `${Math.min(usedBudget / 30 * 100, 100)}%` }}
-                ></div>
-              </div>
-            </div>
+            {/* 하단 버튼 */}
+            <button
+              onClick={() => setPlacedPieces(placedPieces.filter(p => p.type === 'k'))}
+              disabled={waitingForOpponent}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>↺</span> 초기화
+            </button>
           </div>
 
-          {/* 기물 선택 영역 */}
-          <div className="bg-gray-800 rounded-lg p-6 w-full lg:w-64 h-fit">
-            <h2 className="text-xl font-bold mb-4">배치할 기물</h2>
+          {/* 우측 컨트롤 영역 */}
+          <div className="flex flex-col gap-6">
+            {/* 덱 선택 */}
+            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+              <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">저장된 덱 불러오기</div>
+              <select className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-gray-700 text-white focus:outline-none focus:border-blue-500 transition-colors">
+                <option>기본 밸런스 덱</option>
+                <option>공격형 덱</option>
+                <option>방어형 덱</option>
+              </select>
+            </section>
 
-            {availablePieces.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">배치할 기물이 없습니다</p>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {availablePieces.map((piece) => (
-                  <div key={piece.type} className="space-y-2">
-                    <div className="text-sm font-semibold flex justify-between">
-                      <span>{getPieceName(piece.type)}</span>
-                      <span className="text-xs text-gray-400">
-                        {piece.count}/{PIECE_MAX_COUNT[piece.type]}
-                      </span>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {Array.from({ length: piece.count }).map((_, idx) => (
-                        <div
-                          key={`${piece.type}-${idx}`}
-                          draggable
-                          onDragStart={() => handleDragStart(piece.type, idx)}
-                          className="
-                            w-12 h-12 flex items-center justify-center
-                            bg-gray-700 hover:bg-gray-600 rounded-lg cursor-grab
-                            active:cursor-grabbing border-2 border-gray-600
-                            hover:border-gray-500 transition-colors
-                          "
-                        >
+            {/* 보유 기물 */}
+            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-orange-500 text-lg">📦</span>
+                <h2 className="text-lg font-semibold">보유 기물</h2>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {availablePieces.map((piece) => {
+                  const isKing = piece.type === 'k'
+                  const isSelected = selectedPieceType === piece.type
+
+                  return (
+                    <div key={piece.type} className="relative">
+                      <div
+                        onClick={() => handlePieceSelect(piece.type)}
+                        className={`
+                          rounded-xl border bg-slate-700/60 p-3 text-center
+                          transition-all duration-200
+                          ${isKing ? 'opacity-50 cursor-not-allowed border-gray-700' : 'cursor-grab hover:bg-slate-700 border-gray-700 hover:border-gray-600'}
+                          ${isSelected ? 'ring-2 ring-blue-400 border-blue-400 bg-slate-600' : ''}
+                        `}
+                      >
+                        <div className="flex justify-center mb-2">
                           <img
                             src={PIECE_IMAGES[myColor][piece.type]}
-                            alt={piece.type}
-                            className="w-10 h-10"
+                            alt={getPieceName(piece.type)}
+                            className="w-12 h-12"
                             draggable={false}
                           />
                         </div>
-                      ))}
+                        <div className="text-sm font-semibold mb-1">{getPieceName(piece.type)}</div>
+                        <div className="text-xs text-slate-300 mb-1">{piece.count}개 남음</div>
+                        <div className="text-xs text-slate-400">{PIECE_COSTS[piece.type]} pts</div>
+                        {isKing && (
+                          <div className="absolute top-2 right-2 h-4 w-4 grid place-items-center rounded-full bg-emerald-600 text-white text-xs">✓</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-400">
-                      {PIECE_COSTS[piece.type]}점
-                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+            {/* 배치된 기물 요약 */}
+            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+              <div className="text-xs text-slate-400 uppercase tracking-wider mb-3">배치된 기물 요약</div>
+              <div className="flex flex-wrap gap-3">
+                {Object.entries(placedSummary).map(([type, count]) => (
+                  <div key={type} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-700">
+                    <img
+                      src={PIECE_IMAGES[myColor][type as PieceType]}
+                      alt={type}
+                      className="w-5 h-5"
+                    />
+                    <span className="text-sm font-semibold">{getPieceName(type as PieceType)} x {count}</span>
                   </div>
                 ))}
+                {placedPieces.length === 0 && (
+                  <div className="text-sm text-slate-500">배치된 기물이 없습니다</div>
+                )}
               </div>
-            )}
+            </section>
 
-            {/* 액션 버튼 */}
-            <div className="mt-6 space-y-2">
-              <button
-                onClick={handleConfirmPlacement}
-                disabled={!placedPieces.some(p => p.type === 'k') || waitingForOpponent}
-                className={`
-                  w-full py-2 rounded-lg font-semibold transition-colors
-                  ${waitingForOpponent
-                    ? 'bg-yellow-600 text-white cursor-wait'
-                    : placedPieces.some(p => p.type === 'k')
-                      ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  }
-                `}
-              >
-                {waitingForOpponent ? '⏳ 상대방 배치 대기 중...' : '배치 완료'}
-              </button>
-              <button
-                onClick={() => navigate('/')}
-                disabled={waitingForOpponent}
-                className={`
-                  w-full py-2 rounded-lg font-semibold transition-colors
-                  ${waitingForOpponent
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                  }
-                `}
-              >
-                취소
-              </button>
-            </div>
+            {/* 사용 예산 */}
+            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wider">사용 예산</div>
+                  <div className="text-2xl font-bold text-orange-400">{usedBudget} <span className="text-base text-slate-400">/ 30 pts</span></div>
+                </div>
+              </div>
+              <div className="relative h-2.5 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="absolute h-full bg-orange-500 transition-all duration-300"
+                  style={{ width: `${Math.min(usedBudget / 30 * 100, 100)}%` }}
+                ></div>
+              </div>
+            </section>
+
+            {/* 배치 확정 버튼 */}
+            <button
+              onClick={handleConfirmPlacement}
+              disabled={!placedPieces.some(p => p.type === 'k') || waitingForOpponent}
+              className={`
+                flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-bold text-lg
+                transition-all duration-200
+                ${waitingForOpponent
+                  ? 'bg-yellow-600 text-white cursor-wait'
+                  : placedPieces.some(p => p.type === 'k')
+                    ? 'bg-orange-500 hover:bg-orange-400 text-gray-900 cursor-pointer shadow-lg hover:shadow-orange-500/50'
+                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                }
+              `}
+            >
+              {waitingForOpponent ? (
+                <>⏳ 상대방 배치 대기 중...</>
+              ) : (
+                <>배치 확정 🚀</>
+              )}
+            </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
