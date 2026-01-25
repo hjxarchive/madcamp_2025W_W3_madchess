@@ -94,10 +94,16 @@ export default function MatchmakingPage() {
   }
 
   const handleCopyRoomCode = () => {
-    navigator.clipboard.writeText(roomCode)
-    alert('방 코드가 복사되었습니다!')
+    if (roomCode) {
+      try {
+        navigator.clipboard.writeText(roomCode)
+        alert('방 코드가 복사되었습니다!')
+      } catch (error) {
+        // HTTP에서는 clipboard API 사용 불가
+        alert(`방 코드: ${roomCode}\n(수동으로 복사해주세요)`)
+      }
+    }
   }
-
   const handleCancel = () => {
     if (waiting) {
       socketService.leaveRoom()
