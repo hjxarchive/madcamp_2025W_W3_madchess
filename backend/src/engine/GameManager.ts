@@ -1,3 +1,5 @@
+import { ChessService } from './ChessService'
+
 interface QueuePlayer {
   socketId: string
   userId: string
@@ -18,6 +20,7 @@ interface Match {
   player1Placement?: Array<{ type: string; file: string; rank: number }>
   player2Placement?: Array<{ type: string; file: string; rank: number }>
   gameState: any
+  chessEngine: ChessService
 }
 
 // Room interface for room-based matchmaking
@@ -54,12 +57,14 @@ export class GameManager {
     const player2 = this.queue.shift()!
 
     const matchId = `match-${Date.now()}`
+    const chessEngine = new ChessService()
     const match: Match = {
       id: matchId,
       player1SocketId: player1.socketId,
       player2SocketId: player2.socketId,
       player1: { userId: player1.userId, deckId: player1.deckId },
       player2: { userId: player2.userId, deckId: player2.deckId },
+      chessEngine,
       gameState: this.initializeGame(),
     }
 
@@ -90,6 +95,10 @@ export class GameManager {
 
     // 양쪽 모두 배치 완료 확인
     if (match.player1Placement && match.player2Placement) {
+      // Initialize chess engine with both placements
+      match.chessEngine.initializeFromPlacement(match.player1Placement, match.player2Placement)
+      console.log('✅ Chess engine initialized with custom placements')
+
       return { success: true }
     } else {
       return { waiting: true }
@@ -100,15 +109,63 @@ export class GameManager {
     return this.matches.get(matchId)
   }
 
-  makeMove(matchId: string, socketId: string, move: any): { success: boolean; gameState?: any; error?: string } {
+  makeMove(matchId: string, socketId: string, move: any): {
+    success: boolean
+    gameState?: any
+    error?: string
+    isCheck?: boolean
+    isCheckmate?: boolean
+    isStalemate?: boolean
+    isDraw?: boolean
+    winner?: string
+  } {
     const match = this.matches.get(matchId)
     if (!match) {
+      console.log(`❌ Match not found: ${matchId}`)
       return { success: false, error: 'Match not found' }
     }
 
-    // Validate move and update game state
-    // This is a placeholder - implement actual game logic
-    return { success: true, gameState: match.gameState }
+    // Parse UCI move (e.g., "e2e4" or "e7e8q")
+    if (!move.uci || move.uci.length < 4) {
+      console.log(`❌ Invalid move format:`, move)
+      return { success: false, error: 'Invalid move format' }
+    }
+
+    const from = move.uci.substring(0, 2)
+    const to = move.uci.substring(2, 4)
+    const promotion = move.uci.length === 5 ? move.uci[4] : undefined
+
+    console.log(`🔍 Validating move: ${from} -> ${to}${promotion ? ` (promotion: ${promotion})` : ''}`)
+
+    // Use custom chess engine to validate move
+    const result = match.chessEngine.makeMove(from, to, promotion)
+
+    if (!result.success) {
+      console.log(`❌ Move validation failed: ${from} -> ${to}`)
+      return {
+        success: false,
+        error: 'Invalid move - 불법 이동입니다'
+      }
+    }
+
+    // Determine winner if checkmate
+    let winner: string | undefined
+    if (result.isCheckmate) {
+      // The player who just moved wins
+      winner = match.player1SocketId === socketId ? 'white' : 'black'
+    }
+
+    console.log(`✅ Move validated: ${move.uci}, Check: ${result.isCheck}, Checkmate: ${result.isCheckmate}`)
+
+    return {
+      success: true,
+      gameState: match.gameState,
+      isCheck: result.isCheck,
+      isCheckmate: result.isCheckmate,
+      isStalemate: false, // TODO: implement stalemate
+      isDraw: false, // TODO: implement draw
+      winner,
+    }
   }
 
   // ===== Room Management =====
@@ -174,6 +231,7 @@ export class GameManager {
     room.status = 'ready'
 
     // Create a match for this room
+    const chessEngine = new ChessService()
     const match: Match = {
       id: room.matchId,
       player1SocketId: room.hostSocketId,
@@ -181,6 +239,7 @@ export class GameManager {
       player1: { userId: room.host.userId, deckId: room.host.deckId },
       player2: { userId, deckId },
       gameState: this.initializeGame(),
+      chessEngine,
     }
 
     this.matches.set(room.matchId, match)

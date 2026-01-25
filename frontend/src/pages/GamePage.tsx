@@ -8,9 +8,15 @@ import { socketService } from '../services/socket'
 
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
-  const { gameState, setGameState, makeMove, applyOpponentMove } = useGameStore()
-  const [useImages, setUseImages] = useState(true)  // 기본값: 이미지로 표시
+  const { gameState, setGameState, makeMove, applyOpponentMove, rollbackMove } = useGameStore()
+  const [useImages, setUseImages] = useState(true)
   const [myColor, setMyColor] = useState<PieceColor>('white')
+  const [isCheck, setIsCheck] = useState(false)
+  const [isCheckmate, setIsCheckmate] = useState(false)
+  const [gameOverData, setGameOverData] = useState<{ winner: string; reason: string } | null>(null)
+  const [showPromotion, setShowPromotion] = useState(false)
+  const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
 
   // 개발 모드에서 전역 접근을 위해 window에 노출
   useEffect(() => {
@@ -111,7 +117,12 @@ export default function GamePage() {
     // 서버에서 브로드캐스트된 수를 받았을 때
     socketService.onMoveMade((data) => {
       console.log('Received move-made from server:', data)
-      // 내가 보낸 수가 아닌 경우에만 적용 (socketId가 다르거나 playerId가 다른 경우)
+
+      // Update check status
+      setIsCheck(data.isCheck || false)
+      setIsCheckmate(data.isCheckmate || false)
+
+      // 내가 보낸 수가 아닌 경우에만 적용
       const mySocketId = socketService.getSocket()?.id
       const isMyMove = data.socketId ? data.socketId === mySocketId : data.move.playerId === mySocketId
       if (!isMyMove) {
@@ -119,15 +130,30 @@ export default function GamePage() {
       }
     })
 
+    // Game over event
+    socketService.onGameOver((data) => {
+      console.log('Game over:', data)
+      setGameOverData(data)
+      setIsCheckmate(data.reason === 'checkmate')
+    })
+
     // 이동 에러
     socketService.onMoveError((data) => {
       console.error('Move error:', data.message)
-      alert(`이동 오류: ${data.message}`)
+
+      // Rollback the move
+      rollbackMove()
+
+      // Show error message
+      setMoveError(data.message)
+      // 3초 후 에러 메시지 자동 숨김
+      setTimeout(() => setMoveError(null), 3000)
     })
 
     // 정리
     return () => {
       socketService.offMoveMade()
+      socketService.offGameOver()
       socketService.offMoveError()
     }
   }, [applyOpponentMove])
@@ -150,6 +176,12 @@ export default function GamePage() {
   const me = myColor === 'white' ? gameState.white : gameState.black
 
   const handleMove = (move: Move) => {
+    // Prevent moves if game is over
+    if (gameOverData || gameState?.status !== 'playing') {
+      console.log('Game is over, move prevented')
+      return
+    }
+
     makeMove(move)
     // Socket.io를 통해 서버로 이동 전송
     if (gameState) {
@@ -278,6 +310,38 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+      {/* CHECK! Notification */}
+      {isCheck && !isCheckmate && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-600 text-white px-8 py-3 rounded-lg shadow-2xl animate-bounce font-bold text-xl">
+          ⚠️ CHECK!
+        </div>
+      )}
+
+      {/* Game Over Modal */}
+      {gameOverData && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4 text-center">
+            <h2 className="text-3xl font-bold mb-4">
+              {gameOverData.reason === 'checkmate' ? '👑 Checkmate!' : '🤝 Game Over'}
+            </h2>
+            <p className="text-xl mb-6">
+              {gameOverData.winner === 'draw'
+                ? `Game ended in ${gameOverData.reason}`
+                : `Winner: ${gameOverData.winner === myColor ? 'You!' : 'Opponent'}`
+              }
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => window.location.href = '/'}
+                className="w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Back to Home
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="mb-6 flex items-center justify-between">

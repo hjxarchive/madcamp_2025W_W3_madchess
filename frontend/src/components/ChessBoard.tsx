@@ -100,22 +100,35 @@ export default function ChessBoard({
     // 기물 선택
     if (piece && piece.color === myColor && !selectedSquare) {
       setSelectedSquare(actual)
+
+      // Calculate legal moves (or use fetchLegalMoves if provided)
       if (fetchLegalMoves) {
-        try {
-          const moves = await fetchLegalMoves({ row: actual.row, col: actual.col, piece })
-          setLegalMoves(moves)
-        } catch (e) {
-          console.error('Failed to fetch legal moves', e)
-          setLegalMoves([])
-        }
+        fetchLegalMoves({ row: actual.row, col: actual.col, piece })
+          .then(moves => setLegalMoves(moves))
+          .catch(e => {
+            console.error('Failed to fetch legal moves', e)
+            setLegalMoves([])
+          })
       } else {
-        setLegalMoves([])
+        // Show all possible squares as hints (server will validate)
+        const possibleMoves: { row: number; col: number }[] = []
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const targetPiece = board[r][c]
+            // Don't show own pieces as targets
+            if (!targetPiece || targetPiece.color !== piece.color) {
+              possibleMoves.push({ row: r, col: c })
+            }
+          }
+        }
+        setLegalMoves(possibleMoves)
       }
       return
     }
 
     // 이동 실행
     if (selectedSquare) {
+      // Check if clicked square is in legal moves
       const isLegalMove = legalMoves.some(
         move => move.row === actual.row && move.col === actual.col
       )

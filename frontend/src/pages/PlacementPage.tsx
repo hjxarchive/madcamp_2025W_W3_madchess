@@ -242,6 +242,17 @@ export default function PlacementPage() {
       }
     }
 
+    // 예산 검증: 30점 초과 확인
+    const existingPiece = placedPieces.find(p => p.file === file && p.rank === rank)
+    const existingPieceCost = existingPiece ? PIECE_COSTS[existingPiece.type] : 0
+    const newPieceCost = PIECE_COSTS[draggedPiece.type]
+    const newBudget = usedBudget - existingPieceCost + newPieceCost
+
+    if (newBudget > 30) {
+      alert(`기물 점수가 30점을 초과할 수 없습니다 (현재: ${usedBudget}점, 추가 시: ${newBudget}점)`)
+      return
+    }
+
     // 이미 기물이 있으면 제거
     setPlacedPieces(prev =>
       prev.filter(p => !(p.file === file && p.rank === rank))

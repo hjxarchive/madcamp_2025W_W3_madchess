@@ -155,9 +155,22 @@ class SocketService {
   }
 
   // 이동 완료
-  onMoveMade(callback: (data: { move: Move; gameState: any; socketId: string }) => void) {
+  onMoveMade(callback: (data: {
+    move: Move
+    gameState: any
+    socketId: string
+    isCheck?: boolean
+    isCheckmate?: boolean
+  }) => void) {
     if (this.socket) {
       this.socket.on('move-made', callback)
+    }
+  }
+
+  // 게임 종료
+  onGameOver(callback: (data: { winner: string; reason: string }) => void) {
+    if (this.socket) {
+      this.socket.on('game-over', callback)
     }
   }
 
@@ -226,6 +239,12 @@ class SocketService {
   offMoveMade() {
     if (this.socket) {
       this.socket.off('move-made')
+    }
+  }
+
+  offGameOver() {
+    if (this.socket) {
+      this.socket.off('game-over')
     }
   }
 

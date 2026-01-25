@@ -130,14 +130,42 @@ export function setupSocketHandlers(io: Server) {
     socket.on('make-move', (data: { matchId: string; move: any }) => {
       console.log(`🎲 Move from ${socket.id} in match ${data.matchId}:`, data.move)
       const result = gameManager.makeMove(data.matchId, socket.id, data.move)
+
       if (result.success) {
-        // 이동을 보낸 socketId를 포함하여 브로드캐스트
+        // Broadcast move with check/checkmate status
         console.log(`📢 Broadcasting move to room ${data.matchId}`)
         io.to(data.matchId).emit('move-made', {
           move: data.move,
           gameState: result.gameState,
-          socketId: socket.id,  // 누가 이동했는지 식별
+          socketId: socket.id,
+          isCheck: result.isCheck,
+          isCheckmate: result.isCheckmate,
         })
+
+        // Handle checkmate
+        if (result.isCheckmate) {
+          console.log(`👑 Checkmate! Winner: ${result.winner}`)
+          io.to(data.matchId).emit('game-over', {
+            winner: result.winner,
+            reason: 'checkmate',
+          })
+        }
+        // Handle stalemate
+        else if (result.isStalemate) {
+          console.log(`🤝 Stalemate!`)
+          io.to(data.matchId).emit('game-over', {
+            winner: 'draw',
+            reason: 'stalemate',
+          })
+        }
+        // Handle draw
+        else if (result.isDraw) {
+          console.log(`🤝 Draw!`)
+          io.to(data.matchId).emit('game-over', {
+            winner: 'draw',
+            reason: 'draw',
+          })
+        }
       } else {
         socket.emit('move-error', { message: result.error })
       }

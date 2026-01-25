@@ -5,6 +5,7 @@ interface GameStoreState {
   gameState: GameState | null
   selectedSquare: { row: number; col: number } | null
   legalMoves: { row: number; col: number }[]
+  previousBoard: (Piece | null)[][] | null
 
   // Actions
   setGameState: (state: GameState) => void
@@ -15,6 +16,7 @@ interface GameStoreState {
   makeMove: (move: Move) => void
   applyOpponentMove: (move: Move) => void
   addCapturedPiece: (color: PieceColor, piece: PieceType) => void
+  rollbackMove: () => void
 }
 
 // 초기 빈 보드 생성
@@ -87,6 +89,7 @@ export const useGameStore = create<GameStoreState>((set) => ({
   },
   selectedSquare: null,
   legalMoves: [],
+  previousBoard: null,
 
   setGameState: (state) => set({ gameState: state }),
 
@@ -109,6 +112,9 @@ export const useGameStore = create<GameStoreState>((set) => ({
   makeMove: (move) =>
     set((state) => {
       if (!state.gameState) return state
+
+      // Save current board for potential rollback
+      const previousBoard = state.gameState.board.map(row => [...row])
 
       const newBoard = state.gameState.board.map(row => [...row])
       const { from, to } = parseUci(move.uci)
@@ -133,6 +139,7 @@ export const useGameStore = create<GameStoreState>((set) => ({
         },
         selectedSquare: null,
         legalMoves: [],
+        previousBoard, // Save for rollback
       }
     }),
 
@@ -188,6 +195,24 @@ export const useGameStore = create<GameStoreState>((set) => ({
             [color]: [...state.gameState.capturedPieces[color], piece],
           },
         },
+      }
+    }),
+
+  rollbackMove: () =>
+    set((state) => {
+      if (!state.gameState || !state.previousBoard) return state
+
+      // Restore previous board state and toggle turn back
+      const previousTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
+
+      return {
+        gameState: {
+          ...state.gameState,
+          board: state.previousBoard,
+          currentTurn: previousTurn,
+          moveCount: Math.max(0, state.gameState.moveCount - 1),
+        },
+        previousBoard: null,
       }
     }),
 }))
