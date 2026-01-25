@@ -8,9 +8,15 @@ import { socketService } from '../services/socket'
 
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
-  const { gameState, setGameState, makeMove, applyOpponentMove } = useGameStore()
-  const [useImages, setUseImages] = useState(true)  // 기본값: 이미지로 표시
+  const { gameState, setGameState, makeMove, applyOpponentMove, rollbackMove } = useGameStore()
+  const [useImages, setUseImages] = useState(true)
   const [myColor, setMyColor] = useState<PieceColor>('white')
+  const [isCheck, setIsCheck] = useState(false)
+  const [isCheckmate, setIsCheckmate] = useState(false)
+  const [gameOverData, setGameOverData] = useState<{ winner: string; reason: string } | null>(null)
+  const [showPromotion, setShowPromotion] = useState(false)
+  const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
 
   // 개발 모드에서 전역 접근을 위해 window에 노출
   useEffect(() => {
@@ -38,10 +44,10 @@ export default function GamePage() {
     const placedPiecesStr = sessionStorage.getItem('placedPieces')
     if (placedPiecesStr) {
       const placedPieces = JSON.parse(placedPiecesStr) as PlacedPiece[]
-      
+
       // 보드에 배치된 기물 배치
       const newBoard = Array(8).fill(null).map(() => Array(8).fill(null))
-      
+
       // 내 기물 배치
       placedPieces.forEach((piece) => {
         const { row, col } = squareToRowCol({ file: piece.file, rank: piece.rank })
@@ -56,7 +62,7 @@ export default function GamePage() {
       if (opponentPlacementStr) {
         const opponentPlacement = JSON.parse(opponentPlacementStr) as PlacedPiece[]
         const opponentColor = (savedColor || myColor) === 'white' ? 'black' : 'white'
-        
+
         opponentPlacement.forEach((piece) => {
           const { row, col } = squareToRowCol({ file: piece.file, rank: piece.rank })
           newBoard[row][col] = {
@@ -108,37 +114,47 @@ export default function GamePage() {
 
   // WebSocket 이벤트 리스너 설정
   useEffect(() => {
-    const socket = socketService.getSocket()
-    if (!socket) return
-
-    // 상대의 수를 받았을 때 (레거시)
-    socket.on('opponent:move', (move: Move) => {
-      console.log('Received opponent move:', move)
-      applyOpponentMove(move)
-    })
-
     // 서버에서 브로드캐스트된 수를 받았을 때
-    socket.on('move-made', (data: { move: Move; gameState: any; socketId?: string }) => {
+    socketService.onMoveMade((data) => {
       console.log('Received move-made from server:', data)
-      // 내가 보낸 수가 아닌 경우에만 적용 (socketId가 다르거나 playerId가 다른 경우)
-      const mySocketId = socket.id
+
+      // Update check status
+      setIsCheck(data.isCheck || false)
+      setIsCheckmate(data.isCheckmate || false)
+
+      // 내가 보낸 수가 아닌 경우에만 적용
+      const mySocketId = socketService.getSocket()?.id
       const isMyMove = data.socketId ? data.socketId === mySocketId : data.move.playerId === mySocketId
       if (!isMyMove) {
         applyOpponentMove(data.move)
       }
     })
 
+    // Game over event
+    socketService.onGameOver((data) => {
+      console.log('Game over:', data)
+      setGameOverData(data)
+      setIsCheckmate(data.reason === 'checkmate')
+    })
+
     // 이동 에러
-    socket.on('move-error', (data: { message: string }) => {
+    socketService.onMoveError((data) => {
       console.error('Move error:', data.message)
-      alert(`이동 오류: ${data.message}`)
+
+      // Rollback the move
+      rollbackMove()
+
+      // Show error message
+      setMoveError(data.message)
+      // 3초 후 에러 메시지 자동 숨김
+      setTimeout(() => setMoveError(null), 3000)
     })
 
     // 정리
     return () => {
-      socket.off('opponent:move')
-      socket.off('move-made')
-      socket.off('move-error')
+      socketService.offMoveMade()
+      socketService.offGameOver()
+      socketService.offMoveError()
     }
   }, [applyOpponentMove])
 
@@ -160,6 +176,12 @@ export default function GamePage() {
   const me = myColor === 'white' ? gameState.white : gameState.black
 
   const handleMove = (move: Move) => {
+    // Prevent moves if game is over
+    if (gameOverData || gameState?.status !== 'playing') {
+      console.log('Game is over, move prevented')
+      return
+    }
+
     makeMove(move)
     // Socket.io를 통해 서버로 이동 전송
     if (gameState) {
@@ -202,11 +224,11 @@ export default function GamePage() {
       // 폰: 전진 1칸 또는 2칸 (빈 칸만), 대각선 캡처
       const one = row + forward
       const two = row + forward * 2
-      
+
       // 전진
       if (one >= 0 && one < 8 && !gameState.board[one][col]) {
         moves.push({ row: one, col })
-        
+
         // 첫 수 더블 무브
         const startRank = piece.color === 'white' ? 6 : 1
         if (row === startRank && !gameState.board[two][col]) {
@@ -288,6 +310,38 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+      {/* CHECK! Notification */}
+      {isCheck && !isCheckmate && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-600 text-white px-8 py-3 rounded-lg shadow-2xl animate-bounce font-bold text-xl">
+          ⚠️ CHECK!
+        </div>
+      )}
+
+      {/* Game Over Modal */}
+      {gameOverData && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4 text-center">
+            <h2 className="text-3xl font-bold mb-4">
+              {gameOverData.reason === 'checkmate' ? '👑 Checkmate!' : '🤝 Game Over'}
+            </h2>
+            <p className="text-xl mb-6">
+              {gameOverData.winner === 'draw'
+                ? `Game ended in ${gameOverData.reason}`
+                : `Winner: ${gameOverData.winner === myColor ? 'You!' : 'Opponent'}`
+              }
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => window.location.href = '/'}
+                className="w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Back to Home
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="mb-6 flex items-center justify-between">
@@ -295,7 +349,7 @@ export default function GamePage() {
             <h1 className="text-3xl font-bold mb-1">덱 체스</h1>
             <div className="text-gray-400 text-sm">Game ID: {gameId}</div>
           </div>
-          
+
           {/* 게임 컨트롤 */}
           <div className="flex gap-3">
             <button
@@ -335,7 +389,7 @@ export default function GamePage() {
                   </div>
                 )}
               </div>
-              
+
               {/* 게임 정보 */}
               <div className="mt-6 pt-4 border-t border-gray-700">
                 <div className="space-y-2 text-sm">
@@ -345,9 +399,8 @@ export default function GamePage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">상태:</span>
-                    <span className={`font-semibold ${
-                      gameState.isCheck ? 'text-red-500' : 'text-green-500'
-                    }`}>
+                    <span className={`font-semibold ${gameState.isCheck ? 'text-red-500' : 'text-green-500'
+                      }`}>
                       {gameState.isCheck ? '체크!' : '정상'}
                     </span>
                   </div>
@@ -400,7 +453,7 @@ export default function GamePage() {
           <div className="order-3 xl:order-3">
             <div className="bg-gray-800 rounded-lg p-4 h-full">
               <h2 className="text-xl font-bold mb-4">게임 통계</h2>
-              
+
               <div className="space-y-4">
                 {/* 머티리얼 카운트 */}
                 <div>

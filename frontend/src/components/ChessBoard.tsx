@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Piece, PieceType, PieceColor, Move, Square, rowColToSquare, squareToRowCol, moveToUci, parseUci } from '../types/game'
+import { useState } from 'react'
+import { Piece, PieceType, PieceColor, Move, rowColToSquare, squareToRowCol, moveToUci, parseUci } from '../types/game'
 
 interface ChessBoardProps {
   board: (Piece | null)[][]
@@ -73,7 +73,7 @@ export default function ChessBoard({
   const [legalMoves, setLegalMoves] = useState<{ row: number; col: number }[]>([])
 
   // 보드를 내 색상에 맞게 회전
-  const displayBoard = myColor === 'black' 
+  const displayBoard = myColor === 'black'
     ? [...board].reverse().map(row => [...row].reverse())
     : board
 
@@ -100,22 +100,35 @@ export default function ChessBoard({
     // 기물 선택
     if (piece && piece.color === myColor && !selectedSquare) {
       setSelectedSquare(actual)
+
+      // Calculate legal moves (or use fetchLegalMoves if provided)
       if (fetchLegalMoves) {
-        try {
-          const moves = await fetchLegalMoves({ row: actual.row, col: actual.col, piece })
-          setLegalMoves(moves)
-        } catch (e) {
-          console.error('Failed to fetch legal moves', e)
-          setLegalMoves([])
-        }
+        fetchLegalMoves({ row: actual.row, col: actual.col, piece })
+          .then(moves => setLegalMoves(moves))
+          .catch(e => {
+            console.error('Failed to fetch legal moves', e)
+            setLegalMoves([])
+          })
       } else {
-        setLegalMoves([])
+        // Show all possible squares as hints (server will validate)
+        const possibleMoves: { row: number; col: number }[] = []
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const targetPiece = board[r][c]
+            // Don't show own pieces as targets
+            if (!targetPiece || targetPiece.color !== piece.color) {
+              possibleMoves.push({ row: r, col: c })
+            }
+          }
+        }
+        setLegalMoves(possibleMoves)
       }
       return
     }
 
     // 이동 실행
     if (selectedSquare) {
+      // Check if clicked square is in legal moves
       const isLegalMove = legalMoves.some(
         move => move.row === actual.row && move.col === actual.col
       )
@@ -236,7 +249,7 @@ export default function ChessBoard({
                     {legalMove && !isCapture && !piece && (
                       <div className="absolute w-4 h-4 rounded-full bg-green-500 bg-opacity-70" />
                     )}
-                    
+
                     {/* 캡처 가능한 칸 표시 (기물을 둘러싼) */}
                     {isCapture && (
                       <div className="absolute w-14 h-14 rounded-full border-[3px] border-red-500 opacity-90" style={{ pointerEvents: 'none' }} />
@@ -252,7 +265,7 @@ export default function ChessBoard({
                           draggable={false}
                         />
                       ) : (
-                        <span 
+                        <span
                           className={`
                             text-5xl select-none relative z-10
                             ${piece.color === 'white' ? 'text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]' : 'text-gray-900'}

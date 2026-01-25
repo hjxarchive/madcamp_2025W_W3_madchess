@@ -33,7 +33,7 @@ const FILES: File[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 export default function PlacementPage() {
   const navigate = useNavigate()
   const { gameId } = useParams<{ gameId: string }>()
-  
+
   const [myColor, setMyColor] = useState<PieceColor>('white')
   const [placedPieces, setPlacedPieces] = useState<PlacedPiece[]>([])
   const [draggedPiece, setDraggedPiece] = useState<{ type: PieceType; index: number } | null>(null)
@@ -46,7 +46,7 @@ export default function PlacementPage() {
     if (savedColor) {
       setMyColor(savedColor)
       sessionStorage.removeItem('selectedColor')
-      
+
       // 킹을 자동으로 배치 (e1 또는 e8)
       const kingRank: Rank = savedColor === 'white' ? 1 : 8
       setPlacedPieces([{ type: 'k', file: 'e', rank: kingRank }])
@@ -105,15 +105,15 @@ export default function PlacementPage() {
       (window as any).testReceivePlacement = () => {
         const opponentColor = myColor === 'white' ? 'black' : 'white'
         const opponentPlacement = createDummyPlacement(opponentColor)
-        
+
         // placement:complete 이벤트 시뮬레이션
         sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
         sessionStorage.setItem('myColor', myColor)
         sessionStorage.setItem('opponentPlacement', JSON.stringify(opponentPlacement))
-        
+
         console.log('📥 상대 배치 수신 시뮬레이션:', opponentPlacement)
         console.log('🎮 게임 페이지로 이동:', `/game/${gameId}`)
-        
+
         if (gameId) {
           navigate(`/game/${gameId}`)
         }
@@ -128,17 +128,17 @@ export default function PlacementPage() {
 
         const opponentColor = myColor === 'white' ? 'black' : 'white'
         const opponentPlacement = createDummyPlacement(opponentColor)
-        
+
         console.log('✅ 상대가 배치 완료! placement:complete 이벤트 시뮬레이션')
         console.log('📥 상대 배치:', opponentPlacement)
-        
+
         // placement:complete 이벤트 핸들러와 동일하게 처리
         sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
         sessionStorage.setItem('myColor', myColor)
         sessionStorage.setItem('opponentPlacement', JSON.stringify(opponentPlacement))
-        
+
         setWaitingForOpponent(false)
-        
+
         if (gameId) {
           console.log('🎮 게임 시작! 페이지 이동:', `/game/${gameId}`)
           navigate(`/game/${gameId}`)
@@ -242,6 +242,17 @@ export default function PlacementPage() {
       }
     }
 
+    // 예산 검증: 30점 초과 확인
+    const existingPiece = placedPieces.find(p => p.file === file && p.rank === rank)
+    const existingPieceCost = existingPiece ? PIECE_COSTS[existingPiece.type] : 0
+    const newPieceCost = PIECE_COSTS[draggedPiece.type]
+    const newBudget = usedBudget - existingPieceCost + newPieceCost
+
+    if (newBudget > 30) {
+      alert(`기물 점수가 30점을 초과할 수 없습니다 (현재: ${usedBudget}점, 추가 시: ${newBudget}점)`)
+      return
+    }
+
     // 이미 기물이 있으면 제거
     setPlacedPieces(prev =>
       prev.filter(p => !(p.file === file && p.rank === rank))
@@ -261,13 +272,13 @@ export default function PlacementPage() {
   // 보드 칸 클릭해서 기물 제거
   const handleSquareClick = (file: File, rank: Rank) => {
     const clickedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
-    
+
     // 킹은 제거할 수 없음
     if (clickedPiece?.type === 'k') {
       alert('킹은 제거할 수 없습니다')
       return
     }
-    
+
     setPlacedPieces(prev =>
       prev.filter(p => !(p.file === file && p.rank === rank))
     )
@@ -275,33 +286,40 @@ export default function PlacementPage() {
 
   // WebSocket 이벤트 리스너 설정
   useEffect(() => {
-    const socket = socketService.getSocket()
-    if (!socket) return
-
     // 상대방 배치가 완료되고 게임 시작
-    socket.on('placement:complete', (data: { opponentPlacement: PlacedPiece[] }) => {
+    socketService.onPlacementComplete((data) => {
       console.log('✅ Both placements complete, starting game:', data)
-      
+
       // sessionStorage에 저장
       sessionStorage.setItem('placedPieces', JSON.stringify(placedPieces))
       sessionStorage.setItem('myColor', myColor)
       sessionStorage.setItem('opponentPlacement', JSON.stringify(data.opponentPlacement))
-      
+
       setWaitingForOpponent(false)
-      
+
       // 게임 페이지로 이동
-      navigate(`/game/${gameId}`)
+      if (gameId) {
+        navigate(`/game/${gameId}`)
+      }
     })
 
     // 상대가 배치 중임을 알림
-    socket.on('placement:waiting', () => {
+    socketService.onPlacementWaiting(() => {
       console.log('⏳ Waiting for opponent placement...')
       setWaitingForOpponent(true)
     })
 
+    // 배치 에러 처리
+    socketService.onPlacementError((data) => {
+      console.error('❌ Placement error:', data.message)
+      alert(`배치 오류: ${data.message}`)
+      setWaitingForOpponent(false)
+    })
+
     return () => {
-      socket.off('placement:complete')
-      socket.off('placement:waiting')
+      socketService.offPlacementComplete()
+      socketService.offPlacementWaiting()
+      socketService.offPlacementError()
     }
   }, [placedPieces, myColor, gameId, navigate])
 
@@ -321,7 +339,7 @@ export default function PlacementPage() {
         placement: placedPieces,
       })
       console.log('📤 배치 전송:', { color: myColor, placement: placedPieces })
-      
+
       // 대기 상태로 전환 (상대 배치를 기다림)
       // placement:complete 이벤트를 받아야 게임 페이지로 이동
       setWaitingForOpponent(true)
@@ -350,11 +368,11 @@ export default function PlacementPage() {
               {Array.from({ length: 8 }).map((_, rankIdx) => {
                 const rank = (myColor === 'black' ? rankIdx + 1 : 8 - rankIdx) as Rank
                 const isPlacementRank = isPlacementArea(rank)
-                
+
                 return (
                   <div key={rank} className="flex">
                     {FILES.map((file) => {
-                      const displayFile = myColor === 'black' ? FILES[7 - FILES.indexOf(file)] : file
+                      // const displayFile = myColor === 'black' ? FILES[7 - FILES.indexOf(file)] : file
                       const isLight = (FILES.indexOf(file) + (8 - rank)) % 2 === 0
                       const placedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
                       const kingRank: Rank = myColor === 'white' ? 1 : 8
@@ -384,14 +402,14 @@ export default function PlacementPage() {
                               <span className="text-4xl">♚</span>
                             </div>
                           )}
-                          
+
                           {/* 상대 킹 위치 표시 (빨간 테두리로 표시) */}
                           {isOppKingSpot && !placedPiece && (
                             <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
                               <span className="text-4xl">♔</span>
                             </div>
                           )}
-                          
+
                           {/* 배치된 기물 */}
                           {placedPiece && (
                             <img
@@ -482,8 +500,8 @@ export default function PlacementPage() {
                   ${waitingForOpponent
                     ? 'bg-yellow-600 text-white cursor-wait'
                     : placedPieces.some(p => p.type === 'k')
-                    ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                   }
                 `}
               >

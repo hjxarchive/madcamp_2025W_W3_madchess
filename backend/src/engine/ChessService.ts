@@ -1,0 +1,487 @@
+interface Piece {
+    type: 'p' | 'n' | 'b' | 'r' | 'q' | 'k'
+    color: 'white' | 'black'
+}
+
+interface Position {
+    file: number // 0-7 (a-h)
+    rank: number // 0-7 (1-8)
+}
+
+export class ChessService {
+    private board: (Piece | null)[][] = Array(8).fill(null).map(() => Array(8).fill(null))
+    private turn: 'white' | 'black' = 'white'
+    private enPassantTarget: Position | null = null
+    private castlingRights = {
+        whiteKingSide: true,
+        whiteQueenSide: true,
+        blackKingSide: true,
+        blackQueenSide: true,
+    }
+    private kingMoved = { white: false, black: false }
+    private rookMoved = {
+        whiteKingSide: false,
+        whiteQueenSide: false,
+        blackKingSide: false,
+        blackQueenSide: false,
+    }
+
+    /**
+     * UCI notation to position (e.g., "e2" -> {file: 4, rank: 1})
+     */
+    private uciToPosition(uci: string): Position {
+        const file = uci.charCodeAt(0) - 'a'.charCodeAt(0)
+        const rank = parseInt(uci[1]) - 1
+        return { file, rank }
+    }
+
+    /**
+     * Check if position is on board
+     */
+    private isOnBoard(pos: Position): boolean {
+        return pos.file >= 0 && pos.file < 8 && pos.rank >= 0 && pos.rank < 8
+    }
+
+    /**
+     * Get piece at position
+     */
+    private getPiece(pos: Position): Piece | null {
+        if (!this.isOnBoard(pos)) return null
+        return this.board[pos.rank][pos.file]
+    }
+
+    /**
+     * Set piece at position
+     */
+    private setPiece(pos: Position, piece: Piece | null): void {
+        if (this.isOnBoard(pos)) {
+            this.board[pos.rank][pos.file] = piece
+        }
+    }
+
+    /**
+     * Check if path is clear (for sliding pieces)
+     */
+    private isPathClear(from: Position, to: Position): boolean {
+        const fileDir = Math.sign(to.file - from.file)
+        const rankDir = Math.sign(to.rank - from.rank)
+
+        let current = { file: from.file + fileDir, rank: from.rank + rankDir }
+
+        while (current.file !== to.file || current.rank !== to.rank) {
+            if (this.getPiece(current) !== null) return false
+            current.file += fileDir
+            current.rank += rankDir
+        }
+
+        return true
+    }
+
+    /**
+     * Validate pawn move
+     */
+    private isValidPawnMove(from: Position, to: Position, piece: Piece): boolean {
+        const direction = piece.color === 'white' ? 1 : -1
+        const startRank = piece.color === 'white' ? 1 : 6
+        const fileDiff = to.file - from.file
+        const rankDiff = to.rank - from.rank
+
+        // Forward 1 square
+        if (fileDiff === 0 && rankDiff === direction) {
+            return this.getPiece(to) === null
+        }
+
+        // Forward 2 squares from starting position
+        if (fileDiff === 0 && rankDiff === 2 * direction && from.rank === startRank) {
+            const middlePos = { file: from.file, rank: from.rank + direction }
+            return this.getPiece(to) === null && this.getPiece(middlePos) === null
+        }
+
+        // Diagonal capture
+        if (Math.abs(fileDiff) === 1 && rankDiff === direction) {
+            const target = this.getPiece(to)
+            // Regular capture
+            if (target && target.color !== piece.color) return true
+
+            // En passant
+            if (this.enPassantTarget &&
+                to.file === this.enPassantTarget.file &&
+                to.rank === this.enPassantTarget.rank) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    /**
+     * Validate knight move
+     */
+    private isValidKnightMove(from: Position, to: Position): boolean {
+        const fileDiff = Math.abs(to.file - from.file)
+        const rankDiff = Math.abs(to.rank - from.rank)
+        return (fileDiff === 2 && rankDiff === 1) || (fileDiff === 1 && rankDiff === 2)
+    }
+
+    /**
+     * Validate bishop move
+     */
+    private isValidBishopMove(from: Position, to: Position): boolean {
+        const fileDiff = Math.abs(to.file - from.file)
+        const rankDiff = Math.abs(to.rank - from.rank)
+        return fileDiff === rankDiff && fileDiff > 0 && this.isPathClear(from, to)
+    }
+
+    /**
+     * Validate rook move
+     */
+    private isValidRookMove(from: Position, to: Position): boolean {
+        const fileDiff = Math.abs(to.file - from.file)
+        const rankDiff = Math.abs(to.rank - from.rank)
+        return (fileDiff === 0 || rankDiff === 0) && (fileDiff + rankDiff > 0) && this.isPathClear(from, to)
+    }
+
+    /**
+     * Validate queen move
+     */
+    private isValidQueenMove(from: Position, to: Position): boolean {
+        return this.isValidBishopMove(from, to) || this.isValidRookMove(from, to)
+    }
+
+    /**
+     * Validate king move
+     */
+    private isValidKingMove(from: Position, to: Position): boolean {
+        const fileDiff = Math.abs(to.file - from.file)
+        const rankDiff = Math.abs(to.rank - from.rank)
+
+        // Normal king move
+        if (fileDiff <= 1 && rankDiff <= 1 && (fileDiff + rankDiff > 0)) {
+            return true
+        }
+
+        // Castling
+        if (rankDiff === 0 && fileDiff === 2) {
+            return this.canCastle(from, to)
+        }
+
+        return false
+    }
+
+    /**
+     * Check if castling is valid
+     */
+    private canCastle(from: Position, to: Position): boolean {
+        const piece = this.getPiece(from)
+        if (!piece || piece.type !== 'k') return false
+
+        // King must not have moved
+        if (this.kingMoved[piece.color]) return false
+
+        // King must not be in check
+        if (this.isKingInCheck(piece.color)) return false
+
+        const isKingSide = to.file > from.file
+        const rookFile = isKingSide ? 7 : 0
+        const rookPos = { file: rookFile, rank: from.rank }
+        const rook = this.getPiece(rookPos)
+
+        // Rook must be present and not moved
+        if (!rook || rook.type !== 'r' || rook.color !== piece.color) return false
+        if (piece.color === 'white') {
+            if (isKingSide && this.rookMoved.whiteKingSide) return false
+            if (!isKingSide && this.rookMoved.whiteQueenSide) return false
+        } else {
+            if (isKingSide && this.rookMoved.blackKingSide) return false
+            if (!isKingSide && this.rookMoved.blackQueenSide) return false
+        }
+
+        // Path must be clear
+        if (!this.isPathClear(from, rookPos)) return false
+
+        // Squares king passes through must not be under attack
+        const direction = isKingSide ? 1 : -1
+        for (let i = 1; i <= 2; i++) {
+            const intermediatePos = { file: from.file + i * direction, rank: from.rank }
+            if (this.isSquareAttacked(intermediatePos, piece.color === 'white' ? 'black' : 'white')) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    /**
+     * Check if a square is attacked by opponent
+     */
+    private isSquareAttacked(pos: Position, byColor: 'white' | 'black'): boolean {
+        for (let rank = 0; rank < 8; rank++) {
+            for (let file = 0; file < 8; file++) {
+                const piece = this.board[rank][file]
+                if (piece && piece.color === byColor) {
+                    const from = { file, rank }
+                    if (this.canPieceAttack(from, pos, piece)) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    /**
+     * Check if a piece can attack a square (ignoring check rules)
+     */
+    private canPieceAttack(from: Position, to: Position, piece: Piece): boolean {
+        switch (piece.type) {
+            case 'p':
+                const direction = piece.color === 'white' ? 1 : -1
+                const fileDiff = Math.abs(to.file - from.file)
+                const rankDiff = to.rank - from.rank
+                return fileDiff === 1 && rankDiff === direction
+            case 'n':
+                return this.isValidKnightMove(from, to)
+            case 'b':
+                return this.isValidBishopMove(from, to)
+            case 'r':
+                return this.isValidRookMove(from, to)
+            case 'q':
+                return this.isValidQueenMove(from, to)
+            case 'k':
+                const kFileDiff = Math.abs(to.file - from.file)
+                const kRankDiff = Math.abs(to.rank - from.rank)
+                return kFileDiff <= 1 && kRankDiff <= 1 && (kFileDiff + kRankDiff > 0)
+            default:
+                return false
+        }
+    }
+
+    /**
+     * Find king position
+     */
+    private findKing(color: 'white' | 'black'): Position | null {
+        for (let rank = 0; rank < 8; rank++) {
+            for (let file = 0; file < 8; file++) {
+                const piece = this.board[rank][file]
+                if (piece && piece.type === 'k' && piece.color === color) {
+                    return { file, rank }
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Check if king is in check
+     */
+    isKingInCheck(color: 'white' | 'black'): boolean {
+        const kingPos = this.findKing(color)
+        if (!kingPos) return false
+
+        const opponentColor = color === 'white' ? 'black' : 'white'
+        return this.isSquareAttacked(kingPos, opponentColor)
+    }
+
+    /**
+     * Make a move
+     */
+    makeMove(from: string, to: string, promotion?: string): { success: boolean; isCheck: boolean; isCheckmate: boolean } {
+        const fromPos = this.uciToPosition(from)
+        const toPos = this.uciToPosition(to)
+
+        console.log(`🔍 makeMove called: ${from} -> ${to}`)
+        console.log(`  From position:`, fromPos)
+        console.log(`  To position:`, toPos)
+
+        const piece = this.getPiece(fromPos)
+        console.log(`  Piece at ${from}:`, piece)
+        console.log(`  Current turn:`, this.turn)
+
+        if (!piece) {
+            console.log(`  ❌ No piece at ${from}`)
+            return { success: false, isCheck: false, isCheckmate: false }
+        }
+
+        // Check if it's the right player's turn
+        if (piece.color !== this.turn) {
+            console.log(`  ❌ Wrong turn. Piece is ${piece.color}, turn is ${this.turn}`)
+            return { success: false, isCheck: false, isCheckmate: false }
+        }
+
+        // Check if destination has own piece
+        const targetPiece = this.getPiece(toPos)
+        if (targetPiece && targetPiece.color === piece.color) {
+            console.log(`  ❌ Destination has own piece`)
+            return { success: false, isCheck: false, isCheckmate: false }
+        }
+
+        // Validate move based on piece type
+        let isValid = false
+        switch (piece.type) {
+            case 'p':
+                isValid = this.isValidPawnMove(fromPos, toPos, piece)
+                break
+            case 'n':
+                isValid = this.isValidKnightMove(fromPos, toPos)
+                break
+            case 'b':
+                isValid = this.isValidBishopMove(fromPos, toPos)
+                break
+            case 'r':
+                isValid = this.isValidRookMove(fromPos, toPos)
+                break
+            case 'q':
+                isValid = this.isValidQueenMove(fromPos, toPos)
+                break
+            case 'k':
+                isValid = this.isValidKingMove(fromPos, toPos)
+                break
+        }
+
+        console.log(`  Move validation result: ${isValid}`)
+
+        if (!isValid) {
+            return { success: false, isCheck: false, isCheckmate: false }
+        }
+
+        // Make the move temporarily to check if it puts own king in check
+        const originalTarget = this.getPiece(toPos)
+        this.setPiece(toPos, piece)
+        this.setPiece(fromPos, null)
+
+        // Check if this move puts own king in check
+        if (this.isKingInCheck(piece.color)) {
+            // Undo move
+            this.setPiece(fromPos, piece)
+            this.setPiece(toPos, originalTarget)
+            return { success: false, isCheck: false, isCheckmate: false }
+        }
+
+        // Move is valid, update game state
+        // Handle en passant capture
+        if (piece.type === 'p' && this.enPassantTarget &&
+            toPos.file === this.enPassantTarget.file &&
+            toPos.rank === this.enPassantTarget.rank) {
+            const captureRank = piece.color === 'white' ? toPos.rank - 1 : toPos.rank + 1
+            this.setPiece({ file: toPos.file, rank: captureRank }, null)
+        }
+
+        // Handle castling
+        if (piece.type === 'k' && Math.abs(toPos.file - fromPos.file) === 2) {
+            const isKingSide = toPos.file > fromPos.file
+            const rookFromFile = isKingSide ? 7 : 0
+            const rookToFile = isKingSide ? 5 : 3
+            const rook = this.getPiece({ file: rookFromFile, rank: fromPos.rank })
+            if (rook) {
+                this.setPiece({ file: rookToFile, rank: fromPos.rank }, rook)
+                this.setPiece({ file: rookFromFile, rank: fromPos.rank }, null)
+            }
+        }
+
+        // Handle pawn promotion
+        if (piece.type === 'p' && (toPos.rank === 7 || toPos.rank === 0)) {
+            const promotionPiece = promotion || 'q'
+            this.setPiece(toPos, { type: promotionPiece as any, color: piece.color })
+        }
+
+        // Update en passant target
+        if (piece.type === 'p' && Math.abs(toPos.rank - fromPos.rank) === 2) {
+            const direction = piece.color === 'white' ? 1 : -1
+            this.enPassantTarget = { file: fromPos.file, rank: fromPos.rank + direction }
+        } else {
+            this.enPassantTarget = null
+        }
+
+        // Update castling rights
+        if (piece.type === 'k') {
+            this.kingMoved[piece.color] = true
+        }
+        if (piece.type === 'r') {
+            if (piece.color === 'white') {
+                if (fromPos.file === 7) this.rookMoved.whiteKingSide = true
+                if (fromPos.file === 0) this.rookMoved.whiteQueenSide = true
+            } else {
+                if (fromPos.file === 7) this.rookMoved.blackKingSide = true
+                if (fromPos.file === 0) this.rookMoved.blackQueenSide = true
+            }
+        }
+
+        // Switch turn
+        this.turn = this.turn === 'white' ? 'black' : 'white'
+
+        // Check for check and checkmate
+        const isCheck = this.isKingInCheck(this.turn)
+        const isCheckmate = isCheck && this.isCheckmate(this.turn)
+
+        return { success: true, isCheck, isCheckmate }
+    }
+
+    /**
+     * Check if current player is in checkmate
+     */
+    isCheckmate(color: 'white' | 'black'): boolean {
+        if (!this.isKingInCheck(color)) return false
+
+        // Try all possible moves to see if any can get out of check
+        for (let fromRank = 0; fromRank < 8; fromRank++) {
+            for (let fromFile = 0; fromFile < 8; fromFile++) {
+                const piece = this.board[fromRank][fromFile]
+                if (piece && piece.color === color) {
+                    for (let toRank = 0; toRank < 8; toRank++) {
+                        for (let toFile = 0; toFile < 8; toFile++) {
+                            // Try this move
+                            const from = { file: fromFile, rank: fromRank }
+                            const to = { file: toFile, rank: toRank }
+
+                            // Save state
+                            const originalTarget = this.getPiece(to)
+                            const originalTurn = this.turn
+
+                            // Try move (simplified check)
+                            this.turn = color
+                            this.setPiece(to, piece)
+                            this.setPiece(from, null)
+
+                            const stillInCheck = this.isKingInCheck(color)
+
+                            // Restore state
+                            this.setPiece(from, piece)
+                            this.setPiece(to, originalTarget)
+                            this.turn = originalTurn
+
+                            if (!stillInCheck) {
+                                return false // Found a move that gets out of check
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return true // No move can get out of check
+    }
+
+    /**
+     * Initialize board from custom placement
+     */
+    initializeFromPlacement(whitePlacement: any[], blackPlacement: any[]): void {
+        // Clear board
+        this.board = Array(8).fill(null).map(() => Array(8).fill(null))
+
+        // Place white pieces
+        whitePlacement.forEach((p: any) => {
+            const file = p.file.charCodeAt(0) - 'a'.charCodeAt(0)
+            const rank = p.rank - 1
+            this.board[rank][file] = { type: p.type, color: 'white' }
+        })
+
+        // Place black pieces
+        blackPlacement.forEach((p: any) => {
+            const file = p.file.charCodeAt(0) - 'a'.charCodeAt(0)
+            const rank = p.rank - 1
+            this.board[rank][file] = { type: p.type, color: 'black' }
+        })
+
+        this.turn = 'white'
+    }
+}

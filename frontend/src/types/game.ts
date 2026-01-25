@@ -13,7 +13,7 @@ export interface Square {
 
 // 좌표 변환 유틸
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const
-const RANKS = [1, 2, 3, 4, 5, 6, 7, 8] as const
+// const RANKS = [1, 2, 3, 4, 5, 6, 7, 8] as const
 
 export const rowColToSquare = (row: number, col: number): Square => {
   return {

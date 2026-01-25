@@ -1,4 +1,3 @@
-import React from 'react'
 import { PlayerInfo as PlayerInfoType, PieceType } from '../types/game'
 
 interface PlayerInfoProps {
@@ -111,7 +110,7 @@ export default function PlayerInfo({
                   )}
                 </div>
               ))}
-            
+
             {/* 총 가치 */}
             <div className="ml-2 text-sm font-semibold text-green-400">
               +{materialAdvantage}
