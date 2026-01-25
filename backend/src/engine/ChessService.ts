@@ -12,6 +12,7 @@ export class ChessService {
     private board: (Piece | null)[][] = Array(8).fill(null).map(() => Array(8).fill(null))
     private turn: 'white' | 'black' = 'white'
     private enPassantTarget: Position | null = null
+    private halfmoveClock: number = 0  // For fifty-move rule
     private castlingRights = {
         whiteKingSide: true,
         whiteQueenSide: true,
@@ -285,7 +286,7 @@ export class ChessService {
     /**
      * Make a move
      */
-    makeMove(from: string, to: string, promotion?: string): { success: boolean; isCheck: boolean; isCheckmate: boolean } {
+    makeMove(from: string, to: string, promotion?: string): { success: boolean; isCheck: boolean; isCheckmate: boolean; isStalemate: boolean; isDraw: boolean; drawReason?: string } {
         const fromPos = this.uciToPosition(from)
         const toPos = this.uciToPosition(to)
 
@@ -299,20 +300,20 @@ export class ChessService {
 
         if (!piece) {
             console.log(`  ❌ No piece at ${from}`)
-            return { success: false, isCheck: false, isCheckmate: false }
+            return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Check if it's the right player's turn
         if (piece.color !== this.turn) {
             console.log(`  ❌ Wrong turn. Piece is ${piece.color}, turn is ${this.turn}`)
-            return { success: false, isCheck: false, isCheckmate: false }
+            return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Check if destination has own piece
         const targetPiece = this.getPiece(toPos)
         if (targetPiece && targetPiece.color === piece.color) {
             console.log(`  ❌ Destination has own piece`)
-            return { success: false, isCheck: false, isCheckmate: false }
+            return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Validate move based on piece type
@@ -341,7 +342,7 @@ export class ChessService {
         console.log(`  Move validation result: ${isValid}`)
 
         if (!isValid) {
-            return { success: false, isCheck: false, isCheckmate: false }
+            return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Make the move temporarily to check if it puts own king in check
@@ -354,7 +355,7 @@ export class ChessService {
             // Undo move
             this.setPiece(fromPos, piece)
             this.setPiece(toPos, originalTarget)
-            return { success: false, isCheck: false, isCheckmate: false }
+            return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Move is valid, update game state
@@ -392,6 +393,14 @@ export class ChessService {
             this.enPassantTarget = null
         }
 
+        // Update halfmove clock for fifty-move rule
+        if (piece.type === 'p' || targetPiece) {
+            // Reset on pawn move or capture
+            this.halfmoveClock = 0
+        } else {
+            this.halfmoveClock++
+        }
+
         // Update castling rights
         if (piece.type === 'k') {
             this.kingMoved[piece.color] = true
@@ -409,11 +418,30 @@ export class ChessService {
         // Switch turn
         this.turn = this.turn === 'white' ? 'black' : 'white'
 
-        // Check for check and checkmate
+        // Check for check, checkmate, and stalemate
         const isCheck = this.isKingInCheck(this.turn)
         const isCheckmate = isCheck && this.isCheckmate(this.turn)
+        const isStalemate = !isCheck && this.isStalemate(this.turn)
 
-        return { success: true, isCheck, isCheckmate }
+        // Check for draw conditions
+        let isDraw = false
+        let drawReason: string | undefined = undefined
+
+        // Fifty-move rule
+        if (this.halfmoveClock >= 100) {
+            isDraw = true
+            drawReason = 'fifty-move rule'
+        }
+
+        // Insufficient material
+        if (!isDraw && this.isInsufficientMaterial()) {
+            isDraw = true
+            drawReason = 'insufficient material'
+        }
+
+        console.log(`  ✅ Move completed. Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}, Draw: ${isDraw} ${drawReason ? `(${drawReason})` : ''}`)
+
+        return { success: true, isCheck, isCheckmate, isStalemate, isDraw, drawReason }
     }
 
     /**
@@ -459,6 +487,137 @@ export class ChessService {
         }
 
         return true // No move can get out of check
+    }
+
+    /**
+     * Check if current player is in stalemate (no legal moves but not in check)
+     */
+    isStalemate(color: 'white' | 'black'): boolean {
+        // Must NOT be in check
+        if (this.isKingInCheck(color)) return false
+
+        // Check if there are any legal moves
+        for (let fromRank = 0; fromRank < 8; fromRank++) {
+            for (let fromFile = 0; fromFile < 8; fromFile++) {
+                const piece = this.board[fromRank][fromFile]
+                if (piece && piece.color === color) {
+                    for (let toRank = 0; toRank < 8; toRank++) {
+                        for (let toFile = 0; toFile < 8; toFile++) {
+                            const from = { file: fromFile, rank: fromRank }
+                            const to = { file: toFile, rank: toRank }
+
+                            // Skip if target has own piece
+                            const targetPiece = this.getPiece(to)
+                            if (targetPiece && targetPiece.color === color) continue
+
+                            // Try to validate the move
+                            let isValidPieceMove = false
+                            switch (piece.type) {
+                                case 'p':
+                                    isValidPieceMove = this.isValidPawnMove(from, to, piece)
+                                    break
+                                case 'n':
+                                    isValidPieceMove = this.isValidKnightMove(from, to)
+                                    break
+                                case 'b':
+                                    isValidPieceMove = this.isValidBishopMove(from, to)
+                                    break
+                                case 'r':
+                                    isValidPieceMove = this.isValidRookMove(from, to)
+                                    break
+                                case 'q':
+                                    isValidPieceMove = this.isValidQueenMove(from, to)
+                                    break
+                                case 'k':
+                                    isValidPieceMove = this.isValidKingMove(from, to)
+                                    break
+                            }
+
+                            if (!isValidPieceMove) continue
+
+                            // Test if move would put own king in check
+                            const originalTarget = this.getPiece(to)
+                            this.setPiece(to, piece)
+                            this.setPiece(from, null)
+
+                            const wouldBeInCheck = this.isKingInCheck(color)
+
+                            // Restore board
+                            this.setPiece(from, piece)
+                            this.setPiece(to, originalTarget)
+
+                            if (!wouldBeInCheck) {
+                                return false // Found a legal move
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return true // No legal moves available
+    }
+
+    /**
+     * Check if there is insufficient material to checkmate (automatic draw)
+     */
+    isInsufficientMaterial(): boolean {
+        const pieces: { type: string; color: string }[] = []
+
+        // Collect all pieces on the board
+        for (let rank = 0; rank < 8; rank++) {
+            for (let file = 0; file < 8; file++) {
+                const piece = this.board[rank][file]
+                if (piece) {
+                    pieces.push(piece)
+                }
+            }
+        }
+
+        // King vs King
+        if (pieces.length === 2) {
+            return true
+        }
+
+        // King + minor piece vs King
+        if (pieces.length === 3) {
+            const nonKings = pieces.filter(p => p.type !== 'k')
+            if (nonKings.length === 1) {
+                const piece = nonKings[0]
+                // Only bishop or knight (not rook, queen, or pawn)
+                if (piece.type === 'b' || piece.type === 'n') {
+                    return true
+                }
+            }
+        }
+
+        // King + Bishop vs King + Bishop (same colored squares)
+        if (pieces.length === 4) {
+            const bishops = pieces.filter(p => p.type === 'b')
+            if (bishops.length === 2) {
+                // Find bishop positions
+                const bishopPositions: Position[] = []
+                for (let rank = 0; rank < 8; rank++) {
+                    for (let file = 0; file < 8; file++) {
+                        const piece = this.board[rank][file]
+                        if (piece && piece.type === 'b') {
+                            bishopPositions.push({ file, rank })
+                        }
+                    }
+                }
+
+                // Check if both bishops are on same color squares
+                if (bishopPositions.length === 2) {
+                    const color1 = (bishopPositions[0].file + bishopPositions[0].rank) % 2
+                    const color2 = (bishopPositions[1].file + bishopPositions[1].rank) % 2
+                    if (color1 === color2) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        return false
     }
 
     /**
