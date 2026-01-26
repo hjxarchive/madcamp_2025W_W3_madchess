@@ -11,9 +11,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     useEffect(() => {
         checkAuth()
-    }, [])
+    }, [checkAuth])
 
-    if (isLoading) {
+    // 로컬 개발 환경에서는 auth 체크 무시
+    const isDevelopment = !import.meta.env.PROD
+
+    if (isLoading && !isDevelopment) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-900">
                 <div className="text-white text-xl">Loading...</div>
@@ -21,7 +24,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         )
     }
 
-    if (!isAuthenticated) {
+    // 개발 환경이면 항상 통과, 프로덕션이면 인증 확인
+    if (!isDevelopment && !isAuthenticated) {
         return <Navigate to="/login" replace />
     }
 
