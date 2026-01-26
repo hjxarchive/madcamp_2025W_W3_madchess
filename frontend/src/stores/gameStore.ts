@@ -158,16 +158,54 @@ export const useGameStore = create<GameStoreState>((set) => ({
       const { row: toRow, col: toCol } = squareToRowCol(to)
       let piece = newBoard[fromRow][fromCol]
 
-      // 상대 기물 이동
-      newBoard[toRow][toCol] = piece
-      newBoard[fromRow][fromCol] = null
-
-      // 프로모션 처리: UCI가 "e7e8q" 형태면 프로모션
-      if (piece && piece.type === 'p' && move.uci.length > 4) {
-        const promotedType = move.uci[4] as PieceType
-        console.log(`🎉 Pawn promoted to ${promotedType}!`)
-        piece = { ...piece, type: promotedType }
+      // 캐슬링 감지 (킹이 2칸 이동하는 경우)
+      const isCastling = piece && piece.type === 'k' && Math.abs(toCol - fromCol) === 2
+      
+      if (isCastling) {
+        console.log(`♜ Castling detected: ${move.uci}`)
+        // 킹 이동
         newBoard[toRow][toCol] = piece
+        newBoard[fromRow][fromCol] = null
+
+        // 룩 이동
+        const isKingside = toCol > fromCol
+        const rookFromCol = isKingside ? 7 : 0 // h-file or a-file
+        const rookToCol = isKingside ? toCol - 1 : toCol + 1 // f-file (6) or d-file (3)
+        
+        // 실제로는 룩이 다양한 위치에 있을 수 있으므로, 해당 줄에서 룩 찾기
+        let rookCol = -1
+        for (let col = 0; col < 8; col++) {
+          const p = newBoard[fromRow][col]
+          if (p && p.type === 'r' && p.color === piece.color) {
+            // 킹사이드: f-h 파일의 룩 / 퀸사이드: a-d 파일의 룩
+            if (isKingside && col >= 5) {
+              rookCol = col
+              break
+            } else if (!isKingside && col <= 3) {
+              rookCol = col
+              break
+            }
+          }
+        }
+
+        if (rookCol !== -1) {
+          const rook = newBoard[fromRow][rookCol]
+          newBoard[fromRow][rookToCol] = rook
+          newBoard[fromRow][rookCol] = null
+          console.log(`♜ Rook moved from ${String.fromCharCode(97 + rookCol)}${8 - fromRow} to ${String.fromCharCode(97 + rookToCol)}${8 - fromRow}`)
+        }
+      } else {
+        // 일반 기물 이동
+        newBoard[toRow][toCol] = piece
+        newBoard[fromRow][fromCol] = null
+
+        // 프로모션 처리: UCI가 "e7e8q" 형태면 프로모션
+        if (piece && piece.type === 'p' && move.uci.length > 4) {
+          const promotedType = move.uci[4] as PieceType
+          console.log(`🎉 Pawn promoted to ${promotedType}!`)
+          piece = { ...piece, type: promotedType }
+          newBoard[toRow][toCol] = piece
+        }
       }
 
       // 캡처된 기물 기록

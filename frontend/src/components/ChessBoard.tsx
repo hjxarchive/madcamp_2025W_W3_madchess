@@ -11,6 +11,7 @@ interface ChessBoardProps {
   onMove: (move: Move) => void
   useImages?: boolean  // 이미지 사용 여부 (기본값: false = 유니코드 사용)
   fetchLegalMoves?: (from: { row: number; col: number; piece: Piece }) => Promise<{ row: number; col: number }[]>  // 백엔드로부터 합법적 수 요청
+  castlingOptions?: Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }>
 }
 
 // 유니코드 체스 기물 심볼
@@ -68,6 +69,7 @@ export default function ChessBoard({
   onMove,
   useImages = false,  // 기본값은 유니코드 심볼 사용
   fetchLegalMoves,
+  castlingOptions = [],
 }: ChessBoardProps) {
   const [selectedSquare, setSelectedSquare] = useState<{ row: number; col: number } | null>(null)
   const [legalMoves, setLegalMoves] = useState<{ row: number; col: number }[]>([])
@@ -76,6 +78,12 @@ export default function ChessBoard({
   const displayBoard = myColor === 'black'
     ? [...board].reverse().map(row => [...row].reverse())
     : board
+
+  // 캐슬링 가능한 룩 위치 확인
+  const isCastlingRook = (row: number, col: number): boolean => {
+    const square = rowColToSquare(row, col)
+    return castlingOptions.some(option => option.rookPos === square)
+  }
 
   const getActualPosition = (displayRow: number, displayCol: number) => {
     if (myColor === 'black') {
@@ -101,6 +109,21 @@ export default function ChessBoard({
     if (piece && piece.color === myColor && !selectedSquare) {
       setSelectedSquare(actual)
 
+      // 룩 클릭 시 캐슬링 옵션 확인
+      const square = rowColToSquare(actual.row, actual.col)
+      const castlingOption = castlingOptions.find(opt => opt.rookPos === square)
+      
+      if (castlingOption && piece.type === 'r') {
+        // 캐슬링 가능한 룩: 킹의 목적지를 합법수로 표시
+        console.log(`♜ Castling option for rook at ${square}: ${castlingOption.side}`)
+        const kingTarget = squareToRowCol({ 
+          file: castlingOption.kingTarget[0] as any, 
+          rank: parseInt(castlingOption.kingTarget[1]) as any 
+        })
+        setLegalMoves([kingTarget])
+        return
+      }
+
       // Calculate legal moves (or use fetchLegalMoves if provided)
       if (fetchLegalMoves) {
         fetchLegalMoves({ row: actual.row, col: actual.col, piece })
@@ -108,7 +131,6 @@ export default function ChessBoard({
           .catch(e => {
             console.error('Failed to fetch legal moves', e)
             setLegalMoves([])
-
           })
       } else {
         // Show all possible squares as hints (server will validate)
@@ -139,12 +161,28 @@ export default function ChessBoard({
         if (movingPiece) {
           const fromSquare = rowColToSquare(selectedSquare.row, selectedSquare.col)
           const toSquare = rowColToSquare(actual.row, actual.col)
-          const move: Move = {
-            uci: moveToUci(fromSquare, toSquare),
-            piece: movingPiece.type,
-            captured: piece?.type,
+          
+          // 캐슬링 체크: 룩을 선택하고 킹의 목적지를 클릭한 경우
+          const selectedSquareUci = rowColToSquare(selectedSquare.row, selectedSquare.col)
+          const castlingOpt = castlingOptions.find(opt => opt.rookPos === selectedSquareUci)
+          
+          if (castlingOpt && movingPiece.type === 'r') {
+            // 캐슬링 실행: 킹 이동으로 변환
+            console.log(`♜ Executing castling: ${castlingOpt.side}`)
+            const kingMove: Move = {
+              uci: `${castlingOpt.kingPos}${castlingOpt.kingTarget}`,
+              piece: 'k',
+            }
+            onMove(kingMove)
+          } else {
+            // 일반 이동
+            const move: Move = {
+              uci: moveToUci(fromSquare, toSquare),
+              piece: movingPiece.type,
+              captured: piece?.type,
+            }
+            onMove(move)
           }
-          onMove(move)
         }
       }
 
@@ -231,6 +269,7 @@ export default function ChessBoard({
                 const isCapture = isSquareCapture(rowIndex, colIndex)
                 const lastMoveHighlight = isSquareLastMove(rowIndex, colIndex)
                 const kingCheck = isKingInCheck(rowIndex, colIndex)
+                const castlingRook = isCastlingRook(rowIndex, colIndex) && isMyTurn
 
                 return (
                   <div
@@ -243,12 +282,18 @@ export default function ChessBoard({
                       ${selected ? 'ring-4 ring-blue-500 ring-inset' : ''}
                       ${lastMoveHighlight ? 'bg-yellow-300' : ''}
                       ${kingCheck ? 'bg-red-500' : ''}
+                      ${castlingRook ? 'ring-4 ring-green-400 ring-inset' : ''}
                       ${isMyTurn ? 'hover:brightness-90' : 'cursor-not-allowed'}
                     `}
                   >
                     {/* 체크된 왕 하이라이트 - 칸 전체 붉은 오버레이 */}
                     {kingCheck && (
                       <div className="absolute inset-0 bg-red-600/80 animate-pulse" />
+                    )}
+
+                    {/* 캐슬링 가능한 룩 표시 */}
+                    {castlingRook && (
+                      <div className="absolute top-1 right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
                     )}
 
                     {/* 합법적인 이동 표시 - 빈 칸에만 초록 점 */}

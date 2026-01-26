@@ -84,6 +84,7 @@ export default function GamePage() {
   const [serverLegalMoves, setServerLegalMoves] = useState<Array<{ from: string; to: string; promotion?: string }>>([])
   const [hasLegalMovesResponse, setHasLegalMovesResponse] = useState(false)
   const [lastMoverColor, setLastMoverColor] = useState<PieceColor | null>(null)
+  const [castlingOptions, setCastlingOptions] = useState<Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }>>([])
 
   // Ref for myColor to access in socket callbacks without closure issues
   const myColorRef = useRef<PieceColor>(myColor)
@@ -201,11 +202,22 @@ export default function GamePage() {
       const toFile = to[0]
       const toRank = to[1]
       const fromFile = from[0]
+      const fromFileCode = from.charCodeAt(0) - 97 // a=0, b=1, ...
+      const toFileCode = to.charCodeAt(0) - 97
       const isCapture = !!capturedPiece
       
       let notation = ''
       
-      if (piece === 'p') {
+      // 캐슬링 감지 (킹이 2칸 이동)
+      if (piece === 'k' && Math.abs(toFileCode - fromFileCode) === 2) {
+        if (toFile === 'g') {
+          notation = 'O-O' // 킹사이드 캐슬링
+          console.log(`♜ Kingside castling detected`)
+        } else if (toFile === 'c') {
+          notation = 'O-O-O' // 퀸사이드 캐슬링
+          console.log(`♜ Queenside castling detected`)
+        }
+      } else if (piece === 'p') {
         // 폰 이동
         if (isCapture) {
           notation = `${fromFile}x${to}`
@@ -336,11 +348,32 @@ export default function GamePage() {
       console.error('Legal moves error:', data.message)
     }
 
+    // 캐슬링 옵션 응답
+    const handleCastlingOptions = (data: { options: Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }> }) => {
+      console.log('♜ Castling options received:', data.options)
+      setCastlingOptions(data.options || [])
+      
+      // 로그로 캐슬링 가능 여부 표시
+      if (data.options && data.options.length > 0) {
+        data.options.forEach(option => {
+          console.log(`✅ Castling available: ${option.side} (rook at ${option.rookPos})`)
+        })
+      } else {
+        console.log('❌ No castling options available')
+      }
+    }
+
+    const handleCastlingOptionsError = (data: { message: string }) => {
+      console.error('Castling options error:', data.message)
+    }
+
     socketService.onMoveMade(handleMoveMade)
     socketService.onGameOver(handleGameOver)
     socketService.onMoveError(handleMoveError)
     socketService.onLegalMoves(handleLegalMoves)
     socketService.onLegalMovesError(handleLegalMovesError)
+    socketService.onCastlingOptions(handleCastlingOptions)
+    socketService.onCastlingOptionsError(handleCastlingOptionsError)
 
     // 정리
     return () => {
@@ -355,10 +388,13 @@ export default function GamePage() {
   // 내 턴이 시작될 때 합법수 요청
   useEffect(() => {
     if (gameState && gameState.currentTurn === myColor && !gameOverData) {
-      console.log('🎯 My turn started, requesting legal moves')
+      console.log('🎯 My turn started, requesting legal moves and castling options')
       setHasLegalMovesResponse(false)
       setServerLegalMoves([])
       socketService.requestLegalMoves(gameState.roomId)
+      
+      // 캐슬링 옵션 요청
+      socketService.requestCastlingOptions(gameState.roomId, myColor)
     }
   }, [gameState?.currentTurn, gameState?.roomId, myColor, gameOverData])
 
@@ -852,6 +888,7 @@ export default function GamePage() {
                 onMove={handleMove}
                 useImages={useImages}
                 fetchLegalMoves={fetchLegalMovesFromServer}
+                castlingOptions={castlingOptions}
               />
             </div>
 

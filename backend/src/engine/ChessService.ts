@@ -59,6 +59,112 @@ export class ChessService {
     }
 
     /**
+     * Get available freestyle castling options for a color
+     * Returns: array of { rookPos, kingTarget, rookTarget, side }
+     */
+    getFreestyleCastlingOptions(color: 'white' | 'black'): Array<{
+        rookPos: string
+        kingPos: string
+        kingTarget: string
+        rookTarget: string
+        side: 'kingside' | 'queenside'
+    }> {
+        const baseRank = color === 'white' ? 0 : 7
+        const castlingOptions: Array<{
+            rookPos: string
+            kingPos: string
+            kingTarget: string
+            rookTarget: string
+            side: 'kingside' | 'queenside'
+        }> = []
+
+        // Find king position
+        let kingFile = -1
+        for (let file = 0; file < 8; file++) {
+            const piece = this.board[baseRank][file]
+            if (piece && piece.type === 'k' && piece.color === color) {
+                kingFile = file
+                break
+            }
+        }
+
+        if (kingFile === -1 || this.kingMoved[color]) return []
+        if (this.isKingInCheck(color)) return []
+
+        const kingPos = this.positionToUci({ file: kingFile, rank: baseRank })
+
+        // Find all unmoved rooks on base rank
+        for (let rookFile = 0; rookFile < 8; rookFile++) {
+            if (rookFile === kingFile) continue
+
+            const piece = this.board[baseRank][rookFile]
+            if (!piece || piece.type !== 'r' || piece.color !== color) continue
+
+            // Check if rook has moved
+            const rookMoved = this.hasRookMoved(color, rookFile)
+            if (rookMoved) continue
+
+            // Determine side (a-d = queenside, f-h = kingside)
+            const side: 'kingside' | 'queenside' = rookFile >= 5 ? 'kingside' : 'queenside'
+            const kingTargetFile = side === 'kingside' ? 6 : 2 // g or c file
+            const rookTargetFile = side === 'kingside' ? 5 : 3 // f or d file
+
+            // Check if path is clear
+            const minFile = Math.min(kingFile, rookFile, kingTargetFile, rookTargetFile)
+            const maxFile = Math.max(kingFile, rookFile, kingTargetFile, rookTargetFile)
+            
+            let pathClear = true
+            for (let file = minFile; file <= maxFile; file++) {
+                if (file === kingFile || file === rookFile) continue
+                if (this.board[baseRank][file] !== null) {
+                    pathClear = false
+                    break
+                }
+            }
+
+            if (!pathClear) continue
+
+            // Check if king's path is not under attack
+            const kingPathStart = Math.min(kingFile, kingTargetFile)
+            const kingPathEnd = Math.max(kingFile, kingTargetFile)
+            let kingPathSafe = true
+
+            for (let file = kingPathStart; file <= kingPathEnd; file++) {
+                if (this.isSquareAttacked({ file, rank: baseRank }, color === 'white' ? 'black' : 'white')) {
+                    kingPathSafe = false
+                    break
+                }
+            }
+
+            if (!kingPathSafe) continue
+
+            castlingOptions.push({
+                rookPos: this.positionToUci({ file: rookFile, rank: baseRank }),
+                kingPos,
+                kingTarget: this.positionToUci({ file: kingTargetFile, rank: baseRank }),
+                rookTarget: this.positionToUci({ file: rookTargetFile, rank: baseRank }),
+                side
+            })
+        }
+
+        return castlingOptions
+    }
+
+    private hasRookMoved(color: 'white' | 'black', file: number): boolean {
+        // For freestyle castling, track individual rook positions
+        // This is a simplified check - you may need to enhance tracking
+        if (color === 'white') {
+            if (file === 7) return this.rookMoved.whiteKingSide
+            if (file === 0) return this.rookMoved.whiteQueenSide
+        } else {
+            if (file === 7) return this.rookMoved.blackKingSide
+            if (file === 0) return this.rookMoved.blackQueenSide
+        }
+        // For non-standard rook positions, assume not moved initially
+        return false
+    }
+
+    /**
      * Get all legal moves for a given color (used by clients to filter UI options)
      */
     getLegalMovesForColor(color: 'white' | 'black'): Array<{ from: string; to: string; promotion?: string }> {
