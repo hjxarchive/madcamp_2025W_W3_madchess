@@ -48,6 +48,17 @@ export class GameManager {
     this.queue.push({ socketId, userId, deckId })
   }
 
+  getCastlingOptions(matchId: string, color: 'white' | 'black') {
+    const match = this.matches.get(matchId)
+    if (!match) {
+      return { success: false, error: 'Match not found' }
+    }
+
+    const options = match.chessEngine.getFreestyleCastlingOptions(color)
+    console.log(`♜ Castling options for ${color} in ${matchId}:`, options)
+    return { success: true, options }
+  }
+
   removeFromQueue(socketId: string) {
     this.queue = this.queue.filter(player => player.socketId !== socketId)
   }

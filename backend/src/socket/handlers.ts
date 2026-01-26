@@ -181,6 +181,18 @@ export function setupSocketHandlers(io: Server) {
       }
     })
 
+    // Request castling options
+    socket.on('request-castling-options', (data: { matchId: string; color: 'white' | 'black' }) => {
+      console.log(`♜ Castling options requested for ${data.color} in ${data.matchId}`)
+      const result = gameManager.getCastlingOptions(data.matchId, data.color)
+      if (result.success) {
+        socket.emit('castling-options', { options: result.options })
+        console.log(`✅ Sent castling options:`, result.options)
+      } else {
+        socket.emit('castling-options-error', { message: result.error || 'Failed to fetch castling options' })
+      }
+    })
+
     // Client declares game end (checkmate/stalemate backup - when server missed it)
     socket.on('declare-game-end', (data: { matchId: string; winner: string; reason: string }) => {
       console.log(`🏁 Client ${socket.id} declares game end:`, data)

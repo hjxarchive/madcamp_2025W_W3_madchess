@@ -5,7 +5,8 @@ class SocketService {
   private socket: Socket | null = null
 
   connect() {
-    this.socket = io('http://localhost:5001', {
+    const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:5001'
+    this.socket = io(socketUrl, {
       transports: ['websocket'],
     })
 
@@ -102,6 +103,14 @@ class SocketService {
     if (this.socket) {
       this.socket.emit('declare-game-end', { matchId: roomId, winner, reason })
       console.log('Game end declared:', { matchId: roomId, winner, reason })
+    }
+  }
+
+  // Request castling options from server
+  requestCastlingOptions(matchId: string, color: 'white' | 'black') {
+    if (this.socket) {
+      this.socket.emit('request-castling-options', { matchId, color })
+      console.log(`♜ Requesting castling options for ${color}`)
     }
   }
 
@@ -207,6 +216,19 @@ class SocketService {
   onLegalMovesError(callback: (data: { message: string }) => void) {
     if (this.socket) {
       this.socket.on('legal-moves-error', callback)
+    }
+  }
+
+  // Castling options response
+  onCastlingOptions(callback: (data: { options: Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }> }) => void) {
+    if (this.socket) {
+      this.socket.on('castling-options', callback)
+    }
+  }
+
+  onCastlingOptionsError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('castling-options-error', callback)
     }
   }
 
