@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAllPieces } from '../services/pieceApi'
-import { createDeck } from '../services/deckApi'
+import { createDeck, updateDeck, deleteDeck } from '../services/deckApi'
 import { getUserDecks } from '../services/userApi'
 import { useAuthStore } from '../stores/authStore'
 import type { DeckWithStats } from '../types/api.types'
@@ -42,12 +41,44 @@ const PIECE_IMAGES: Record<PieceType, string> = {
   p: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
 }
 
+// Convert composition to board placements
+function compositionToPlacement(composition: { [key: string]: number }): PlacedPiece[] {
+  const pieces: PlacedPiece[] = []
+  const usedSquares = new Set<string>()
+
+  // King always at e1
+  pieces.push({ type: 'k', file: 'e', rank: 1 })
+  usedSquares.add('e1')
+
+  // Place other pieces in available squares
+  const availableSquares: { file: File; rank: Rank }[] = []
+  for (const rank of RANKS) {
+    for (const file of FILES) {
+      if (!(file === 'e' && rank === 1)) {
+        availableSquares.push({ file, rank })
+      }
+    }
+  }
+
+  let squareIdx = 0
+  for (const [pieceCode, count] of Object.entries(composition)) {
+    if (pieceCode === 'k') continue // King already placed
+    const pieceType = pieceCode as PieceType
+    for (let i = 0; i < count && squareIdx < availableSquares.length; i++) {
+      const square = availableSquares[squareIdx++]
+      pieces.push({ type: pieceType, file: square.file, rank: square.rank })
+    }
+  }
+
+  return pieces
+}
+
 export default function DeckBuilderPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuthStore()
 
   const [placedPieces, setPlacedPieces] = useState<PlacedPiece[]>([
-    { type: 'k', file: 'e', rank: 1 } // King is always at e1
+    { type: 'k', file: 'e', rank: 1 }
   ])
   const [selectedPieceType, setSelectedPieceType] = useState<PieceType | null>(null)
   const [hoverSquare, setHoverSquare] = useState<{ file: File; rank: Rank } | null>(null)
@@ -55,6 +86,9 @@ export default function DeckBuilderPage() {
   const [savedDecks, setSavedDecks] = useState<DeckWithStats[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Editing mode
+  const [editingDeckId, setEditingDeckId] = useState<number | null>(null)
 
   // Load saved decks
   useEffect(() => {
@@ -69,9 +103,9 @@ export default function DeckBuilderPage() {
   const usedBudget = placedPieces.reduce((sum, p) => sum + PIECE_COSTS[p.type], 0)
   const budgetRemaining = BUDGET_MAX - usedBudget
 
-  // Get available pieces (not maxed out)
+  // Get available pieces
   const getAvailablePieces = () => {
-    const pieceTypes: PieceType[] = ['q', 'r', 'b', 'n', 'p'] // King is always placed
+    const pieceTypes: PieceType[] = ['q', 'r', 'b', 'n', 'p']
     return pieceTypes.map(type => {
       const placedCount = placedPieces.filter(p => p.type === type).length
       const remaining = PIECE_MAX_COUNT[type] - placedCount
@@ -84,7 +118,6 @@ export default function DeckBuilderPage() {
     if (selectedPieceType === type) {
       setSelectedPieceType(null)
     } else {
-      // Check if can afford
       if (usedBudget + PIECE_COSTS[type] > BUDGET_MAX) {
         setError(`Not enough budget for ${PIECE_NAMES[type]}`)
         return
@@ -98,34 +131,29 @@ export default function DeckBuilderPage() {
   const handleSquareClick = (file: File, rank: Rank) => {
     const existingPiece = placedPieces.find(p => p.file === file && p.rank === rank)
 
-    // If clicking on existing piece, remove it (except King)
     if (existingPiece) {
       if (existingPiece.type === 'k') {
         setError("King cannot be removed")
         return
       }
       setPlacedPieces(prev => prev.filter(p => !(p.file === file && p.rank === rank)))
-      setSelectedPieceType(existingPiece.type) // Auto-select removed piece
+      setSelectedPieceType(existingPiece.type)
       setError('')
       return
     }
 
-    // If no piece selected, do nothing
     if (!selectedPieceType) return
 
-    // King can only be at e1
     if (file === 'e' && rank === 1) {
       setError("King's position is fixed at e1")
       return
     }
 
-    // Check budget
     if (usedBudget + PIECE_COSTS[selectedPieceType] > BUDGET_MAX) {
       setError("Budget exceeded!")
       return
     }
 
-    // Place the piece
     setPlacedPieces(prev => [...prev, { type: selectedPieceType, file, rank }])
     setSelectedPieceType(null)
     setError('')
@@ -140,7 +168,27 @@ export default function DeckBuilderPage() {
     return composition
   }
 
-  // Save deck
+  // Load deck for editing
+  const handleLoadDeck = (deck: DeckWithStats) => {
+    // Convert composition (from API response) to board placements
+    // The API returns composition as { "k": 1, "p": 8, ... }
+    const composition = deck.pieces
+      ? deck.pieces.reduce((acc, p) => {
+        // If pieces array format
+        const pieceType = (p as any).type || (p as any).action?.toLowerCase() || 'p'
+        acc[pieceType] = (acc[pieceType] || 0) + ((p as any).count || (p as any).quantity || 1)
+        return acc
+      }, {} as { [key: string]: number })
+      : (deck as any).composition || {}
+
+    const placement = compositionToPlacement(composition)
+    setPlacedPieces(placement)
+    setDeckName(deck.name)
+    setEditingDeckId(deck.id)
+    setError('')
+  }
+
+  // Save or update deck
   const handleSaveDeck = async () => {
     if (!isAuthenticated || !user) {
       setError('Please login to save a deck')
@@ -159,17 +207,26 @@ export default function DeckBuilderPage() {
     setError('')
     try {
       const composition = buildComposition()
-      const res = await createDeck({
-        userId: user.id,
-        name: deckName,
-        composition,
-      })
-      if (res?.success) {
-        setDeckName('')
-        // Refresh saved decks
-        const decksRes = await getUserDecks(user.id)
-        if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
+
+      if (editingDeckId) {
+        // Update existing deck
+        await updateDeck(editingDeckId, {
+          name: deckName,
+          composition,
+        })
+      } else {
+        // Create new deck
+        await createDeck({
+          userId: user.id,
+          name: deckName,
+          composition,
+        })
       }
+
+      // Reset and refresh
+      handleNewDeck()
+      const decksRes = await getUserDecks(user.id)
+      if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Failed to save deck')
     } finally {
@@ -177,9 +234,27 @@ export default function DeckBuilderPage() {
     }
   }
 
-  // Reset board
-  const handleReset = () => {
+  // Delete deck
+  const handleDeleteDeck = async () => {
+    if (!editingDeckId || !user) return
+
+    if (!confirm('Are you sure you want to delete this deck?')) return
+
+    try {
+      await deleteDeck(editingDeckId)
+      handleNewDeck()
+      const decksRes = await getUserDecks(user.id)
+      if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
+    } catch (err: any) {
+      setError('Failed to delete deck')
+    }
+  }
+
+  // Start new deck
+  const handleNewDeck = () => {
     setPlacedPieces([{ type: 'k', file: 'e', rank: 1 }])
+    setDeckName('')
+    setEditingDeckId(null)
     setSelectedPieceType(null)
     setError('')
   }
@@ -206,6 +281,21 @@ export default function DeckBuilderPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
+        {/* Editing indicator */}
+        {editingDeckId && (
+          <div className="mb-4 p-3 border border-[#D4FF00] bg-[#D4FF00]/10 flex items-center justify-between">
+            <div className="text-sm">
+              <span className="text-[#D4FF00] font-bold">Editing:</span> {deckName}
+            </div>
+            <button
+              onClick={handleNewDeck}
+              className="text-xs uppercase tracking-widest text-gray-400 hover:text-white transition-colors"
+            >
+              ✕ Cancel
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
           {/* Left: Board */}
           <div>
@@ -233,7 +323,6 @@ export default function DeckBuilderPage() {
             <div className="inline-block border-2 border-gray-800">
               {[...RANKS].reverse().map(rank => (
                 <div key={rank} className="flex">
-                  {/* Rank label */}
                   <div className="w-8 flex items-center justify-center text-gray-600 text-sm font-mono">
                     {rank}
                   </div>
@@ -259,13 +348,11 @@ export default function DeckBuilderPage() {
                           ${piece && piece.type !== 'k' ? 'hover:opacity-70' : ''}
                         `}
                       >
-                        {/* Hover preview */}
                         {isHovered && canPlace && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-40">
                             <img src={PIECE_IMAGES[selectedPieceType]} alt="" className="w-12 h-12" />
                           </div>
                         )}
-                        {/* Placed piece */}
                         {piece && (
                           <img
                             src={PIECE_IMAGES[piece.type]}
@@ -279,7 +366,6 @@ export default function DeckBuilderPage() {
                   })}
                 </div>
               ))}
-              {/* File labels */}
               <div className="flex">
                 <div className="w-8" />
                 {FILES.map(file => (
@@ -292,7 +378,7 @@ export default function DeckBuilderPage() {
 
             {/* Reset button */}
             <button
-              onClick={handleReset}
+              onClick={handleNewDeck}
               className="mt-4 px-6 py-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-600 uppercase tracking-widest text-xs font-bold transition-colors"
             >
               ↺ Reset Board
@@ -339,7 +425,7 @@ export default function DeckBuilderPage() {
             <div className="border border-gray-800 p-4">
               <h2 className="text-lg font-serif mb-4 flex items-center gap-2">
                 <span className="w-2 h-2 bg-[#D4FF00]"></span>
-                Save Deck
+                {editingDeckId ? 'Update Deck' : 'Save Deck'}
               </h2>
               <input
                 type="text"
@@ -361,8 +447,16 @@ export default function DeckBuilderPage() {
                     : 'bg-[#D4FF00] text-black hover:bg-white'
                   }`}
               >
-                {saving ? 'Saving...' : 'Save Deck'}
+                {saving ? 'Saving...' : editingDeckId ? 'Update Deck' : 'Save Deck'}
               </button>
+              {editingDeckId && (
+                <button
+                  onClick={handleDeleteDeck}
+                  className="w-full mt-2 py-2 border border-red-900 text-red-500 hover:bg-red-900/20 uppercase tracking-widest text-xs font-bold transition-colors"
+                >
+                  Delete Deck
+                </button>
+              )}
             </div>
 
             {/* Saved Decks */}
@@ -371,9 +465,16 @@ export default function DeckBuilderPage() {
                 <h3 className="text-sm font-serif text-gray-400 mb-3">Your Decks</h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {savedDecks.map(deck => (
-                    <div key={deck.id} className="p-3 border border-gray-800 hover:border-[#D4FF00] transition-colors cursor-pointer">
+                    <div
+                      key={deck.id}
+                      onClick={() => handleLoadDeck(deck)}
+                      className={`p-3 border transition-colors cursor-pointer ${editingDeckId === deck.id
+                          ? 'border-[#D4FF00] bg-[#D4FF00]/10'
+                          : 'border-gray-800 hover:border-[#D4FF00]'
+                        }`}
+                    >
                       <div className="font-serif">{deck.name}</div>
-                      <div className="text-xs text-gray-500">{deck.totalCost} pts</div>
+                      <div className="text-xs text-gray-500">{deck.totalCost} pts • {deck.winCnt}W / {deck.loseCnt}L</div>
                     </div>
                   ))}
                 </div>

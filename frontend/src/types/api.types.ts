@@ -69,7 +69,7 @@ export interface CreateDeckRequest {
 
 export interface UpdateDeckRequest {
     name?: string
-    pieces?: DeckPiece[]
+    composition?: { [key: string]: number }
 }
 
 export interface ValidateDeckRequest {
