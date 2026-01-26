@@ -156,11 +156,19 @@ export const useGameStore = create<GameStoreState>((set) => ({
       const { from, to } = parseUci(move.uci)
       const { row: fromRow, col: fromCol } = squareToRowCol(from)
       const { row: toRow, col: toCol } = squareToRowCol(to)
-      const piece = newBoard[fromRow][fromCol]
+      let piece = newBoard[fromRow][fromCol]
 
       // 상대 기물 이동
       newBoard[toRow][toCol] = piece
       newBoard[fromRow][fromCol] = null
+
+      // 프로모션 처리: UCI가 "e7e8q" 형태면 프로모션
+      if (piece && piece.type === 'p' && move.uci.length > 4) {
+        const promotedType = move.uci[4] as PieceType
+        console.log(`🎉 Pawn promoted to ${promotedType}!`)
+        piece = { ...piece, type: promotedType }
+        newBoard[toRow][toCol] = piece
+      }
 
       // 캡처된 기물 기록
       let newCapturedPieces = { ...state.gameState.capturedPieces }

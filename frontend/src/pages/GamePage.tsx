@@ -488,6 +488,27 @@ export default function GamePage() {
       return
     }
 
+    // 프로모션 체크: 폰이 끝 랭크로 이동하는지 확인
+    if (gameState) {
+      // UCI 파싱: "e2e4" 또는 "e7e8" (프로모션 후보)
+      const from = move.uci.substring(0, 2)
+      const to = move.uci.substring(2, 4)
+      const fromSquare = squareToRowCol({ file: from[0] as any, rank: parseInt(from[1]) as any })
+      const toSquare = squareToRowCol({ file: to[0] as any, rank: parseInt(to[1]) as any })
+      const piece = gameState.board[fromSquare.row][fromSquare.col]
+      
+      // 폰이 끝 랭크(1랭크 또는 8랭크)에 도달하는 경우
+      if (piece && piece.type === 'p') {
+        const promotionRank = piece.color === 'white' ? 0 : 7 // row index (0 = 8랭크, 7 = 1랭크)
+        if (toSquare.row === promotionRank) {
+          console.log('🎯 Promotion detected! Showing UI...')
+          setPromotionMove({ from, to })
+          setShowPromotion(true)
+          return // 프로모션 선택 후 전송
+        }
+      }
+    }
+
     // 내가 둔 수이므로 직전에 둔 색을 저장
     setLastMoverColor(myColor)
 
@@ -496,6 +517,38 @@ export default function GamePage() {
       socketService.sendMove(gameState.roomId, move)
       console.log('Move sent to server:', move)
     }
+  }
+
+  // 프로모션 선택 핸들러
+  const handlePromotionSelect = (pieceType: 'q' | 'r' | 'b' | 'n') => {
+    if (!promotionMove || !gameState) return
+    
+    console.log(`✅ Promotion selected: ${pieceType}`)
+    
+    // UCI에 프로모션 추가: "e7e8q"
+    const uci = `${promotionMove.from}${promotionMove.to}${pieceType}`
+    const move: Move = {
+      uci,
+      piece: 'p',
+    }
+    
+    // 내가 둔 수이므로 직전에 둔 색을 저장
+    setLastMoverColor(myColor)
+    
+    // 서버로 프로모션 정보 포함하여 전송
+    socketService.sendMove(gameState.roomId, move)
+    console.log('Promotion move sent to server:', move)
+    
+    // 프로모션 UI 닫기
+    setShowPromotion(false)
+    setPromotionMove(null)
+  }
+
+  // 프로모션 취소 핸들러
+  const handlePromotionCancel = () => {
+    console.log('❌ Promotion cancelled')
+    setShowPromotion(false)
+    setPromotionMove(null)
   }
 
   // 서버 제공 합법수 기반으로 특정 말의 legal moves 반환
@@ -727,6 +780,44 @@ export default function GamePage() {
                 Back to Home
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Promotion Modal */}
+      {showPromotion && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          onClick={handlePromotionCancel}
+        >
+          <div 
+            className="bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-4 text-center">Choose Promotion</h2>
+            <p className="text-sm text-gray-400 mb-6 text-center">Select a piece to promote your pawn</p>
+            <div className="flex justify-center gap-3 mb-4">
+              {[{ type: 'q', name: 'Queen' }, { type: 'r', name: 'Rook' }, { type: 'b', name: 'Bishop' }, { type: 'n', name: 'Knight' }].map(({ type, name }) => (
+                <button
+                  key={type}
+                  onClick={() => handlePromotionSelect(type as 'q' | 'r' | 'b' | 'n')}
+                  className="bg-gray-700 hover:bg-gray-600 rounded-lg p-2 transition-colors flex flex-col items-center gap-1"
+                >
+                  <img
+                    src={PIECE_IMAGES[myColor][type as PieceType]}
+                    alt={name}
+                    className="w-10 h-10"
+                  />
+                  <span className="text-xs font-medium">{name}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handlePromotionCancel}
+              className="w-full bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
