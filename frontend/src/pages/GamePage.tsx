@@ -25,6 +25,42 @@ const PIECE_IMAGES: Record<PieceColor, Record<PieceType, string>> = {
   },
 }
 
+function CapturedBar({
+  pieces,
+  pieceColor,
+  label,
+}: {
+  pieces: PieceType[]
+  pieceColor: PieceColor
+  label: string
+}) {
+  return (
+    <div className="mt-2 w-full rounded-full bg-emerald-900/40 border border-emerald-700/50 px-3 py-2 flex items-center gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-200/90">
+        {label}
+      </span>
+      <div className="flex items-center gap-2 overflow-x-auto">
+        {pieces.length === 0 ? (
+          <span className="text-xs text-emerald-200/60">없음</span>
+        ) : (
+          pieces.map((piece, idx) => (
+            <div
+              key={`${piece}-${idx}`}
+              className="w-8 h-8 rounded-full bg-white/10 grid place-items-center shrink-0"
+            >
+              <img
+                src={PIECE_IMAGES[pieceColor][piece]}
+                alt={piece}
+                className="w-6 h-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]"
+              />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
   const { gameState, setGameState, makeMove, applyOpponentMove, rollbackMove } = useGameStore()
@@ -504,8 +540,9 @@ export default function GamePage() {
     return total
   }
 
+  const opponentColor: PieceColor = myColor === 'white' ? 'black' : 'white'
   const myMaterial = calculateMaterial(myColor)
-  const opponentMaterial = calculateMaterial(myColor === 'white' ? 'black' : 'white')
+  const opponentMaterial = calculateMaterial(opponentColor)
   const materialDiff = myMaterial - opponentMaterial
   
   // 바 너비 계산 (최대 ±10점 차이를 기준으로)
@@ -629,14 +666,11 @@ export default function GamePage() {
                       Rating: <span className="font-semibold text-yellow-400">{opponent?.rating || 1450}</span>
                     </div>
                   </div>
-                  {/* 잡힌 기물 (상대가 잡은 내 기물) */}
-                  <div className="flex gap-1 flex-wrap mb-2">
-                    {opponentCapturedPieces.map((piece, idx) => (
-                      <div key={idx} className="w-6 h-6 rounded bg-slate-200 p-0.5 flex items-center justify-center">
-                        <img src={PIECE_IMAGES[myColor][piece]} alt={piece} className="w-full h-full" />
-                      </div>
-                    ))}
-                  </div>
+                  <CapturedBar
+                    pieces={opponentCapturedPieces}
+                    pieceColor={myColor}
+                    label="Captured your pieces"
+                  />
                 </div>
               </div>
               {/* 타이머 */}
@@ -693,14 +727,11 @@ export default function GamePage() {
                       Rating: <span className="font-semibold text-yellow-400">{me?.rating || 1520}</span>
                     </div>
                   </div>
-                  {/* 잡힌 기물 (내가 잡은 상대 기물) */}
-                  <div className="flex gap-1 flex-wrap mb-2">
-                    {myCapturedPieces.map((piece, idx) => (
-                      <div key={idx} className="w-6 h-6 rounded bg-slate-200 p-0.5 flex items-center justify-center">
-                        <img src={PIECE_IMAGES[myColor === 'white' ? 'black' : 'white'][piece]} alt={piece} className="w-full h-full" />
-                      </div>
-                    ))}
-                  </div>
+                  <CapturedBar
+                    pieces={myCapturedPieces}
+                    pieceColor={myColor === 'white' ? 'black' : 'white'}
+                    label="You captured"
+                  />
                 </div>
               </div>
               {/* 타이머 */}
@@ -719,19 +750,34 @@ export default function GamePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`text-xs font-semibold px-2 py-0.5 rounded ${myColor === 'white' ? 'bg-slate-100 text-slate-900' : 'bg-slate-900 text-slate-100 border border-slate-600'}`}>
+                <div className={`text-xs font-semibold px-2 py-0.5 rounded shadow ${myColor === 'white' ? 'bg-white text-gray-900 border border-gray-300' : 'bg-black text-white border border-white/40'}`}>
                   {myColor === 'white' ? 'W' : 'B'}
                 </div>
                 <div className="flex-1">
-                  <div className="h-3 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
-                    <div 
-                      className={`h-full transition-all duration-300 ${myColor === 'white' ? 'bg-white' : 'bg-black'}`}
+                  <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                    <div
+                      className={`absolute inset-y-0 left-0 transition-all duration-300 ${myColor === 'white' ? 'bg-white' : 'bg-black'}`}
                       style={{ width: `${barPercentage}%` }}
                     ></div>
+                    <div
+                      className={`absolute inset-y-0 right-0 transition-all duration-300 ${opponentColor === 'white' ? 'bg-white/80' : 'bg-black'}`}
+                      style={{ width: `${100 - barPercentage}%` }}
+                    ></div>
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-black/10 pointer-events-none"></div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
+                    <span className="flex items-center gap-2">
+                      <span className={`inline-block h-3 w-3 rounded-full border ${myColor === 'white' ? 'bg-white border-gray-300' : 'bg-black border-white/60'}`}></span>
+                      <span>{myMaterial}점</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className={`inline-block h-3 w-3 rounded-full border ${opponentColor === 'white' ? 'bg-white border-gray-300' : 'bg-black border-white/60'}`}></span>
+                      <span>{opponentMaterial}점</span>
+                    </span>
                   </div>
                 </div>
-                <div className={`text-xs font-semibold px-2 py-0.5 rounded ${opponent?.color === 'white' ? 'bg-slate-100 text-slate-900' : 'bg-slate-900 text-slate-100 border border-slate-600'}`}>
-                  {opponent?.color === 'white' ? 'W' : 'B'}
+                <div className={`text-xs font-semibold px-2 py-0.5 rounded shadow ${opponentColor === 'white' ? 'bg-white text-gray-900 border border-gray-300' : 'bg-black text-white border border-white/40'}`}>
+                  {opponentColor === 'white' ? 'W' : 'B'}
                 </div>
               </div>
             </div>
