@@ -117,93 +117,99 @@ export default function MatchmakingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-slate-200 font-sans">
+    <div className="min-h-screen bg-[#050505] text-white font-sans">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur sticky top-0 z-10">
+      <header className="border-b border-gray-900 bg-[#050505]/90 backdrop-blur sticky top-0 z-10">
         <div className="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+            className="group flex items-center gap-2 text-gray-500 hover:text-white transition-colors"
           >
-            <span className="text-lg">←</span>
-            <span className="font-medium">Back to Home</span>
+            <span className="text-xl group-hover:-translate-x-1 transition-transform">←</span>
+            <span className="uppercase tracking-widest text-xs font-bold">Back to Arena</span>
           </button>
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 grid place-items-center rounded-sm bg-yellow-500 text-gray-900 font-black">♟</div>
-            <span className="font-semibold text-white">Mad Chess</span>
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 bg-white skew-x-12"></div>
+            <div className="font-serif text-lg">
+              <span className="text-[#D4FF00]">MAD</span>
+              <span className="text-white">CHESS</span>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-12">
+      <main className="mx-auto max-w-4xl px-6 py-16">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8 text-center text-white">Matchmaking</h1>
+          <h1 className="text-5xl font-serif font-light mb-12 text-center">
+            <span className="text-white">MATCH</span>
+            <span className="text-[#D4FF00]">MAKING</span>
+          </h1>
 
           {/* 모드 선택 */}
           {mode === 'select' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <button
                 onClick={() => setMode('create')}
-                className="group relative overflow-hidden rounded-xl border border-gray-700 bg-slate-800/50 p-8 text-left transition-all hover:bg-slate-800 hover:border-yellow-500/50 hover:shadow-lg hover:shadow-yellow-500/10"
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-10 text-left transition-all duration-300"
               >
-                <div className="text-4xl mb-4 bg-slate-900/50 w-16 h-16 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">🏠</div>
-                <h3 className="text-xl font-bold text-white mb-2">Create Room</h3>
-                <p className="text-sm text-slate-400">Host a game and invite a friend using a code.</p>
+                <div className="text-5xl mb-6 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all">🏠</div>
+                <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Create Room</h3>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Host a private match</p>
               </button>
 
               <button
                 onClick={() => setMode('join')}
-                className="group relative overflow-hidden rounded-xl border border-gray-700 bg-slate-800/50 p-8 text-left transition-all hover:bg-slate-800 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10"
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-10 text-left transition-all duration-300"
               >
-                <div className="text-4xl mb-4 bg-slate-900/50 w-16 h-16 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">🚪</div>
-                <h3 className="text-xl font-bold text-white mb-2">Join Room</h3>
-                <p className="text-sm text-slate-400">Enter a room code to join an existing game.</p>
+                <div className="text-5xl mb-6 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all">🚪</div>
+                <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Join Room</h3>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Enter with a code</p>
               </button>
             </div>
           )}
 
           {/* 방 만들기 */}
           {mode === 'create' && !waiting && (
-            <div className="bg-slate-800/50 border border-gray-700 rounded-xl p-8">
-              <h2 className="text-xl font-semibold mb-6 text-center">Select Your Side</h2>
-              <div className="grid grid-cols-2 gap-6 mb-8">
+            <div className="border border-gray-800 p-10">
+              <h2 className="text-2xl font-serif mb-8 text-center">Select Your Side</h2>
+              <div className="grid grid-cols-2 gap-8 mb-10">
                 <button
                   onClick={() => setSelectedColor('white')}
                   className={`
-                    p-6 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-4
+                    p-8 border-2 transition-all duration-200 flex flex-col items-center gap-4
                     ${selectedColor === 'white'
-                      ? 'border-yellow-500 bg-yellow-500/10 shadow-lg shadow-yellow-500/10'
-                      : 'border-slate-700 bg-slate-900/50 hover:border-slate-500'
+                      ? 'border-[#D4FF00] bg-[#D4FF00]/5'
+                      : 'border-gray-800 hover:border-gray-600'
                     }
                   `}
                 >
-                  <img src={KING_IMAGES.white} alt="White King" className="w-16 h-16 drop-shadow-md" />
+                  <img src={KING_IMAGES.white} alt="White King" className="w-20 h-20" />
                   <div className="text-center">
-                    <div className="font-bold text-white">White</div>
-                    <div className="text-xs text-slate-400 mt-1">First Move</div>
+                    <div className="font-serif text-xl text-white">WHITE</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-widest mt-1">First Move</div>
                   </div>
                 </button>
                 <button
                   onClick={() => setSelectedColor('black')}
                   className={`
-                    p-6 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-4
+                    p-8 border-2 transition-all duration-200 flex flex-col items-center gap-4
                     ${selectedColor === 'black'
-                      ? 'border-yellow-500 bg-yellow-500/10 shadow-lg shadow-yellow-500/10'
-                      : 'border-slate-700 bg-slate-900/50 hover:border-slate-500'
+                      ? 'border-[#D4FF00] bg-[#D4FF00]/5'
+                      : 'border-gray-800 hover:border-gray-600'
                     }
                   `}
                 >
-                  <img src={KING_IMAGES.black} alt="Black King" className="w-16 h-16 drop-shadow-md" />
+                  <img src={KING_IMAGES.black} alt="Black King" className="w-20 h-20" />
                   <div className="text-center">
-                    <div className="font-bold text-white">Black</div>
-                    <div className="text-xs text-slate-400 mt-1">Second Move</div>
+                    <div className="font-serif text-xl text-white">BLACK</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-widest mt-1">Second Move</div>
                   </div>
                 </button>
               </div>
               <div className="flex gap-4">
                 <button
                   onClick={handleCancel}
-                  className="flex-1 py-3 rounded-lg font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                  className="flex-1 py-4 border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-white uppercase tracking-widest text-sm font-bold transition-colors"
                 >
                   Cancel
                 </button>
@@ -211,10 +217,10 @@ export default function MatchmakingPage() {
                   onClick={handleCreateRoom}
                   disabled={!selectedColor}
                   className={`
-                    flex-[2] py-3 rounded-lg font-bold text-gray-900 transition-colors
+                    flex-[2] py-4 font-bold uppercase tracking-widest text-sm transition-all
                     ${selectedColor
-                      ? 'bg-yellow-500 hover:bg-yellow-400 shadow-lg shadow-yellow-500/20'
-                      : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                      ? 'bg-[#D4FF00] text-black hover:bg-white'
+                      : 'bg-gray-900 text-gray-600 cursor-not-allowed'
                     }
                   `}
                 >
@@ -226,29 +232,26 @@ export default function MatchmakingPage() {
 
           {/* 대기 중 */}
           {mode === 'create' && waiting && (
-            <div className="bg-slate-800/50 border border-gray-700 rounded-xl p-8 text-center">
-              <div className="inline-block p-4 rounded-full bg-slate-900 mb-6 relative">
-                <div className="text-4xl animate-pulse">⏳</div>
+            <div className="border border-gray-800 p-10 text-center">
+              <div className="inline-block mb-8">
+                <div className="text-6xl animate-pulse">⏳</div>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Waiting for Opponent</h2>
-              <p className="text-slate-400 mb-8">Share this room code with your friend.</p>
+              <h2 className="text-3xl font-serif text-white mb-2">Waiting for Opponent</h2>
+              <p className="text-gray-500 mb-10 uppercase tracking-widest text-sm">Share this room code</p>
 
-              <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 mb-8 max-w-xs mx-auto relative group">
-                <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Room Code</div>
-                <div className="text-4xl font-mono font-bold text-yellow-500 tracking-wider select-all">
+              <div className="bg-[#0A0A0A] border border-gray-800 p-8 mb-10 max-w-xs mx-auto relative group cursor-pointer" onClick={handleCopyRoomCode}>
+                <div className="text-xs text-gray-600 uppercase tracking-widest mb-2">Room Code</div>
+                <div className="text-5xl font-mono font-bold text-[#D4FF00] tracking-wider select-all">
                   {roomCode}
                 </div>
-                <button
-                  onClick={handleCopyRoomCode}
-                  className="absolute inset-0 w-full h-full opacity-0 group-hover:opacity-100 bg-black/60 backdrop-blur-sm flex items-center justify-center transition-opacity rounded-lg"
-                >
-                  <span className="font-semibold text-white">Click to Copy</span>
-                </button>
+                <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <span className="uppercase tracking-widest text-sm font-bold text-white">Click to Copy</span>
+                </div>
               </div>
 
               <button
                 onClick={handleCancel}
-                className="py-2 px-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 font-semibold transition-colors border border-rose-500/20"
+                className="py-3 px-10 border border-red-900 text-red-500 hover:bg-red-900/20 uppercase tracking-widest text-sm font-bold transition-colors"
               >
                 Cancel Room
               </button>
@@ -257,8 +260,8 @@ export default function MatchmakingPage() {
 
           {/* 방 참가하기 */}
           {mode === 'join' && (
-            <div className="bg-slate-800/50 border border-gray-700 rounded-xl p-8">
-              <h2 className="text-xl font-semibold mb-6 text-center">Join Existing Room</h2>
+            <div className="border border-gray-800 p-10">
+              <h2 className="text-2xl font-serif mb-8 text-center">Join Existing Room</h2>
               <div className="max-w-xs mx-auto">
                 <input
                   type="text"
@@ -269,10 +272,10 @@ export default function MatchmakingPage() {
                   }}
                   placeholder="ENTER CODE"
                   maxLength={6}
-                  className="w-full px-4 py-4 bg-slate-900 border border-slate-700 rounded-lg text-center text-2xl font-mono font-bold tracking-widest text-white placeholder-slate-600 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 focus:outline-none transition-colors mb-2"
+                  className="w-full px-4 py-5 bg-[#0A0A0A] border border-gray-800 text-center text-3xl font-mono font-bold tracking-widest text-white placeholder-gray-700 focus:border-[#D4FF00] focus:outline-none transition-colors mb-4"
                 />
                 {error && (
-                  <div className="text-rose-400 text-sm text-center mb-4 bg-rose-900/20 py-1 px-2 rounded">
+                  <div className="text-red-500 text-sm text-center mb-4 py-2 px-4 border border-red-900 bg-red-900/10">
                     {error}
                   </div>
                 )}
@@ -280,7 +283,7 @@ export default function MatchmakingPage() {
                 <div className="mt-8 flex gap-4">
                   <button
                     onClick={handleCancel}
-                    className="flex-1 py-3 rounded-lg font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                    className="flex-1 py-4 border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-white uppercase tracking-widest text-sm font-bold transition-colors"
                   >
                     Cancel
                   </button>
@@ -288,10 +291,10 @@ export default function MatchmakingPage() {
                     onClick={handleJoinRoom}
                     disabled={inputRoomCode.length !== 6}
                     className={`
-                      flex-[2] py-3 rounded-lg font-bold text-gray-900 transition-colors
+                      flex-[2] py-4 font-bold uppercase tracking-widest text-sm transition-all
                       ${inputRoomCode.length === 6
-                        ? 'bg-yellow-500 hover:bg-yellow-400 shadow-lg shadow-yellow-500/20'
-                        : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                        ? 'bg-[#D4FF00] text-black hover:bg-white'
+                        : 'bg-gray-900 text-gray-600 cursor-not-allowed'
                       }
                     `}
                   >
