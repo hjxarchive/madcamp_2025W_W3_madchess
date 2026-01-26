@@ -552,13 +552,6 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* CHECK! Notification */}
-      {isCheck && !isCheckmate && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-600 text-white px-8 py-3 rounded-lg shadow-2xl animate-bounce font-bold text-xl">
-          ⚠️ CHECK!
-        </div>
-      )}
-
       {/* Game Over Modal */}
       {gameOverData && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -610,7 +603,7 @@ export default function GamePage() {
                 myColor={myColor}
                 isMyTurn={gameState?.currentTurn === myColor}
                 lastMove={gameState?.lastMove}
-                isCheck={gameState?.isCheck || false}
+                isCheck={isCheck || gameState?.isCheck || false}
                 onMove={handleMove}
                 useImages={useImages}
                 fetchLegalMoves={fetchLegalMovesFromServer}
