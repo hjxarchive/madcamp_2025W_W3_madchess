@@ -1,20 +1,51 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
+import LoginPage from './pages/LoginPage'
 import MatchmakingPage from './pages/MatchmakingPage'
 import PlacementPage from './pages/PlacementPage'
 import GamePage from './pages/GamePage'
 import DeckBuilderPage from './pages/DeckBuilderPage'
+import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-900 text-white">
         <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<HomePage />} />
-          <Route path="/matchmaking" element={<MatchmakingPage />} />
-          <Route path="/placement/:gameId" element={<PlacementPage />} />
-          <Route path="/game/:gameId" element={<GamePage />} />
-          <Route path="/deck-builder" element={<DeckBuilderPage />} />
+          <Route
+            path="/matchmaking"
+            element={
+              <ProtectedRoute>
+                <MatchmakingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/placement/:gameId"
+            element={
+              <ProtectedRoute>
+                <PlacementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/game/:gameId"
+            element={
+              <ProtectedRoute>
+                <GamePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/deck-builder"
+            element={
+              <ProtectedRoute>
+                <DeckBuilderPage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>
