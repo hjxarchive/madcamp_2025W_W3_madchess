@@ -13,6 +13,9 @@ export interface ApiResponse<T> {
 export interface User {
     id: number
     username: string
+    name?: string
+    email?: string
+    picture?: string
     rating: number
     createdAt: string
 }
@@ -131,4 +134,9 @@ export interface UserGame {
     result: 'WIN' | 'LOSE' | 'DRAW'
     ratingChange: number
     playedAt: string
+}
+
+export interface UserGamesResponse {
+    total: number
+    games: UserGame[]
 }

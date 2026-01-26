@@ -15,6 +15,7 @@ interface AuthStore {
     login: () => void
     logout: () => void
     checkAuth: () => Promise<void>
+    setUser: (user: User) => void
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
@@ -54,5 +55,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
         } finally {
             set({ isLoading: false })
         }
+    },
+
+    setUser: (user: User) => {
+        set({ user })
     }
 }))

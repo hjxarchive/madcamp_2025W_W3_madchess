@@ -5,6 +5,7 @@ import MatchmakingPage from './pages/MatchmakingPage'
 import PlacementPage from './pages/PlacementPage'
 import GamePage from './pages/GamePage'
 import DeckBuilderPage from './pages/DeckBuilderPage'
+import MyPage from './pages/MyPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -43,6 +44,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <DeckBuilderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mypage"
+            element={
+              <ProtectedRoute>
+                <MyPage />
               </ProtectedRoute>
             }
           />
