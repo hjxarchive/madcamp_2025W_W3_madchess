@@ -3,7 +3,7 @@ import { CreateUserDto } from './DTOS/user.dto';
 
 export const createUser = async (data: CreateUserDto) => {
   return await prisma.user.create({
-    data: { 
+    data: {
       username: data.username,
       rating: 1500,
       rd: 350.0,
@@ -13,8 +13,8 @@ export const createUser = async (data: CreateUserDto) => {
 };
 
 export const findUserByUsername = async (username: string) => {
-  return await prisma.user.findUnique({ 
-    where: { username } 
+  return await prisma.user.findUnique({
+    where: { username }
   });
 };
 
@@ -63,9 +63,9 @@ export const getUserStats = async (userId: number) => {
 };
 
 export const updateUserRating = async (
-  userId: number, 
-  newRating: number, 
-  newRd: number, 
+  userId: number,
+  newRating: number,
+  newRd: number,
   newVolatility: number
 ) => {
   return await prisma.user.update({
@@ -75,5 +75,12 @@ export const updateUserRating = async (
       rd: newRd,
       volatility: newVolatility
     }
+  });
+};
+
+export const updateUser = async (userId: number, data: { username?: string, picture?: string }) => {
+  return await prisma.user.update({
+    where: { id: userId },
+    data
   });
 };

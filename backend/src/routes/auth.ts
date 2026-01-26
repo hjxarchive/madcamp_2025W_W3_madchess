@@ -15,7 +15,8 @@ router.get(
     passport.authenticate('google', { failureRedirect: '/login' }),
     (req, res) => {
         // 성공 시 쿼리 파라미터로 userId 전달 (선택사항, 프론트에서 /auth/user로 확인 가능)
-        res.redirect(`${process.env.CORS_ORIGIN || 'http://localhost:3000'}/matchmaking`)
+        // 성공 시 쿼리 파라미터로 userId 전달 (선택사항, 프론트에서 /auth/user로 확인 가능)
+        res.redirect(`${process.env.CORS_ORIGIN || 'http://localhost:3000'}/login`)
     }
 )
 
