@@ -6,6 +6,7 @@ interface User {
     name: string
     picture?: string
     googleId: string
+    rating?: number
 }
 
 interface AuthStore {
