@@ -1,18 +1,36 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 
 export default function LoginPage() {
     const navigate = useNavigate()
+    const location = useLocation()
     const { user, isAuthenticated, login, checkAuth } = useAuthStore()
+
+    const from = location.state?.from?.pathname || '/'
 
     useEffect(() => {
         checkAuth()
     }, [])
 
+    const handleLogin = () => {
+        // 현재 위치(리다이렉트 될 곳)를 저장
+        if (from && from !== '/' && from !== '/login') {
+            localStorage.setItem('loginRedirect', from)
+        }
+        login()
+    }
+
     useEffect(() => {
         if (isAuthenticated && user) {
-            navigate('/matchmaking')
+            // 저장된 리다이렉트 경로 확인
+            const savedRedirect = localStorage.getItem('loginRedirect')
+            if (savedRedirect) {
+                localStorage.removeItem('loginRedirect')
+                navigate(savedRedirect, { replace: true })
+            } else {
+                navigate('/matchmaking', { replace: true })
+            }
         }
     }, [isAuthenticated, user, navigate])
 
@@ -25,7 +43,7 @@ export default function LoginPage() {
                 </div>
 
                 <button
-                    onClick={login}
+                    onClick={handleLogin}
                     className="w-full bg-white border border-gray-300 text-gray-700 px-6 py-4 rounded-xl font-medium hover:bg-gray-50 transition flex items-center justify-center gap-3 shadow-sm hover:shadow-md"
                 >
                     <img

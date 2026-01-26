@@ -5,6 +5,7 @@ import type {
     UserStats,
     DeckWithStats,
     UserGame,
+    UserGamesResponse,
 } from '../types/api.types'
 
 /**
@@ -47,7 +48,16 @@ export const getUserDecks = async (userId: number): Promise<ApiResponse<DeckWith
  * Get user's game history
  * GET /api/users/:userId/games
  */
-export const getUserGames = async (userId: number): Promise<ApiResponse<UserGame[]>> => {
-    const response = await apiClient.get<ApiResponse<UserGame[]>>(`/api/users/${userId}/games`)
+export const getUserGames = async (userId: number): Promise<ApiResponse<UserGamesResponse>> => {
+    const response = await apiClient.get<ApiResponse<UserGamesResponse>>(`/api/users/${userId}/games`)
+    return response.data
+}
+
+/**
+ * Update user info
+ * PATCH /api/users/:userId
+ */
+export const updateUser = async (userId: number, username: string): Promise<ApiResponse<User>> => {
+    const response = await apiClient.patch<ApiResponse<User>>(`/api/users/${userId}`, { username })
     return response.data
 }

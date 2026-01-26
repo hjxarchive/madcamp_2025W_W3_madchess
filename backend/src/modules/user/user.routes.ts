@@ -20,4 +20,7 @@ router.get('/:userId/decks', deckController.getUserDecks);
 // GET /api/users/:userId/games - 사용자 게임 기록 조회
 router.get('/:userId/games', gameController.getUserGames);
 
+// PATCH /api/users/:userId - 사용자 정보 수정 (닉네임)
+router.patch('/:userId', userController.updateUser);
+
 export default router;

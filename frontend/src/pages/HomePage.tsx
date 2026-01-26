@@ -1,47 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getUserById, getUserGames } from '../services/userApi'
-import type { ApiResponse, User, UserGame } from '../types/api.types'
+import { getUserGames } from '../services/userApi'
+import { useAuthStore } from '../stores/authStore'
+import type { UserGame } from '../types/api.types'
 
 export default function HomePage() {
   const navigate = useNavigate()
+  const { user: authUser, isAuthenticated } = useAuthStore()
 
-  // Dummy data fallback
-  const dummyUser: User = {
-    id: 1,
-    username: 'player123',
-    rating: 1550,
-    createdAt: new Date().toISOString(),
-  }
-
-  const dummyGames: UserGame[] = [
-    { gameId: 101, opponent: 'opponentA', result: 'WIN', ratingChange: 15, playedAt: new Date(Date.now() - 2 * 60 * 1000).toISOString() },
-    { gameId: 100, opponent: 'opponentB', result: 'LOSE', ratingChange: -12, playedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() },
-    { gameId: 99, opponent: 'opponentC', result: 'DRAW', ratingChange: 0, playedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString() },
-  ]
-
-  const [user, setUser] = useState<User>(dummyUser)
-  const [recentGames, setRecentGames] = useState<UserGame[]>(dummyGames)
+  const [recentGames, setRecentGames] = useState<UserGame[]>([])
   const [serverOnline, setServerOnline] = useState<boolean>(true)
   const [onlineCount, setOnlineCount] = useState<number>(1429)
 
   useEffect(() => {
-    const userId = 1
-    ;(async () => {
-      try {
-        const userRes: ApiResponse<User> = await getUserById(userId)
-        if (userRes?.success && userRes.data) setUser(userRes.data)
-      } catch (_) {
-        // Fallback already set to dummy
-      }
-      try {
-        const gamesRes = await getUserGames(userId)
-        if (gamesRes?.success && gamesRes.data) setRecentGames(gamesRes.data.slice(0, 3))
-      } catch (_) {
-        // Fallback already set to dummy
-      }
-    })()
-  }, [])
+    if (authUser?.id) {
+      getUserGames(authUser.id).then(res => {
+        if (res.success && res.data) setRecentGames(res.data.games.slice(0, 3))
+      })
+    }
+  }, [authUser])
 
   const handleStartGame = () => {
     navigate('/matchmaking')
@@ -88,19 +65,33 @@ export default function HomePage() {
             <span className="font-semibold">Mad Chess</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-xs text-slate-400">Grandmaster Rank</div>
-            <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-slate-800">
-              <span className="text-yellow-400">★</span>
-              <span className="font-semibold">{user.rating}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <img
-                src={`https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(user.username)}`}
-                alt="avatar"
-                className="h-8 w-8 rounded-full bg-slate-700"
-              />
-              <span className="text-sm text-slate-200">{user.username}</span>
-            </div>
+            {isAuthenticated && authUser ? (
+              <>
+                <div className="text-xs text-slate-400">Grandmaster Rank</div>
+                <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-slate-800">
+                  <span className="text-yellow-400">★</span>
+                  <span className="font-semibold">{authUser.rating || 1500}</span>
+                </div>
+                <button
+                  onClick={() => navigate('/mypage')}
+                  className="flex items-center gap-2 hover:bg-slate-800 px-2 py-1 rounded-lg transition-colors"
+                >
+                  <img
+                    src={authUser.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(authUser.name)}`}
+                    alt="avatar"
+                    className="h-8 w-8 rounded-full bg-slate-700"
+                  />
+                  <span className="text-sm text-slate-200">{authUser.name}</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="bg-yellow-500 text-gray-900 px-4 py-2 rounded-lg font-bold hover:bg-yellow-400 transition-colors"
+              >
+                Login
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -133,25 +124,33 @@ export default function HomePage() {
             <button className="text-xs text-yellow-400 hover:underline">View History</button>
           </div>
           <div className="mt-4 overflow-hidden rounded-xl border border-gray-800">
-            <div className="grid grid-cols-12 bg-slate-800/60 px-4 py-3 text-xs text-slate-300">
-              <div className="col-span-3">SIDE</div>
-              <div className="col-span-3">RESULT</div>
-              <div className="col-span-3">RATING CHANGE</div>
-              <div className="col-span-3">TIME</div>
-            </div>
-            <ul className="divide-y divide-gray-800">
-              {recentGames.map((g, idx) => (
-                <li key={g.gameId} className="grid grid-cols-12 items-center px-4 py-4 bg-slate-900/40">
-                  <div className="col-span-3 flex items-center gap-2 text-sm">
-                    <span className={`h-2.5 w-2.5 rounded-full ${idx % 2 === 0 ? 'bg-white' : 'bg-black border border-slate-500'}`}></span>
-                    <span className="text-slate-200">{idx % 2 === 0 ? 'White' : 'Black'}</span>
-                  </div>
-                  <div className="col-span-3">{resultBadge(g.result)}</div>
-                  <div className="col-span-3">{ratingDelta(g.ratingChange)}</div>
-                  <div className="col-span-3 text-sm text-slate-400">{timeAgo(g.playedAt)}</div>
-                </li>
-              ))}
-            </ul>
+            {recentGames.length > 0 ? (
+              <>
+                <div className="grid grid-cols-12 bg-slate-800/60 px-4 py-3 text-xs text-slate-300">
+                  <div className="col-span-3">SIDE</div>
+                  <div className="col-span-3">RESULT</div>
+                  <div className="col-span-3">RATING CHANGE</div>
+                  <div className="col-span-3">TIME</div>
+                </div>
+                <ul className="divide-y divide-gray-800">
+                  {recentGames.map((g, idx) => (
+                    <li key={g.gameId} className="grid grid-cols-12 items-center px-4 py-4 bg-slate-900/40">
+                      <div className="col-span-3 flex items-center gap-2 text-sm">
+                        <span className={`h-2.5 w-2.5 rounded-full ${idx % 2 === 0 ? 'bg-white' : 'bg-black border border-slate-500'}`}></span>
+                        <span className="text-slate-200">{idx % 2 === 0 ? 'White' : 'Black'}</span>
+                      </div>
+                      <div className="col-span-3">{resultBadge(g.result)}</div>
+                      <div className="col-span-3">{ratingDelta(g.ratingChange)}</div>
+                      <div className="col-span-3 text-sm text-slate-400">{timeAgo(g.playedAt)}</div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                {isAuthenticated ? "No recent matches." : "Login to see your matches."}
+              </div>
+            )}
           </div>
         </section>
 

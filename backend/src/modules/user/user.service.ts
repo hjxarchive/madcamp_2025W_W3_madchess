@@ -13,14 +13,14 @@ export const registerUser = async (dto: CreateUserDto) => {
   if (existingUser) {
     throw new Error('USERNAME_TAKEN');
   }
-  
+
   // 생성
   return await userRepo.createUser(dto);
 };
 
 export const getUserById = async (userId: number): Promise<UserWithStatsDto> => {
   const user = await userRepo.findUserById(userId);
-  
+
   if (!user) {
     throw new Error('USER_NOT_FOUND');
   }
@@ -51,7 +51,7 @@ export const getUserById = async (userId: number): Promise<UserWithStatsDto> => 
 
 export const getUserStats = async (userId: number): Promise<UserStatsDto> => {
   const user = await userRepo.findUserById(userId);
-  
+
   if (!user) {
     throw new Error('USER_NOT_FOUND');
   }
@@ -82,7 +82,7 @@ export const getUserStats = async (userId: number): Promise<UserStatsDto> => {
   // 최근 게임 (최대 10개)
   const recentGames: RecentGameDto[] = gameHistory.slice(0, 10).map((gh: any) => {
     const isWhite = gh.game.white_player_id === userId;
-    const opponent = isWhite 
+    const opponent = isWhite
       ? gh.game.user_game_black_player_idTouser.username
       : gh.game.user_game_white_player_idTouser.username;
 
@@ -105,4 +105,24 @@ export const getUserStats = async (userId: number): Promise<UserStatsDto> => {
     bestStreak,
     recentGames
   };
+};
+
+export const updateUser = async (userId: number, username: string): Promise<UserWithStatsDto> => {
+  // 사용자명 검증 (2-20자, 영문/숫자/언더스코어)
+  const usernameRegex = /^[a-zA-Z0-9_]{2,20}$/;
+  if (!usernameRegex.test(username)) {
+    throw new Error('INVALID_USERNAME');
+  }
+
+  // 중복 체크
+  const existingUser = await userRepo.findUserByUsername(username);
+  if (existingUser && existingUser.id !== userId) {
+    throw new Error('USERNAME_TAKEN');
+  }
+
+  // 업데이트
+  await userRepo.updateUser(userId, { username });
+
+  // 업데이트된 정보 반환
+  return await getUserById(userId);
 };

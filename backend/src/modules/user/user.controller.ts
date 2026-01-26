@@ -75,8 +75,8 @@ import * as userService from './user.service';
 export const createUser = async (req: Request, res: Response) => {
   try {
     const newUser = await userService.registerUser(req.body);
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       data: {
         id: newUser.id,
         username: newUser.username,
@@ -88,25 +88,27 @@ export const createUser = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     if (error.message === 'USERNAME_TAKEN') {
-      return res.status(400).json({ 
-        success: false, 
+      res.status(400).json({
+        success: false,
         error: {
           code: 'USERNAME_TAKEN',
           message: '이미 존재하는 사용자명입니다.'
         }
       });
+      return;
     }
     if (error.message === 'INVALID_USERNAME') {
-      return res.status(400).json({ 
-        success: false, 
+      res.status(400).json({
+        success: false,
         error: {
           code: 'INVALID_INPUT',
           message: '유효하지 않은 사용자명입니다. (2-20자, 영문/숫자/언더스코어)'
         }
       });
+      return;
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: {
         code: 'DATABASE_ERROR',
         message: 'Server Error'
@@ -180,16 +182,17 @@ export const getUserById = async (req: Request, res: Response) => {
     res.json({ success: true, data: user });
   } catch (error: any) {
     if (error.message === 'USER_NOT_FOUND') {
-      return res.status(404).json({ 
-        success: false, 
+      res.status(404).json({
+        success: false,
         error: {
           code: 'USER_NOT_FOUND',
           message: '사용자를 찾을 수 없습니다.'
         }
       });
+      return;
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: {
         code: 'DATABASE_ERROR',
         message: 'Server Error'
@@ -267,20 +270,98 @@ export const getUserStats = async (req: Request, res: Response) => {
     res.json({ success: true, data: stats });
   } catch (error: any) {
     if (error.message === 'USER_NOT_FOUND') {
-      return res.status(404).json({ 
-        success: false, 
+      res.status(404).json({
+        success: false,
         error: {
           code: 'USER_NOT_FOUND',
           message: '사용자를 찾을 수 없습니다.'
         }
       });
+      return;
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: {
         code: 'DATABASE_ERROR',
         message: 'Server Error'
       }
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /api/users/{userId}:
+ *   patch:
+ *     summary: 사용자 정보 수정 (닉네임 변경)
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 사용자 ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 description: 변경할 사용자명
+ *     responses:
+ *       200:
+ *         description: 수정 성공
+ *       400:
+ *         description: 잘못된 요청 (중복/유효성)
+ *       404:
+ *         description: 사용자 없음
+ */
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const { username } = req.body;
+
+    if (!username) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'Username is required' }
+      });
+      return;
+    }
+
+    const updatedUser = await userService.updateUser(userId, username);
+    res.json({ success: true, data: updatedUser });
+  } catch (error: any) {
+    if (error.message === 'USERNAME_TAKEN') {
+      res.status(400).json({
+        success: false,
+        error: { code: 'USERNAME_TAKEN', message: '이미 존재하는 사용자명입니다.' }
+      });
+      return;
+    }
+    if (error.message === 'INVALID_USERNAME') {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: '유효하지 않은 사용자명입니다.' }
+      });
+      return;
+    }
+    if (error.message === 'USER_NOT_FOUND') {
+      res.status(404).json({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' }
+      });
+      return;
+    }
+    res.status(500).json({
+      success: false,
+      error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
 };

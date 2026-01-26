@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 
 interface ProtectedRouteProps {
@@ -7,6 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+    const location = useLocation()
     const { isAuthenticated, isLoading, checkAuth } = useAuthStore()
 
     useEffect(() => {
@@ -24,9 +25,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         )
     }
 
-    // 개발 환경이면 항상 통과, 프로덕션이면 인증 확인
     if (!isDevelopment && !isAuthenticated) {
-        return <Navigate to="/login" replace />
+        return <Navigate to="/login" state={{ from: location }} replace />
     }
 
     return <>{children}</>
