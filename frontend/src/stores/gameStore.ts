@@ -16,6 +16,7 @@ interface GameStoreState {
   makeMove: (move: Move) => void
   applyOpponentMove: (move: Move) => void
   addCapturedPiece: (color: PieceColor, piece: PieceType) => void
+  updatePgn: (pgn: string) => void
   rollbackMove: () => void
 }
 
@@ -129,6 +130,10 @@ export const useGameStore = create<GameStoreState>((set) => ({
       // 턴 변경
       const newTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
 
+      console.log(`🔄 Turn changed: ${state.gameState.currentTurn} → ${newTurn}`)
+      console.log(`📝 Current PGN: "${state.gameState.pgn}"`)
+      console.log(`📊 moveCount: ${state.gameState.moveCount} → ${state.gameState.moveCount + 1}`)
+
       return {
         gameState: {
           ...state.gameState,
@@ -167,7 +172,10 @@ export const useGameStore = create<GameStoreState>((set) => ({
       // 턴 변경 (내 차례로)
       const newTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
 
-      console.log('Opponent move applied:', move)
+      console.log('👥 Opponent move applied:', move)
+      console.log(`🔄 Turn changed: ${state.gameState.currentTurn} → ${newTurn}`)
+      console.log(`📝 Current PGN: "${state.gameState.pgn}"`)
+      console.log(`📊 moveCount: ${state.gameState.moveCount} → ${state.gameState.moveCount + 1}`)
 
       return {
         gameState: {
@@ -194,6 +202,20 @@ export const useGameStore = create<GameStoreState>((set) => ({
             ...state.gameState.capturedPieces,
             [color]: [...state.gameState.capturedPieces[color], piece],
           },
+        },
+      }
+    }),
+
+  updatePgn: (pgn: string) =>
+    set((state) => {
+      if (!state.gameState) return state
+
+      console.log(`📝 [GameStore] Updating PGN to: "${pgn}"`)
+
+      return {
+        gameState: {
+          ...state.gameState,
+          pgn,
         },
       }
     }),

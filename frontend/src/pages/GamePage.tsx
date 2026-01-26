@@ -190,6 +190,49 @@ export default function GamePage() {
     console.log('🔌 Setting up socket listeners (once)')
 
     // 서버에서 브로드캐스트된 수를 받았을 때
+    // UCI를 algebraic notation으로 변환하는 함수
+    const uciToAlgebraic = (uci: string, piece: PieceType, capturedPiece?: PieceType): string => {
+      console.log(`🔄 Converting UCI to algebraic: uci=${uci}, piece=${piece}, captured=${capturedPiece}`)
+      
+      const from = uci.substring(0, 2)
+      const to = uci.substring(2, 4)
+      const promotion = uci.length > 4 ? uci.substring(4) : undefined
+      
+      const toFile = to[0]
+      const toRank = to[1]
+      const fromFile = from[0]
+      const isCapture = !!capturedPiece
+      
+      let notation = ''
+      
+      if (piece === 'p') {
+        // 폰 이동
+        if (isCapture) {
+          notation = `${fromFile}x${to}`
+        } else {
+          notation = to
+        }
+        // 프로모션
+        if (promotion) {
+          notation += `=${promotion.toUpperCase()}`
+        }
+      } else {
+        // 다른 기물
+        const pieceSymbol = piece.toUpperCase()
+        notation = pieceSymbol
+        
+        // 캡처
+        if (isCapture) {
+          notation += 'x'
+        }
+        
+        notation += to
+      }
+      
+      console.log(`✅ Algebraic notation: ${notation}`)
+      return notation
+    }
+
     const handleMoveMade = (data: any) => {
       console.log('📥 Received move-made from server:', data)
 
@@ -201,6 +244,36 @@ export default function GamePage() {
       // Update check status
       setIsCheck(data.isCheck || false)
       setIsCheckmate(data.isCheckmate || false)
+
+      // PGN 업데이트 (applyOpponentMove 전에 계산)
+      const currentState = useGameStore.getState().gameState
+      if (currentState) {
+        const moverColor = iMoved ? currentMyColor : opponentColor
+        console.log(`🎯 Move by: ${moverColor}, moveCount: ${currentState.moveCount}`)
+        
+        // Algebraic notation으로 변환
+        const algebraicMove = uciToAlgebraic(data.move.uci, data.move.piece, data.move.captured)
+        
+        let newPgn = currentState.pgn
+        
+        if (moverColor === 'white') {
+          // 백의 수: "1. e4" 형식
+          const moveNumber = Math.floor(currentState.moveCount / 2) + 1
+          if (newPgn) {
+            newPgn += ` ${moveNumber}. ${algebraicMove}`
+          } else {
+            newPgn = `1. ${algebraicMove}`
+          }
+          console.log(`⚪ White move ${moveNumber}: ${algebraicMove}`)
+        } else {
+          // 흑의 수: 같은 줄에 추가
+          newPgn += ` ${algebraicMove}`
+          console.log(`⚫ Black move: ${algebraicMove}`)
+        }
+        
+        console.log(`📝 New PGN: "${newPgn}"`)
+        useGameStore.getState().updatePgn(newPgn)
+      }
 
       // Apply server-confirmed move
       applyOpponentMove(data.move)
