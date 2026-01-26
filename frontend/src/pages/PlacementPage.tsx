@@ -375,10 +375,12 @@ export default function PlacementPage() {
               {Array.from({ length: 8 }).map((_, rankIdx) => {
                 const rank = (myColor === 'black' ? rankIdx + 1 : 8 - rankIdx) as Rank
                 const isPlacementRank = isPlacementArea(rank)
+                // 흑일 경우 파일 순서를 반전 (h -> a)
+                const displayFiles = myColor === 'black' ? [...FILES].reverse() : FILES
 
                 return (
                   <div key={rank} className="flex">
-                    {FILES.map((file) => {
+                    {displayFiles.map((file) => {
                       const isLight = (FILES.indexOf(file) + (8 - rank)) % 2 === 0
                       const placedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
                       const oppKingRank: Rank = myColor === 'white' ? 8 : 1

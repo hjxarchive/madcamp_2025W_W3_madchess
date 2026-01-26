@@ -106,6 +106,14 @@ class SocketService {
     }
   }
 
+  // Request castling options from server
+  requestCastlingOptions(matchId: string, color: 'white' | 'black') {
+    if (this.socket) {
+      this.socket.emit('request-castling-options', { matchId, color })
+      console.log(`♜ Requesting castling options for ${color}`)
+    }
+  }
+
   // Event listeners
 
   // 게임 매칭 완료
@@ -208,6 +216,19 @@ class SocketService {
   onLegalMovesError(callback: (data: { message: string }) => void) {
     if (this.socket) {
       this.socket.on('legal-moves-error', callback)
+    }
+  }
+
+  // Castling options response
+  onCastlingOptions(callback: (data: { options: Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }> }) => void) {
+    if (this.socket) {
+      this.socket.on('castling-options', callback)
+    }
+  }
+
+  onCastlingOptionsError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('castling-options-error', callback)
     }
   }
 
