@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import ChessBoard from '../components/ChessBoard'
 import { Move, Piece, PlacedPiece, PieceColor, squareToRowCol, PieceType, rowColToSquare, squareToUci } from '../types/game'
@@ -82,6 +82,14 @@ export default function GamePage() {
   const [opponentCapturedPieces, setOpponentCapturedPieces] = useState<PieceType[]>([]) // 상대가 잡은 기물
   const [previousBoard, setPreviousBoard] = useState<(Piece | null)[][]>([]) // 이전 보드 상태
   const [serverLegalMoves, setServerLegalMoves] = useState<Array<{ from: string; to: string; promotion?: string }>>([])
+  const [hasLegalMovesResponse, setHasLegalMovesResponse] = useState(false)
+  const [lastMoverColor, setLastMoverColor] = useState<PieceColor | null>(null)
+
+  // Ref for myColor to access in socket callbacks without closure issues
+  const myColorRef = useRef<PieceColor>(myColor)
+  useEffect(() => {
+    myColorRef.current = myColor
+  }, [myColor])
 
   // 개발 모드에서 전역 접근을 위해 window에 노출
   useEffect(() => {
@@ -177,53 +185,89 @@ export default function GamePage() {
     }
   }, [])
 
-  // WebSocket 이벤트 리스너 설정
+  // WebSocket 이벤트 리스너 설정 (한 번만 등록, 빈 배열)
   useEffect(() => {
+    console.log('🔌 Setting up socket listeners (once)')
+
     // 서버에서 브로드캐스트된 수를 받았을 때
-    socketService.onMoveMade((data) => {
-      console.log('Received move-made from server:', data)
+    const handleMoveMade = (data: any) => {
+      console.log('📥 Received move-made from server:', data)
+
+      const mySocketId = socketService.getSocket()?.id
+      const iMoved = data.socketId === mySocketId
+      const currentMyColor = myColorRef.current
+      const opponentColor = currentMyColor === 'white' ? 'black' : 'white'
 
       // Update check status
       setIsCheck(data.isCheck || false)
       setIsCheckmate(data.isCheckmate || false)
 
-      // Apply all server-confirmed moves (both mine and opponent)
+      // Apply server-confirmed move
       applyOpponentMove(data.move)
 
-      // After any move, refresh legal moves for next turn
-      if (gameState) {
-        socketService.requestLegalMoves(gameState.roomId)
-      }
-    })
+      // 다음 턴 합법수 재요청을 위해 플래그 리셋
+      setHasLegalMovesResponse(false)
+      setServerLegalMoves([])
 
-    // Game over event
-    socketService.onGameOver((data) => {
-      console.log('Game over:', data)
-      setGameOverData(data)
-      setIsCheckmate(data.reason === 'checkmate')
-    })
+      // 체크메이트가 함께 전송된 경우 즉시 팝업 표시
+      if (data.isCheckmate) {
+        const winner = iMoved ? currentMyColor : opponentColor
+        console.log('🏆 Checkmate detected in move-made! Winner:', winner, 'I moved:', iMoved)
+        setGameOverData(prev => prev ? prev : { winner, reason: 'checkmate' })
+      }
+
+      // 내가 수를 둔 직후 상대가 체크 상태라면, 잠시 후 game-over 여부 확인
+      // (서버 isCheckmate 누락 대비)
+      if (iMoved && data.isCheck) {
+        console.log('⏳ I made a check move, waiting for opponent mate confirmation...')
+        setTimeout(() => {
+          // gameOverData가 이미 설정되었으면 무시
+          setGameOverData(prev => {
+            if (prev) return prev
+            // 아직 game-over가 안 왔으면 상대가 합법수가 없을 경우 서버에서 곧 올 것
+            // 여기서는 로그만 남김 (상대 클라이언트의 backup detection이 작동)
+            return prev
+          })
+        }, 2000)
+      }
+    }
+
+    // Game over event - 서버에서 보내는 이벤트가 유일한 신뢰 소스
+    const handleGameOver = (data: { winner: string; reason: string }) => {
+      console.log('🎮 Game over event received:', data)
+      // 서버가 보낸 winner를 그대로 사용 (중복 방지)
+      setGameOverData(prev => {
+        if (prev) return prev
+        return data
+      })
+      if (data.reason === 'checkmate') {
+        setIsCheckmate(true)
+      }
+    }
 
     // 이동 에러
-    socketService.onMoveError((data) => {
+    const handleMoveError = (data: { message: string }) => {
       console.error('Move error:', data.message)
-
-      // Rollback the move
       rollbackMove()
-
-      // Show error message
       setMoveError(data.message)
-      // 3초 후 에러 메시지 자동 숨김
       setTimeout(() => setMoveError(null), 3000)
-    })
+    }
 
     // 합법수 응답
-    socketService.onLegalMoves((data) => {
+    const handleLegalMoves = (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }> }) => {
       setServerLegalMoves(data.legalMoves || [])
-    })
+      setHasLegalMovesResponse(true)
+    }
 
-    socketService.onLegalMovesError((data) => {
+    const handleLegalMovesError = (data: { message: string }) => {
       console.error('Legal moves error:', data.message)
-    })
+    }
+
+    socketService.onMoveMade(handleMoveMade)
+    socketService.onGameOver(handleGameOver)
+    socketService.onMoveError(handleMoveError)
+    socketService.onLegalMoves(handleLegalMoves)
+    socketService.onLegalMovesError(handleLegalMovesError)
 
     // 정리
     return () => {
@@ -233,14 +277,48 @@ export default function GamePage() {
       socketService.offLegalMoves()
       socketService.offLegalMovesError()
     }
-  }, [applyOpponentMove, gameState])
+  }, []) // 빈 배열: 한 번만 등록
 
-  // Request legal moves whenever turn/board is set (initial and after join)
+  // 내 턴이 시작될 때 합법수 요청
   useEffect(() => {
-    if (gameState) {
+    if (gameState && gameState.currentTurn === myColor && !gameOverData) {
+      console.log('🎯 My turn started, requesting legal moves')
+      setHasLegalMovesResponse(false)
+      setServerLegalMoves([])
       socketService.requestLegalMoves(gameState.roomId)
     }
-  }, [gameState?.roomId, gameState?.currentTurn])
+  }, [gameState?.currentTurn, gameState?.roomId, myColor, gameOverData])
+
+  // 내 턴이 시작될 때 스테일메이트/체크메이트 백업 판정
+  // (서버 game-over 이벤트가 누락된 경우에만 작동)
+  useEffect(() => {
+    // 이미 게임 종료면 스킵
+    if (gameOverData) return
+    // 아직 합법수 응답이 없으면 스킵
+    if (!hasLegalMovesResponse) return
+    // 내 턴이 아니면 스킵 (내 턴 시작 시에만 판정)
+    if (!gameState || gameState.currentTurn !== myColor) return
+
+    const noLegalMoves = serverLegalMoves.length === 0
+
+    if (noLegalMoves) {
+      if (isCheck) {
+        // 내가 체크 상태인데 합법수 없음 = 내가 체크메이트 당함
+        const winner = myColor === 'white' ? 'black' : 'white'
+        console.log('🏁 Checkmate detected (backup): I lost, notifying server...')
+        setIsCheckmate(true)
+        setGameOverData({ winner, reason: 'checkmate' })
+        // 서버에 알려서 상대방에게도 game-over 전송
+        socketService.declareGameEnd(gameState.roomId, winner, 'checkmate')
+      } else {
+        // 체크 아닌데 합법수 없음 = 스테일메이트
+        console.log('🏁 Stalemate detected (backup), notifying server...')
+        setGameOverData({ winner: 'draw', reason: 'stalemate' })
+        // 서버에 알려서 상대방에게도 game-over 전송
+        socketService.declareGameEnd(gameState.roomId, 'draw', 'stalemate')
+      }
+    }
+  }, [hasLegalMovesResponse, serverLegalMoves, isCheck, gameState?.currentTurn, myColor, gameOverData])
 
   // 타이머 카운트다운
   useEffect(() => {
@@ -336,6 +414,9 @@ export default function GamePage() {
       console.log('Game is over, move prevented')
       return
     }
+
+    // 내가 둔 수이므로 직전에 둔 색을 저장
+    setLastMoverColor(myColor)
 
     // Server-authoritative: send move without optimistic local update
     if (gameState) {

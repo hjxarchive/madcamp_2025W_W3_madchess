@@ -181,6 +181,16 @@ export function setupSocketHandlers(io: Server) {
       }
     })
 
+    // Client declares game end (checkmate/stalemate backup - when server missed it)
+    socket.on('declare-game-end', (data: { matchId: string; winner: string; reason: string }) => {
+      console.log(`🏁 Client ${socket.id} declares game end:`, data)
+      // Broadcast to all players in the match room
+      io.to(data.matchId).emit('game-over', {
+        winner: data.winner,
+        reason: data.reason,
+      })
+    })
+
     // Leave queue
     socket.on('leave-queue', () => {
       gameManager.removeFromQueue(socket.id)

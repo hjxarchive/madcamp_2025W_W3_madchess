@@ -97,6 +97,14 @@ class SocketService {
     }
   }
 
+  // 클라이언트에서 체크메이트/스테일메이트를 감지했을 때 서버에 알림
+  declareGameEnd(roomId: string, winner: string, reason: string) {
+    if (this.socket) {
+      this.socket.emit('declare-game-end', { matchId: roomId, winner, reason })
+      console.log('Game end declared:', { matchId: roomId, winner, reason })
+    }
+  }
+
   // Event listeners
 
   // 게임 매칭 완료
