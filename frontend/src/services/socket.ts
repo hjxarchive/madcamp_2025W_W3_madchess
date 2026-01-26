@@ -81,11 +81,27 @@ class SocketService {
     }
   }
 
+  // 합법수 요청
+  requestLegalMoves(roomId: string) {
+    if (this.socket) {
+      this.socket.emit('request-legal-moves', { matchId: roomId })
+      console.log('Requested legal moves:', { matchId: roomId })
+    }
+  }
+
   // 기물 배치 전송
   sendPlacement(roomId: string, placement: any) {
     if (this.socket) {
       this.socket.emit('submit-placement', { matchId: roomId, placement })
       console.log('Placement sent:', { matchId: roomId, placement })
+    }
+  }
+
+  // 클라이언트에서 체크메이트/스테일메이트를 감지했을 때 서버에 알림
+  declareGameEnd(roomId: string, winner: string, reason: string) {
+    if (this.socket) {
+      this.socket.emit('declare-game-end', { matchId: roomId, winner, reason })
+      console.log('Game end declared:', { matchId: roomId, winner, reason })
     }
   }
 
@@ -181,6 +197,19 @@ class SocketService {
     }
   }
 
+  // 합법수 응답
+  onLegalMoves(callback: (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }> }) => void) {
+    if (this.socket) {
+      this.socket.on('legal-moves', callback)
+    }
+  }
+
+  onLegalMovesError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('legal-moves-error', callback)
+    }
+  }
+
   // Remove event listeners
   offGameFound() {
     if (this.socket) {
@@ -251,6 +280,18 @@ class SocketService {
   offMoveError() {
     if (this.socket) {
       this.socket.off('move-error')
+    }
+  }
+
+  offLegalMoves() {
+    if (this.socket) {
+      this.socket.off('legal-moves')
+    }
+  }
+
+  offLegalMovesError() {
+    if (this.socket) {
+      this.socket.off('legal-moves-error')
     }
   }
 }

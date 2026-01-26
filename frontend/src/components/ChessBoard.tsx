@@ -108,6 +108,7 @@ export default function ChessBoard({
           .catch(e => {
             console.error('Failed to fetch legal moves', e)
             setLegalMoves([])
+
           })
       } else {
         // Show all possible squares as hints (server will validate)
@@ -245,6 +246,11 @@ export default function ChessBoard({
                       ${isMyTurn ? 'hover:brightness-90' : 'cursor-not-allowed'}
                     `}
                   >
+                    {/* 체크된 왕 하이라이트 - 칸 전체 붉은 오버레이 */}
+                    {kingCheck && (
+                      <div className="absolute inset-0 bg-red-600/80 animate-pulse" />
+                    )}
+
                     {/* 합법적인 이동 표시 - 빈 칸에만 초록 점 */}
                     {legalMove && !isCapture && !piece && (
                       <div className="absolute w-4 h-4 rounded-full bg-green-500 bg-opacity-70" />

@@ -171,6 +171,26 @@ export function setupSocketHandlers(io: Server) {
       }
     })
 
+    // Request legal moves for current position (server-authoritative)
+    socket.on('request-legal-moves', (data: { matchId: string }) => {
+      const result = gameManager.getLegalMoves(data.matchId, socket.id)
+      if (result.success) {
+        socket.emit('legal-moves', { legalMoves: result.legalMoves })
+      } else {
+        socket.emit('legal-moves-error', { message: result.error || 'Failed to fetch legal moves' })
+      }
+    })
+
+    // Client declares game end (checkmate/stalemate backup - when server missed it)
+    socket.on('declare-game-end', (data: { matchId: string; winner: string; reason: string }) => {
+      console.log(`🏁 Client ${socket.id} declares game end:`, data)
+      // Broadcast to all players in the match room
+      io.to(data.matchId).emit('game-over', {
+        winner: data.winner,
+        reason: data.reason,
+      })
+    })
+
     // Leave queue
     socket.on('leave-queue', () => {
       gameManager.removeFromQueue(socket.id)

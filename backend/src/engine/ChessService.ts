@@ -27,6 +27,84 @@ export class ChessService {
         blackQueenSide: false,
     }
 
+    /** Snapshot engine state for reversible simulations */
+    private createSnapshot() {
+        return {
+            board: this.board.map(row => row.map(cell => cell ? { ...cell } : null)),
+            turn: this.turn,
+            enPassantTarget: this.enPassantTarget ? { ...this.enPassantTarget } : null,
+            halfmoveClock: this.halfmoveClock,
+            castlingRights: { ...this.castlingRights },
+            kingMoved: { ...this.kingMoved },
+            rookMoved: { ...this.rookMoved },
+        }
+    }
+
+    /** Restore engine state from snapshot */
+    private restoreSnapshot(snapshot: ReturnType<ChessService['createSnapshot']>) {
+        this.board = snapshot.board.map(row => row.map(cell => cell ? { ...cell } : null))
+        this.turn = snapshot.turn
+        this.enPassantTarget = snapshot.enPassantTarget ? { ...snapshot.enPassantTarget } : null
+        this.halfmoveClock = snapshot.halfmoveClock
+        this.castlingRights = { ...snapshot.castlingRights }
+        this.kingMoved = { ...snapshot.kingMoved }
+        this.rookMoved = { ...snapshot.rookMoved }
+    }
+
+    /** Position to UCI helper */
+    private positionToUci(pos: Position): string {
+        const fileChar = String.fromCharCode('a'.charCodeAt(0) + pos.file)
+        const rankChar = (pos.rank + 1).toString()
+        return `${fileChar}${rankChar}`
+    }
+
+    /**
+     * Get all legal moves for a given color (used by clients to filter UI options)
+     */
+    getLegalMovesForColor(color: 'white' | 'black'): Array<{ from: string; to: string; promotion?: string }> {
+        const legalMoves: Array<{ from: string; to: string; promotion?: string }> = []
+
+        for (let rank = 0; rank < 8; rank++) {
+            for (let file = 0; file < 8; file++) {
+                const piece = this.board[rank][file]
+                if (!piece || piece.color !== color) continue
+
+                const fromPos: Position = { file, rank }
+                const fromUci = this.positionToUci(fromPos)
+
+                for (let toRank = 0; toRank < 8; toRank++) {
+                    for (let toFile = 0; toFile < 8; toFile++) {
+                        if (toRank === rank && toFile === file) continue
+
+                        const toPos: Position = { file: toFile, rank: toRank }
+                        const toUci = this.positionToUci(toPos)
+
+                        // Promotion candidates (default to queen)
+                        const promotionNeeded = piece.type === 'p' && (toRank === 0 || toRank === 7)
+                        const promotionOptions = promotionNeeded ? ['q'] : [undefined]
+
+                        for (const promo of promotionOptions) {
+                            const snapshot = this.createSnapshot()
+
+                            // Force turn to the querying color for validation
+                            this.turn = color
+                            const result = this.makeMove(fromUci, toUci, promo)
+
+                            // Restore engine state after simulation
+                            this.restoreSnapshot(snapshot)
+
+                            if (result.success) {
+                                legalMoves.push({ from: fromUci, to: toUci, promotion: promo })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return legalMoves
+    }
+
     /**
      * UCI notation to position (e.g., "e2" -> {file: 4, rank: 1})
      */
