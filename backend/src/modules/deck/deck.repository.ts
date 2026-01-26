@@ -8,6 +8,7 @@ export const createDeck = async (data: CreateDeckDto, pieceMap: Map<string, numb
     const deck = await tx.deck.create({
       data: {
         user_id: data.userId,
+        name: data.name || 'Untitled Deck',
         total_p_val: 0, // 트리거가 계산해주겠지만 초기값
       },
     });
@@ -25,14 +26,14 @@ export const createDeck = async (data: CreateDeckDto, pieceMap: Map<string, numb
         });
       }
     }
-    
+
     // 3. 덱 조회 (composition 포함)
     return await tx.deck.findUnique({
       where: { id: deck.id },
-      include: { 
-        deck_composition: { 
-          include: { piece: true } 
-        } 
+      include: {
+        deck_composition: {
+          include: { piece: true }
+        }
       }
     });
   });
@@ -40,7 +41,7 @@ export const createDeck = async (data: CreateDeckDto, pieceMap: Map<string, numb
 
 export const findDecksByUser = async (userId: number, sort?: string, limit?: number) => {
   const orderBy: any = {};
-  
+
   if (sort === 'recent') {
     orderBy.created_at = 'desc';
   } else if (sort === 'winRate') {
@@ -51,10 +52,10 @@ export const findDecksByUser = async (userId: number, sort?: string, limit?: num
 
   return await prisma.deck.findMany({
     where: { user_id: userId },
-    include: { 
-      deck_composition: { 
-        include: { piece: true } 
-      } 
+    include: {
+      deck_composition: {
+        include: { piece: true }
+      }
     },
     orderBy: orderBy,
     take: limit
@@ -116,10 +117,10 @@ export const updateDeck = async (deckId: number, data: UpdateDeckDto, pieceMap?:
     // 덱 조회 반환
     return await tx.deck.findUnique({
       where: { id: deckId },
-      include: { 
-        deck_composition: { 
-          include: { piece: true } 
-        } 
+      include: {
+        deck_composition: {
+          include: { piece: true }
+        }
       }
     });
   });
