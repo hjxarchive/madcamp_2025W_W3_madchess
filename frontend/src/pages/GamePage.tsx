@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
+import { useAuthStore } from '../stores/authStore'
 import ChessBoard from '../components/ChessBoard'
 import { Move, Piece, PlacedPiece, PieceColor, squareToRowCol, PieceType, rowColToSquare, squareToUci } from '../types/game'
 import { socketService } from '../services/socket'
@@ -35,23 +36,23 @@ function CapturedBar({
   label: string
 }) {
   return (
-    <div className="mt-2 w-full border border-gray-800 bg-[#0A0A0A] px-3 py-2 flex items-center gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
-        {label}
-      </span>
-      <div className="flex items-center gap-1 overflow-x-auto">
+    <div className="mt-3 w-full border border-gray-800 bg-[#0A0A0A] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+        {label} ({pieces.length})
+      </div>
+      <div className="flex items-center gap-1 flex-wrap min-h-[32px]">
         {pieces.length === 0 ? (
-          <span className="text-xs text-gray-600">—</span>
+          <span className="text-xs text-gray-600 italic">None</span>
         ) : (
           pieces.map((piece, idx) => (
             <div
               key={`${piece}-${idx}`}
-              className="w-6 h-6 grid place-items-center shrink-0"
+              className="w-8 h-8 bg-gray-800/50 rounded grid place-items-center"
             >
               <img
                 src={PIECE_IMAGES[pieceColor][piece]}
                 alt={piece}
-                className="w-5 h-5"
+                className="w-7 h-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
               />
             </div>
           ))
@@ -64,6 +65,7 @@ function CapturedBar({
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const { gameState, setGameState, makeMove, applyOpponentMove, rollbackMove } = useGameStore()
   const [useImages, setUseImages] = useState(true)
   const [myColor, setMyColor] = useState<PieceColor>('white')
@@ -1050,18 +1052,18 @@ export default function GamePage() {
             <div className="border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 bg-[#D4FF00] flex items-center justify-center font-serif text-lg text-black">
-                  {me?.username?.[0]?.toUpperCase() || 'Y'}
+                  {user?.name?.[0]?.toUpperCase() || me?.username?.[0]?.toUpperCase() || 'Y'}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium">{me?.username || 'You'}</div>
+                      <div className="font-medium">{user?.name || me?.username || 'You'}</div>
                       <div className="text-xs text-gray-500 uppercase tracking-widest">
                         {myColor === 'white' ? 'WHITE' : 'BLACK'}
                       </div>
                     </div>
                     <div className="text-sm text-gray-500">
-                      {me?.rating || 1520}
+                      {user?.rating || me?.rating || 1500}
                     </div>
                   </div>
                   <CapturedBar

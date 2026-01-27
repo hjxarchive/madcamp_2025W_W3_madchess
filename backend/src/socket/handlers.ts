@@ -203,6 +203,48 @@ export function setupSocketHandlers(io: Server) {
       })
     })
 
+    // Resign - 기권
+    socket.on('resign', (data: { matchId: string }) => {
+      console.log(`🏳️ Player ${socket.id} resigned in match ${data.matchId}`)
+      const match = gameManager.getMatch(data.matchId)
+      if (match) {
+        // Determine winner (opponent of resigned player)
+        const winner = match.player1SocketId === socket.id ? 'black' : 'white'
+        io.to(data.matchId).emit('game-over', {
+          winner,
+          reason: 'resignation',
+        })
+      }
+    })
+
+    // Draw offer - 무승부 제안
+    socket.on('offer-draw', (data: { matchId: string }) => {
+      console.log(`🤝 Player ${socket.id} offers draw in match ${data.matchId}`)
+      const match = gameManager.getMatch(data.matchId)
+      if (match) {
+        // Send draw offer to opponent
+        const opponentSocketId = match.player1SocketId === socket.id
+          ? match.player2SocketId
+          : match.player1SocketId
+        io.to(opponentSocketId).emit('draw-offered', {
+          from: socket.id,
+        })
+      }
+    })
+
+    // Draw response - 무승부 응답
+    socket.on('respond-draw', (data: { matchId: string; accept: boolean }) => {
+      console.log(`🤝 Player ${socket.id} ${data.accept ? 'accepted' : 'rejected'} draw in match ${data.matchId}`)
+      if (data.accept) {
+        // Draw accepted - game over
+        io.to(data.matchId).emit('game-over', {
+          winner: 'draw',
+          reason: 'mutual agreement',
+        })
+      }
+      // If rejected, no action needed - game continues
+    })
+
     // Leave queue
     socket.on('leave-queue', () => {
       gameManager.removeFromQueue(socket.id)
