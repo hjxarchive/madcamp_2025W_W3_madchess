@@ -1,16 +1,14 @@
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUserGames } from '../services/userApi'
 import { useAuthStore } from '../stores/authStore'
 import type { UserGame } from '../types/api.types'
-import Hero3D from '../components/Hero3D'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const { user: authUser, isAuthenticated } = useAuthStore()
 
   const [recentGames, setRecentGames] = useState<UserGame[]>([])
-  const [userStats, setUserStats] = useState<{ totalGames: number; winRate: number } | null>(null)
   const [serverOnline, setServerOnline] = useState<boolean>(true)
   const [onlineCount, setOnlineCount] = useState<number>(1429)
 
@@ -18,17 +16,6 @@ export default function HomePage() {
     if (authUser?.id) {
       getUserGames(authUser.id).then(res => {
         if (res.success && res.data) setRecentGames(res.data.games.slice(0, 3))
-      })
-      // Fetch user stats (mocked or real)
-      // Note: Assuming logic to calculate stats if API doesn't return them directly in this view, 
-      // but assuming getUserStats is available or we derive from games for now to be safe if types mismatch.
-      // Actually we imported getUserStats from userApi, let's use it.
-      import('../services/userApi').then(({ getUserStats }) => {
-        getUserStats(authUser.id).then(res => {
-          if (res.success && res.data) {
-            setUserStats(res.data)
-          }
-        })
       })
     }
   }, [authUser])
@@ -102,30 +89,18 @@ export default function HomePage() {
         <div className="hidden lg:flex lg:col-span-3 flex-col justify-center px-12 border-r border-gray-900 z-10 bg-[#050505]">
           <div className="mb-16">
             <div className="flex items-start text-[#D4FF00]">
-              <span className="text-8xl font-serif font-light leading-none">
-                {isAuthenticated && userStats ? userStats.totalGames : '53'}
-              </span>
+              <span className="text-8xl font-serif font-light leading-none">53</span>
               <span className="text-lg mt-2 ml-1">↗</span>
             </div>
-            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">
-              {isAuthenticated ? 'Total Matches' : 'Tournaments Today'}
-            </div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Tournaments Today</div>
           </div>
 
           <div>
             <div className="flex items-start text-white">
-              <span className="text-8xl font-serif font-light leading-none">
-                {isAuthenticated && userStats ?
-                  (userStats.winRate > 1 ? userStats.winRate : Math.round(userStats.winRate * 100))
-                  : onlineCount}
-              </span>
-              <span className="text-lg mt-2 ml-1 text-[#D4FF00]">
-                {isAuthenticated ? '%' : '↗'}
-              </span>
+              <span className="text-8xl font-serif font-light leading-none">{onlineCount}</span>
+              <span className="text-lg mt-2 ml-1 text-[#D4FF00]">↗</span>
             </div>
-            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">
-              {isAuthenticated ? 'Win Rate' : 'Grandmasters Online'}
-            </div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Grandmasters Online</div>
           </div>
         </div>
 
@@ -178,29 +153,15 @@ export default function HomePage() {
                 </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col lg:flex-row items-center justify-center gap-8 px-8">
-                {/* 3D Queen */}
-                <div className="flex-1 w-full max-w-2xl h-[500px] lg:h-[600px] -ml-12">
-                  <Suspense fallback={
-                    <div className="h-full flex items-center justify-center text-gray-500">
-                      Loading 3D Scene...
-                    </div>
-                  }>
-                    <Hero3D />
-                  </Suspense>
-                </div>
-
-                {/* Text Content */}
-                <div className="flex-1 text-center lg:text-left">
-                  <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-light leading-none mb-6">
-                    <span className="block text-white">WORLD</span>
-                    <span className="block text-[#D4FF00]">CLASS</span>
-                    <span className="block text-white">STRATEGY</span>
-                  </h1>
-                  <p className="text-gray-400 max-w-md text-lg font-light tracking-wide mx-auto lg:mx-0">
-                    Join the ultimate deck-building chess arena. Compete globally.
-                  </p>
-                </div>
+              <div className="h-full flex flex-col justify-center items-center text-center">
+                <h1 className="text-6xl md:text-8xl font-serif font-light leading-none mb-6">
+                  <span className="block text-white">WORLD</span>
+                  <span className="block text-[#D4FF00]">CLASS</span>
+                  <span className="block text-white">STRATEGY</span>
+                </h1>
+                <p className="text-gray-400 max-w-md text-lg font-light tracking-wide">
+                  Join the ultimate deck-building chess arena. Compete globally.
+                </p>
               </div>
             )}
           </div>
