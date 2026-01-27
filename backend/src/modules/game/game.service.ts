@@ -80,14 +80,14 @@ export const getUserGames = async (userId: number, limit: number = 20, offset: n
 
     const gameHistory = game.game_history[0];
 
-    let result = 'unknown';
+    let result = 'UNKNOWN';
     if (gameHistory && gameHistory.result) {
-      result = gameHistory.result;
+      result = gameHistory.result.toUpperCase();
     } else if (game.result) {
-      if (game.result === 'white_win' && isWhite) result = 'win';
-      else if (game.result === 'black_win' && !isWhite) result = 'win';
-      else if (game.result === 'draw') result = 'draw';
-      else result = 'lose';
+      if (game.result === 'white_win' && isWhite) result = 'WIN';
+      else if (game.result === 'black_win' && !isWhite) result = 'WIN';
+      else if (game.result === 'draw') result = 'DRAW';
+      else result = 'LOSE';
     }
 
     return {
