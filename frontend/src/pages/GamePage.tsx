@@ -976,15 +976,23 @@ export default function GamePage() {
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
           <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-md w-full mx-4 text-center">
             <div className="w-12 h-12 mx-auto mb-4 bg-[#D4FF00] flex items-center justify-center">
-              <span className="text-2xl">{gameOverData.reason === 'checkmate' ? '👑' : '🤝'}</span>
+              <span className="text-2xl">
+                {gameOverData.winner === 'draw' ? '🤝' : 
+                 gameOverData.reason === 'checkmate' ? '👑' : 
+                 gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
+              </span>
             </div>
-            <h2 className="text-2xl font-serif mb-2">
-              {gameOverData.reason === 'checkmate' ? 'CHECKMATE' : 'GAME OVER'}
+            <h2 className="text-3xl font-serif mb-3 font-bold">
+              {gameOverData.winner === 'draw' ? 'DRAW!' : 
+               gameOverData.winner === 'white' ? 'WHITE won!' : 'BLACK won!'}
             </h2>
-            <p className="text-lg text-gray-400 mb-6">
-              {gameOverData.winner === 'draw'
-                ? `Game ended in ${gameOverData.reason}`
-                : gameOverData.winner === myColor ? 'Victory!' : 'Defeat'}
+            <p className="text-base text-gray-400 mb-6">
+              by {gameOverData.reason === 'resignation' ? 'resignation' :
+                  gameOverData.reason === 'checkmate' ? 'checkmate' :
+                  gameOverData.reason === 'stalemate' ? 'stalemate' :
+                  gameOverData.reason === 'placement' ? 'placement advantage' :
+                  gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
+                  gameOverData.reason}
             </p>
             <button
               onClick={() => navigate('/')}
