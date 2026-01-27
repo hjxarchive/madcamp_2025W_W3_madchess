@@ -199,7 +199,7 @@ export class GameManager {
     }
   }
 
-  getLegalMoves(matchId: string, socketId: string): { success: boolean; legalMoves?: Array<{ from: string; to: string; promotion?: string }>; error?: string } {
+  getLegalMoves(matchId: string, socketId: string): { success: boolean; legalMoves?: Array<{ from: string; to: string; promotion?: string }>; gameState?: { isCheck: boolean; isCheckmate: boolean; isStalemate: boolean }; error?: string } {
     const match = this.matches.get(matchId)
     if (!match) {
       return { success: false, error: 'Match not found' }
@@ -216,7 +216,8 @@ export class GameManager {
     }
 
     const legalMoves = match.chessEngine.getLegalMovesForColor(color)
-    return { success: true, legalMoves }
+    const gameState = match.chessEngine.getCurrentGameState()
+    return { success: true, legalMoves, gameState }
   }
 
   // ===== Room Management =====

@@ -120,6 +120,20 @@ export function setupSocketHandlers(io: Server) {
           io.to(match.player2SocketId).emit('placement:complete', {
             opponentPlacement: match.player1Placement,
           })
+          
+          // 배치 완료 후 흑 킹이 체크 상태인지 확인
+          // (게임은 백 턴부터 시작하므로, 흑이 체크 상태라면 백이 첫 수를 두기 전에 이미 승리)
+          const blackInCheck = match.chessEngine.isKingInCheck('black')
+          console.log(`🎮 Initial game state after placement - Black in check: ${blackInCheck}, Turn: ${match.chessEngine.getTurn()}`)
+          
+          // 흑이 체크 상태이면 즉시 백 승리로 게임 종료 (특수 승리 조건)
+          if (blackInCheck) {
+            console.log(`🏆 Black king is in check after placement! White wins by placement advantage.`)
+            io.to(data.matchId).emit('game-over', {
+              winner: 'white',
+              reason: 'placement',
+            })
+          }
         }
       } else {
         socket.emit('placement-error', { message: result.error })
@@ -175,7 +189,10 @@ export function setupSocketHandlers(io: Server) {
     socket.on('request-legal-moves', (data: { matchId: string }) => {
       const result = gameManager.getLegalMoves(data.matchId, socket.id)
       if (result.success) {
-        socket.emit('legal-moves', { legalMoves: result.legalMoves })
+        socket.emit('legal-moves', { 
+          legalMoves: result.legalMoves,
+          gameState: result.gameState
+        })
       } else {
         socket.emit('legal-moves-error', { message: result.error || 'Failed to fetch legal moves' })
       }

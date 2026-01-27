@@ -47,7 +47,7 @@ function CapturedBar({
           pieces.map((piece, idx) => (
             <div
               key={`${piece}-${idx}`}
-              className="w-8 h-8 bg-gray-800/50 rounded grid place-items-center"
+              className="w-8 h-8 bg-gray-400 rounded grid place-items-center"
             >
               <img
                 src={PIECE_IMAGES[pieceColor][piece]}
@@ -369,9 +369,18 @@ export default function GamePage() {
     }
 
     // 합법수 응답
-    const handleLegalMoves = (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }> }) => {
+    const handleLegalMoves = (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }>; gameState?: { isCheck: boolean; isCheckmate: boolean; isStalemate: boolean } }) => {
       setServerLegalMoves(data.legalMoves || [])
       setHasLegalMovesResponse(true)
+      
+      // 체크 상태 업데이트
+      if (data.gameState && gameState) {
+        console.log(`♟️ Game state received - Check: ${data.gameState.isCheck}, Checkmate: ${data.gameState.isCheckmate}, Stalemate: ${data.gameState.isStalemate}`)
+        setGameState({
+          ...gameState,
+          isCheck: data.gameState.isCheck
+        })
+      }
     }
 
     const handleLegalMovesError = (data: { message: string }) => {
@@ -439,6 +448,22 @@ export default function GamePage() {
     
     console.log(`📚 Saved board state for move ${currentMoveCount}`)
   }, [gameState?.pgn, gameState?.moveCount])
+
+  // 게임 시작 시 초기 체크 상태 확인 (배치 완료 후)
+  useEffect(() => {
+    if (gameState && gameState.moveCount === 0 && gameState.roomId) {
+      // 게임이 막 시작되었을 때 (moveCount === 0)
+      // 백의 턴이므로 백이 체크 상태인지 확인
+      console.log('🎮 Game started, checking initial check state')
+      
+      // 약간의 지연 후 체크 상태 확인 (배치가 완료된 후)
+      setTimeout(() => {
+        if (gameState.currentTurn === myColor) {
+          socketService.requestLegalMoves(gameState.roomId)
+        }
+      }, 500)
+    }
+  }, [gameState?.roomId, gameState?.moveCount])
 
   // 내 턴이 시작될 때 합법수 요청
   useEffect(() => {
