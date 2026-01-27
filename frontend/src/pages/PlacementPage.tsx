@@ -271,6 +271,7 @@ export default function PlacementPage() {
 
   // 기물 클릭으로 선택
   const handlePieceSelect = (type: PieceType) => {
+    if (waitingForOpponent) return // 배치 완료 후 수정 불가
     if (type === 'k') return // 킹은 선택 불가
     // 이미 선택된 기물을 다시 클릭하면 선택 해제
     if (selectedPieceType === type) {
@@ -282,6 +283,7 @@ export default function PlacementPage() {
 
   // 보드 칸 클릭으로 배치 또는 제거
   const handleSquareClick = (file: File, rank: Rank) => {
+    if (waitingForOpponent) return // 배치 완료 후 수정 불가
     const clickedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
 
     // 기존 기물이 있으면 제거하고 선택 상태로 만들기
