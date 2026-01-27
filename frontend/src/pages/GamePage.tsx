@@ -76,6 +76,8 @@ export default function GamePage() {
   const [showPromotion, setShowPromotion] = useState(false)
   const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
+  const [premove, setPremove] = useState<Move | null>(null)
+  const premoveRef = useRef<Move | null>(null)
 
   // 타이머 상태 (ms 단위)
   const [whiteTime, setWhiteTime] = useState(600 * 1000)
@@ -367,14 +369,22 @@ export default function GamePage() {
       if (iMoved && data.isCheck) {
         console.log('⏳ I made a check move, waiting for opponent mate confirmation...')
         setTimeout(() => {
-          // gameOverData가 이미 설정되었으면 무시
           setGameOverData(prev => {
             if (prev) return prev
-            // 아직 game-over가 안 왔으면 상대가 합법수가 없을 경우 서버에서 곧 올 것
-            // 여기서는 로그만 남김 (상대 클라이언트의 backup detection이 작동)
             return prev
           })
         }, 2000)
+      }
+
+      // 내 턴이 되었을 때 프리무브가 있다면 자동 실행
+      if (!iMoved) {
+        setTimeout(() => {
+          if (premoveRef.current) {
+            console.log('🚀 Executing premove:', premoveRef.current)
+            const moveExec = premoveRef.current
+            handleMove(moveExec)
+          }
+        }, 100)
       }
     }
 
@@ -718,6 +728,18 @@ export default function GamePage() {
     : gameState?.board || []
 
   const handleMove = (move: Move) => {
+    // 내 턴이 아니면 프리무브로 설정
+    if (gameState?.currentTurn !== myColor) {
+      console.log('🔴 Setting premove:', move)
+      setPremove(move)
+      premoveRef.current = move
+      return
+    }
+
+    // 내 턴이면 프리무브 초기화
+    setPremove(null)
+    premoveRef.current = null
+
     // 히스토리 보기 모드에서는 수를 둘 수 없음
     if (isViewingHistory) {
       console.log('Cannot move while viewing history')
@@ -1187,6 +1209,11 @@ export default function GamePage() {
                 useImages={useImages}
                 fetchLegalMoves={fetchLegalMovesFromServer}
                 castlingOptions={isViewingHistory ? [] : castlingOptions}
+                premove={premove || undefined}
+                onClearPmove={() => {
+                  setPremove(null)
+                  premoveRef.current = null
+                }}
               />
               {/* 히스토리 보기 모드 표시 */}
               {isViewingHistory && (
