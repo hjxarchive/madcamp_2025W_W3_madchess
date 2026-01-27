@@ -1,23 +1,24 @@
-export interface DeckCompositionMap {
-  [actionCode: string]: number; // e.g., { "p": 8, "k": 1 }
+export interface PlacedPieceDto {
+  type: string;  // piece action code: 'k', 'q', 'r', 'b', 'n', 'p'
+  position: string;  // board position: 'e1', 'a2', etc.
 }
 
 export interface CreateDeckDto {
   userId: number;
   name: string;
-  composition: DeckCompositionMap;
+  placement: PlacedPieceDto[];  // Array of pieces with positions
 }
 
 export interface UpdateDeckDto {
   name?: string;
-  composition?: DeckCompositionMap;
+  placement?: PlacedPieceDto[];
 }
 
 export interface DeckResponseDto {
   id: number;
   userId: number;
   name: string;
-  composition: DeckCompositionMap;
+  placement: PlacedPieceDto[];  // Return placement with positions
   totalCost: number;
   winCnt: number;
   loseCnt: number;
@@ -27,18 +28,7 @@ export interface DeckResponseDto {
 }
 
 export interface DeckWithPiecesDto extends DeckResponseDto {
-  pieces: PieceInDeckDto[];
   recentGames?: RecentDeckGameDto[];
-}
-
-export interface PieceInDeckDto {
-  pieceId: number;
-  name: string;
-  type: string;
-  value: number;
-  quantity: number;
-  action: string;
-  imgUrl?: string;
 }
 
 export interface RecentDeckGameDto {
@@ -49,7 +39,7 @@ export interface RecentDeckGameDto {
 }
 
 export interface ValidateDeckDto {
-  composition: DeckCompositionMap;
+  placement: PlacedPieceDto[];
 }
 
 export interface ValidateDeckResponseDto {

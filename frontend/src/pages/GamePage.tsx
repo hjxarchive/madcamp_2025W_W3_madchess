@@ -1,6 +1,7 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
+import { useAuthStore } from '../stores/authStore'
 import ChessBoard from '../components/ChessBoard'
 import { Move, Piece, PlacedPiece, PieceColor, squareToRowCol, PieceType, rowColToSquare, squareToUci } from '../types/game'
 import { socketService } from '../services/socket'
@@ -35,23 +36,23 @@ function CapturedBar({
   label: string
 }) {
   return (
-    <div className="mt-2 w-full rounded-full bg-emerald-900/40 border border-emerald-700/50 px-3 py-2 flex items-center gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-200/90">
-        {label}
-      </span>
-      <div className="flex items-center gap-2 overflow-x-auto">
+    <div className="mt-3 w-full border border-gray-800 bg-[#0A0A0A] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+        {label} ({pieces.length})
+      </div>
+      <div className="flex items-center gap-1 flex-wrap min-h-[32px]">
         {pieces.length === 0 ? (
-          <span className="text-xs text-emerald-200/60">없음</span>
+          <span className="text-xs text-gray-600 italic">None</span>
         ) : (
           pieces.map((piece, idx) => (
             <div
               key={`${piece}-${idx}`}
-              className="w-8 h-8 rounded-full bg-white/10 grid place-items-center shrink-0"
+              className="w-8 h-8 bg-gray-800/50 rounded grid place-items-center"
             >
               <img
                 src={PIECE_IMAGES[pieceColor][piece]}
                 alt={piece}
-                className="w-6 h-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]"
+                className="w-7 h-7 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
               />
             </div>
           ))
@@ -63,6 +64,8 @@ function CapturedBar({
 
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
+  const navigate = useNavigate()
+  const { user } = useAuthStore()
   const { gameState, setGameState, makeMove, applyOpponentMove, rollbackMove } = useGameStore()
   const [useImages, setUseImages] = useState(true)
   const [myColor, setMyColor] = useState<PieceColor>('white')
@@ -72,11 +75,11 @@ export default function GamePage() {
   const [showPromotion, setShowPromotion] = useState(false)
   const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
-  
+
   // 타이머 상태 (초 단위)
   const [myTime, setMyTime] = useState(10 * 60) // 10분
   const [opponentTime, setOpponentTime] = useState(10 * 60) // 10분
-  
+
   // 잡힌 기물 추적
   const [myCapturedPieces, setMyCapturedPieces] = useState<PieceType[]>([]) // 내가 잡은 기물
   const [opponentCapturedPieces, setOpponentCapturedPieces] = useState<PieceType[]>([]) // 상대가 잡은 기물
@@ -85,6 +88,10 @@ export default function GamePage() {
   const [hasLegalMovesResponse, setHasLegalMovesResponse] = useState(false)
   const [lastMoverColor, setLastMoverColor] = useState<PieceColor | null>(null)
   const [castlingOptions, setCastlingOptions] = useState<Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }>>([])
+
+  // Draw offer state
+  const [showDrawOffer, setShowDrawOffer] = useState(false)
+  const [drawOfferPending, setDrawOfferPending] = useState(false)
 
   // Ref for myColor to access in socket callbacks without closure issues
   const myColorRef = useRef<PieceColor>(myColor)
@@ -194,20 +201,20 @@ export default function GamePage() {
     // UCI를 algebraic notation으로 변환하는 함수
     const uciToAlgebraic = (uci: string, piece: PieceType, capturedPiece?: PieceType): string => {
       console.log(`🔄 Converting UCI to algebraic: uci=${uci}, piece=${piece}, captured=${capturedPiece}`)
-      
+
       const from = uci.substring(0, 2)
       const to = uci.substring(2, 4)
       const promotion = uci.length > 4 ? uci.substring(4) : undefined
-      
+
       const toFile = to[0]
       const toRank = to[1]
       const fromFile = from[0]
       const fromFileCode = from.charCodeAt(0) - 97 // a=0, b=1, ...
       const toFileCode = to.charCodeAt(0) - 97
       const isCapture = !!capturedPiece
-      
+
       let notation = ''
-      
+
       // 캐슬링 감지 (킹이 2칸 이동)
       if (piece === 'k' && Math.abs(toFileCode - fromFileCode) === 2) {
         if (toFile === 'g') {
@@ -232,15 +239,15 @@ export default function GamePage() {
         // 다른 기물
         const pieceSymbol = piece.toUpperCase()
         notation = pieceSymbol
-        
+
         // 캡처
         if (isCapture) {
           notation += 'x'
         }
-        
+
         notation += to
       }
-      
+
       console.log(`✅ Algebraic notation: ${notation}`)
       return notation
     }
@@ -262,12 +269,12 @@ export default function GamePage() {
       if (currentState) {
         const moverColor = iMoved ? currentMyColor : opponentColor
         console.log(`🎯 Move by: ${moverColor}, moveCount: ${currentState.moveCount}`)
-        
+
         // Algebraic notation으로 변환
         const algebraicMove = uciToAlgebraic(data.move.uci, data.move.piece, data.move.captured)
-        
+
         let newPgn = currentState.pgn
-        
+
         if (moverColor === 'white') {
           // 백의 수: "1. e4" 형식
           const moveNumber = Math.floor(currentState.moveCount / 2) + 1
@@ -282,7 +289,7 @@ export default function GamePage() {
           newPgn += ` ${algebraicMove}`
           console.log(`⚫ Black move: ${algebraicMove}`)
         }
-        
+
         console.log(`📝 New PGN: "${newPgn}"`)
         useGameStore.getState().updatePgn(newPgn)
       }
@@ -352,7 +359,7 @@ export default function GamePage() {
     const handleCastlingOptions = (data: { options: Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }> }) => {
       console.log('♜ Castling options received:', data.options)
       setCastlingOptions(data.options || [])
-      
+
       // 로그로 캐슬링 가능 여부 표시
       if (data.options && data.options.length > 0) {
         data.options.forEach(option => {
@@ -392,7 +399,7 @@ export default function GamePage() {
       setHasLegalMovesResponse(false)
       setServerLegalMoves([])
       socketService.requestLegalMoves(gameState.roomId)
-      
+
       // 캐슬링 옵션 요청
       socketService.requestCastlingOptions(gameState.roomId, myColor)
     }
@@ -455,16 +462,16 @@ export default function GamePage() {
     }
 
     const opponentColor = myColor === 'white' ? 'black' : 'white'
-    
+
     // 보드가 실제로 변경되었는지 확인
     let boardChanged = false
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
         const prev = previousBoard[row][col]
         const curr = gameState.board[row][col]
-        if ((prev === null && curr !== null) || 
-            (prev !== null && curr === null) ||
-            (prev !== null && curr !== null && (prev.type !== curr.type || prev.color !== curr.color))) {
+        if ((prev === null && curr !== null) ||
+          (prev !== null && curr === null) ||
+          (prev !== null && curr !== null && (prev.type !== curr.type || prev.color !== curr.color))) {
           boardChanged = true
           break
         }
@@ -532,7 +539,7 @@ export default function GamePage() {
       const fromSquare = squareToRowCol({ file: from[0] as any, rank: parseInt(from[1]) as any })
       const toSquare = squareToRowCol({ file: to[0] as any, rank: parseInt(to[1]) as any })
       const piece = gameState.board[fromSquare.row][fromSquare.col]
-      
+
       // 폰이 끝 랭크(1랭크 또는 8랭크)에 도달하는 경우
       if (piece && piece.type === 'p') {
         const promotionRank = piece.color === 'white' ? 0 : 7 // row index (0 = 8랭크, 7 = 1랭크)
@@ -558,23 +565,23 @@ export default function GamePage() {
   // 프로모션 선택 핸들러
   const handlePromotionSelect = (pieceType: 'q' | 'r' | 'b' | 'n') => {
     if (!promotionMove || !gameState) return
-    
+
     console.log(`✅ Promotion selected: ${pieceType}`)
-    
+
     // UCI에 프로모션 추가: "e7e8q"
     const uci = `${promotionMove.from}${promotionMove.to}${pieceType}`
     const move: Move = {
       uci,
       piece: 'p',
     }
-    
+
     // 내가 둔 수이므로 직전에 둔 색을 저장
     setLastMoverColor(myColor)
-    
+
     // 서버로 프로모션 정보 포함하여 전송
     socketService.sendMove(gameState.roomId, move)
     console.log('Promotion move sent to server:', move)
-    
+
     // 프로모션 UI 닫기
     setShowPromotion(false)
     setPromotionMove(null)
@@ -714,17 +721,52 @@ export default function GamePage() {
 
   const handleResign = () => {
     if (confirm('정말 기권하시겠습니까?')) {
-      // TODO: 항복 처리
-      console.log('Player resigned')
+      if (gameState) {
+        // 기권 처리: 상대가 승리
+        const winner = myColor === 'white' ? 'black' : 'white'
+        socketService.resign(gameState.roomId)
+        setGameOverData({ winner, reason: 'resignation' })
+        console.log('🏳️ Player resigned')
+      }
     }
   }
 
   const handleDrawOffer = () => {
+    if (drawOfferPending) {
+      alert('이미 무승부 제안을 보냈습니다. 상대방의 응답을 기다려주세요.')
+      return
+    }
     if (confirm('무승부를 제안하시겠습니까?')) {
-      // TODO: 무승부 제안
-      console.log('Draw offered')
+      if (gameState) {
+        socketService.offerDraw(gameState.roomId)
+        setDrawOfferPending(true)
+        console.log('🤝 Draw offered')
+      }
     }
   }
+
+  const handleDrawResponse = (accept: boolean) => {
+    if (gameState) {
+      socketService.respondToDraw(gameState.roomId, accept)
+      setShowDrawOffer(false)
+      if (accept) {
+        setGameOverData({ winner: 'draw', reason: 'mutual agreement' })
+      }
+    }
+  }
+
+  // Draw offer received handler
+  useEffect(() => {
+    const handleDrawOffered = () => {
+      setShowDrawOffer(true)
+    }
+
+    socketService.onDrawOffered(handleDrawOffered)
+
+    return () => {
+      socketService.offDrawOffered()
+    }
+  }, [])
 
   // 시간 포맷팅 (mm:ss)
   const formatTime = (seconds: number) => {
@@ -738,10 +780,10 @@ export default function GamePage() {
     if (!pgn) return []
     const moves: { move: number; white: string; black?: string }[] = []
     const parts = pgn.trim().split(/\s+/)
-    
+
     let currentMove = 0
     let moveObj: { move: number; white: string; black?: string } | null = null
-    
+
     parts.forEach(part => {
       if (part.match(/^\d+\.$/)) {
         if (moveObj) moves.push(moveObj)
@@ -755,7 +797,7 @@ export default function GamePage() {
         }
       }
     })
-    
+
     if (moveObj) moves.push(moveObj)
     return moves
   }
@@ -770,7 +812,7 @@ export default function GamePage() {
       q: 9,
       k: 0, // 킹은 점수에 포함하지 않음
     }
-    
+
     let total = 0
     gameState?.board.forEach(row => {
       row.forEach(piece => {
@@ -779,7 +821,7 @@ export default function GamePage() {
         }
       })
     })
-    
+
     return total
   }
 
@@ -787,33 +829,62 @@ export default function GamePage() {
   const myMaterial = calculateMaterial(myColor)
   const opponentMaterial = calculateMaterial(opponentColor)
   const materialDiff = myMaterial - opponentMaterial
-  
+
   // 바 너비 계산 (최대 ±10점 차이를 기준으로)
   const maxDiff = 10
   const normalizedDiff = Math.max(-maxDiff, Math.min(maxDiff, materialDiff))
   const barPercentage = 50 + (normalizedDiff / maxDiff) * 50
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-[#050505] text-white font-sans">
       {/* Game Over Modal */}
       {gameOverData && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4 text-center">
-            <h2 className="text-3xl font-bold mb-4">
-              {gameOverData.reason === 'checkmate' ? '👑 Checkmate!' : '🤝 Game Over'}
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+          <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-md w-full mx-4 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 bg-[#D4FF00] flex items-center justify-center">
+              <span className="text-2xl">{gameOverData.reason === 'checkmate' ? '👑' : '🤝'}</span>
+            </div>
+            <h2 className="text-2xl font-serif mb-2">
+              {gameOverData.reason === 'checkmate' ? 'CHECKMATE' : 'GAME OVER'}
             </h2>
-            <p className="text-xl mb-6">
+            <p className="text-lg text-gray-400 mb-6">
               {gameOverData.winner === 'draw'
                 ? `Game ended in ${gameOverData.reason}`
-                : `Winner: ${gameOverData.winner === myColor ? 'You!' : 'Opponent'}`
-              }
+                : gameOverData.winner === myColor ? 'Victory!' : 'Defeat'}
             </p>
-            <div className="space-y-3">
+            <button
+              onClick={() => navigate('/')}
+              className="w-full bg-[#D4FF00] text-black py-3 font-bold uppercase tracking-widest text-sm hover:bg-white transition-colors"
+            >
+              Back to Arena
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Draw Offer Modal */}
+      {showDrawOffer && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+          <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-md w-full mx-4 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 bg-gray-800 flex items-center justify-center">
+              <span className="text-2xl">🤝</span>
+            </div>
+            <h2 className="text-2xl font-serif mb-2">DRAW OFFER</h2>
+            <p className="text-lg text-gray-400 mb-6">
+              상대방이 무승부를 제안했습니다
+            </p>
+            <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => window.location.href = '/'}
-                className="w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+                onClick={() => handleDrawResponse(false)}
+                className="border border-gray-800 text-gray-400 py-3 font-bold uppercase tracking-widest text-sm hover:text-white hover:border-gray-600 transition-colors"
               >
-                Back to Home
+                거절
+              </button>
+              <button
+                onClick={() => handleDrawResponse(true)}
+                className="bg-[#D4FF00] text-black py-3 font-bold uppercase tracking-widest text-sm hover:bg-white transition-colors"
+              >
+                수락
               </button>
             </div>
           </div>
@@ -822,35 +893,35 @@ export default function GamePage() {
 
       {/* Promotion Modal */}
       {showPromotion && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
           onClick={handlePromotionCancel}
         >
-          <div 
-            className="bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4"
+          <div
+            className="bg-[#0A0A0A] border border-gray-800 p-6 max-w-sm w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold mb-4 text-center">Choose Promotion</h2>
-            <p className="text-sm text-gray-400 mb-6 text-center">Select a piece to promote your pawn</p>
+            <h2 className="text-xl font-serif mb-2 text-center">PROMOTION</h2>
+            <p className="text-sm text-gray-500 mb-6 text-center">Select a piece</p>
             <div className="flex justify-center gap-3 mb-4">
               {[{ type: 'q', name: 'Queen' }, { type: 'r', name: 'Rook' }, { type: 'b', name: 'Bishop' }, { type: 'n', name: 'Knight' }].map(({ type, name }) => (
                 <button
                   key={type}
                   onClick={() => handlePromotionSelect(type as 'q' | 'r' | 'b' | 'n')}
-                  className="bg-gray-700 hover:bg-gray-600 rounded-lg p-2 transition-colors flex flex-col items-center gap-1"
+                  className="border border-gray-800 hover:border-[#D4FF00] bg-[#0A0A0A] p-3 transition-colors flex flex-col items-center gap-1"
                 >
                   <img
                     src={PIECE_IMAGES[myColor][type as PieceType]}
                     alt={name}
                     className="w-10 h-10"
                   />
-                  <span className="text-xs font-medium">{name}</span>
+                  <span className="text-xs text-gray-500">{name}</span>
                 </button>
               ))}
             </div>
             <button
               onClick={handlePromotionCancel}
-              className="w-full bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg text-sm transition-colors"
+              className="w-full border border-gray-800 px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors"
             >
               Cancel
             </button>
@@ -859,16 +930,18 @@ export default function GamePage() {
       )}
 
       {/* 헤더 */}
-      <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-900/80 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 grid place-items-center rounded-sm bg-green-600 text-white font-black text-xs">♟</div>
-            <span className="font-semibold">Mad Chess</span>
-            <span className="text-xs text-slate-400">PvP Deck Builder Mode</span>
+      <header className="sticky top-0 z-10 border-b border-gray-900 bg-[#050505]/90 backdrop-blur">
+        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 bg-white skew-x-12"></div>
+            <div className="font-serif text-lg">
+              <span className="text-[#D4FF00]">MAD</span>
+              <span className="text-white">CHESS</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <button className="h-8 w-8 grid place-items-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors">⚙</button>
-            <button className="h-8 w-8 grid place-items-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors">🔔</button>
+            <div className="text-xs text-gray-500 uppercase tracking-widest">Live Match</div>
+            <div className="w-2 h-2 bg-[#D4FF00] animate-pulse"></div>
           </div>
         </div>
       </header>
@@ -894,25 +967,22 @@ export default function GamePage() {
 
             {/* 하단 버튼 */}
             {gameState?.currentTurn === myColor && !gameOverData && (
-              <div className="rounded-xl border border-green-600 bg-green-900/20 p-4">
-                <div className="text-sm font-semibold text-green-400 mb-3 text-center">
-                  당신의 차례입니다 (YOUR TURN)
-                </div>
-                <div className="text-xs text-slate-400 text-center mb-3">
-                  다음 수를 선택하세요
+              <div className="border border-[#D4FF00] bg-[#D4FF00]/5 p-4">
+                <div className="text-sm font-serif text-[#D4FF00] mb-3 text-center">
+                  YOUR TURN
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={handleDrawOffer}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors"
+                    className="px-4 py-2 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 uppercase tracking-widest text-xs font-bold transition-colors"
                   >
-                    무승부 요청
+                    Draw
                   </button>
                   <button
                     onClick={handleResign}
-                    className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg font-semibold transition-colors"
+                    className="px-4 py-2 border border-red-900 text-red-500 hover:bg-red-900/20 uppercase tracking-widest text-xs font-bold transition-colors"
                   >
-                    기권
+                    Resign
                   </button>
                 </div>
               </div>
@@ -922,138 +992,133 @@ export default function GamePage() {
           {/* 오른쪽 패널 */}
           <div className="flex flex-col gap-4">
             {/* 상대 프로필 */}
-            <div className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+            <div className="border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center gap-4">
-                <img
-                  src={`https://api.dicebear.com/8.x/avataaars/svg?seed=${opponent?.username}`}
-                  alt="opponent"
-                  className="h-16 w-16 rounded-lg bg-slate-700"
-                />
+                {opponent?.picture ? (
+                  <img
+                    src={opponent.picture}
+                    alt={opponent?.username || 'Opponent'}
+                    className="h-12 w-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-12 w-12 bg-gray-800 flex items-center justify-center font-serif text-lg rounded-full">
+                    {opponent?.username?.[0]?.toUpperCase() || 'O'}
+                  </div>
+                )}
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-semibold text-lg">{opponent?.username || 'player456'}</div>
-                      <div className={`text-xs font-semibold px-2 py-0.5 rounded inline-block ${opponent?.color === 'white' ? 'bg-slate-100 text-slate-900' : 'bg-slate-900 text-slate-100 border border-slate-600'}`}>
+                      <div className="font-medium">{opponent?.username || 'Opponent'}</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-widest">
                         {opponent?.color === 'white' ? 'WHITE' : 'BLACK'}
                       </div>
                     </div>
-                    <div className="text-sm">
-                      Rating: <span className="font-semibold text-yellow-400">{opponent?.rating || 1450}</span>
+                    <div className="text-sm text-gray-500">
+                      {opponent?.rating || 1500}
                     </div>
                   </div>
                   <CapturedBar
                     pieces={opponentCapturedPieces}
                     pieceColor={myColor}
-                    label="Captured your pieces"
+                    label="Captured"
                   />
                 </div>
               </div>
               {/* 타이머 */}
-              <div className="mt-3 flex items-center justify-between px-4 py-2 rounded-lg bg-slate-900">
-                <span className="text-xs text-slate-400 uppercase">Time Remaining</span>
-                <span className="text-xl font-bold font-mono">{formatTime(opponentTime)}</span>
+              <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#050505] border border-gray-900">
+                <span className="text-xs text-gray-600 uppercase tracking-widest">Time</span>
+                <span className="text-2xl font-mono font-light">{formatTime(opponentTime)}</span>
               </div>
             </div>
 
             {/* 대국 기록 */}
-            <div className="flex-1 rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+            <div className="flex-1 border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold">대국 기록 (History)</h2>
-                <button className="text-xs text-blue-400 hover:underline">↻</button>
+                <h2 className="text-xs uppercase tracking-widest text-gray-500">Move History</h2>
               </div>
-              <div className="max-h-64 overflow-y-auto space-y-1">
+              <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-sm">
                 {parseMoves(gameState?.pgn || '').map((m, idx) => (
                   <div
                     key={idx}
-                    className={`grid grid-cols-[auto_1fr_1fr] gap-3 px-3 py-2 rounded-md text-sm ${
-                      idx === parseMoves(gameState?.pgn || '').length - 1 ? 'bg-green-900/40' : 'hover:bg-slate-700/40'
-                    }`}
+                    className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${idx === parseMoves(gameState?.pgn || '').length - 1 ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]' : 'hover:bg-gray-900'
+                      }`}
                   >
-                    <span className="text-slate-400">{m.move}.</span>
-                    <span className="font-mono">{m.white}</span>
-                    <span className="font-mono text-slate-300">{m.black || ''}</span>
+                    <span className="text-gray-600">{m.move}.</span>
+                    <span className="text-white">{m.white}</span>
+                    <span className="text-gray-400">{m.black || ''}</span>
                   </div>
                 ))}
                 {!gameState?.pgn && (
-                  <div className="text-center text-slate-500 py-8 text-sm">
-                    * Move powered by Swift Reflexes© card
+                  <div className="text-center text-gray-600 py-8 text-xs uppercase tracking-widest">
+                    No moves yet
                   </div>
                 )}
               </div>
             </div>
 
             {/* 내 프로필 */}
-            <div className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+            <div className="border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center gap-4">
-                <img
-                  src={`https://api.dicebear.com/8.x/avataaars/svg?seed=${me?.username}`}
-                  alt="me"
-                  className="h-16 w-16 rounded-lg bg-slate-700"
-                />
+                {user?.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user?.name || 'You'}
+                    className="h-12 w-12 rounded-full object-cover border-2 border-[#D4FF00]"
+                  />
+                ) : (
+                  <div className="h-12 w-12 bg-[#D4FF00] flex items-center justify-center font-serif text-lg text-black rounded-full">
+                    {user?.name?.[0]?.toUpperCase() || me?.username?.[0]?.toUpperCase() || 'Y'}
+                  </div>
+                )}
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-semibold text-lg">{me?.username || '나 (YOU)'}</div>
-                      <div className={`text-xs font-semibold px-2 py-0.5 rounded inline-block ${myColor === 'white' ? 'bg-slate-100 text-slate-900' : 'bg-slate-900 text-slate-100 border border-slate-600'}`}>
+                      <div className="font-medium">{user?.name || me?.username || 'You'}</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-widest">
                         {myColor === 'white' ? 'WHITE' : 'BLACK'}
                       </div>
                     </div>
-                    <div className="text-sm">
-                      Rating: <span className="font-semibold text-yellow-400">{me?.rating || 1520}</span>
+                    <div className="text-sm text-gray-500">
+                      {user?.rating || me?.rating || 1500}
                     </div>
                   </div>
                   <CapturedBar
                     pieces={myCapturedPieces}
                     pieceColor={myColor === 'white' ? 'black' : 'white'}
-                    label="You captured"
+                    label="Captured"
                   />
                 </div>
               </div>
               {/* 타이머 */}
-              <div className="mt-3 flex items-center justify-between px-4 py-2 rounded-lg bg-blue-900/40">
-                <span className="text-xs text-slate-400 uppercase">Your Move</span>
-                <span className="text-xl font-bold font-mono text-blue-400">{formatTime(myTime)}</span>
+              <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#050505] border border-[#D4FF00]/30">
+                <span className="text-xs text-[#D4FF00] uppercase tracking-widest">Your Time</span>
+                <span className="text-2xl font-mono font-light text-[#D4FF00]">{formatTime(myTime)}</span>
               </div>
             </div>
 
             {/* 기물 밸런스 */}
-            <div className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+            <div className="border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold">기물 밸런스 (Material)</h3>
-                <div className={`text-lg font-bold ${materialDiff > 0 ? 'text-green-400' : materialDiff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                <h3 className="text-xs uppercase tracking-widest text-gray-500">Material</h3>
+                <div className={`text-lg font-mono ${materialDiff > 0 ? 'text-[#D4FF00]' : materialDiff < 0 ? 'text-red-500' : 'text-gray-500'}`}>
                   {materialDiff > 0 ? '+' : ''}{materialDiff}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className={`text-xs font-semibold px-2 py-0.5 rounded shadow ${myColor === 'white' ? 'bg-white text-gray-900 border border-gray-300' : 'bg-black text-white border border-white/40'}`}>
-                  {myColor === 'white' ? 'W' : 'B'}
-                </div>
+              <div className="flex items-center gap-3">
+                <div className="text-xs text-gray-500">{myColor[0].toUpperCase()}</div>
                 <div className="flex-1">
-                  <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                  <div className="relative h-2 bg-gray-900 overflow-hidden">
                     <div
-                      className={`absolute inset-y-0 left-0 transition-all duration-300 ${myColor === 'white' ? 'bg-white' : 'bg-black'}`}
+                      className="absolute inset-y-0 left-0 transition-all duration-300 bg-[#D4FF00]"
                       style={{ width: `${barPercentage}%` }}
                     ></div>
-                    <div
-                      className={`absolute inset-y-0 right-0 transition-all duration-300 ${opponentColor === 'white' ? 'bg-white/80' : 'bg-black'}`}
-                      style={{ width: `${100 - barPercentage}%` }}
-                    ></div>
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-black/10 pointer-events-none"></div>
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-300">
-                    <span className="flex items-center gap-2">
-                      <span className={`inline-block h-3 w-3 rounded-full border ${myColor === 'white' ? 'bg-white border-gray-300' : 'bg-black border-white/60'}`}></span>
-                      <span>{myMaterial}점</span>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className={`inline-block h-3 w-3 rounded-full border ${opponentColor === 'white' ? 'bg-white border-gray-300' : 'bg-black border-white/60'}`}></span>
-                      <span>{opponentMaterial}점</span>
-                    </span>
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                    <span>{myMaterial}</span>
+                    <span>{opponentMaterial}</span>
                   </div>
                 </div>
-                <div className={`text-xs font-semibold px-2 py-0.5 rounded shadow ${opponentColor === 'white' ? 'bg-white text-gray-900 border border-gray-300' : 'bg-black text-white border border-white/40'}`}>
-                  {opponentColor === 'white' ? 'W' : 'B'}
-                </div>
+                <div className="text-xs text-gray-500">{opponentColor[0].toUpperCase()}</div>
               </div>
             </div>
           </div>

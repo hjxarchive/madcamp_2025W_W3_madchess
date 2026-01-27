@@ -1,6 +1,6 @@
 import * as deckRepo from './deck.repository';
 import * as pieceRepo from '../piece/piece.repository';
-import { CreateDeckDto, UpdateDeckDto, DeckResponseDto, DeckWithPiecesDto, ValidateDeckDto, ValidateDeckResponseDto, PieceInDeckDto } from './DTOS/deck.dto';
+import { CreateDeckDto, UpdateDeckDto, DeckResponseDto, DeckWithPiecesDto, ValidateDeckDto, ValidateDeckResponseDto, PlacedPieceDto } from './DTOS/deck.dto';
 
 // 기물 제한 (API 명세서 기준)
 const PIECE_LIMITS: { [key: string]: number } = {
@@ -14,7 +14,8 @@ const PIECE_LIMITS: { [key: string]: number } = {
 
 const BUDGET = 30; // 예산 제한
 
-export const validateDeck = async (composition: { [key: string]: number }): Promise<ValidateDeckResponseDto> => {
+// placement 배열을 검증
+export const validateDeck = async (placement: PlacedPieceDto[]): Promise<ValidateDeckResponseDto> => {
   const allPieces = await pieceRepo.findAllPieces();
   const valueMap = new Map<string, number>();
 
@@ -25,23 +26,29 @@ export const validateDeck = async (composition: { [key: string]: number }): Prom
   let totalCost = 0;
   let hasKing = false;
   const errors: string[] = [];
+  const pieceCounts: { [key: string]: number } = {};
 
-  for (const [code, qty] of Object.entries(composition)) {
-    const normalizedCode = code.toLowerCase();
+  for (const piece of placement) {
+    const normalizedCode = piece.type.toLowerCase();
 
     // 킹 확인
     if (normalizedCode === 'k') {
       hasKing = true;
     }
 
+    // 개수 카운트
+    pieceCounts[normalizedCode] = (pieceCounts[normalizedCode] || 0) + 1;
+
     // 비용 계산
     const val = valueMap.get(normalizedCode) || 0;
-    totalCost += val * qty;
+    totalCost += val;
+  }
 
-    // 개수 제한 확인
-    const limit = PIECE_LIMITS[normalizedCode];
-    if (limit && qty > limit) {
-      errors.push(`${normalizedCode.toUpperCase()} 개수 초과: 최대 ${limit}개 (현재 ${qty}개)`);
+  // 개수 제한 확인
+  for (const [code, count] of Object.entries(pieceCounts)) {
+    const limit = PIECE_LIMITS[code];
+    if (limit && count > limit) {
+      errors.push(`${code.toUpperCase()} 개수 초과: 최대 ${limit}개 (현재 ${count}개)`);
     }
   }
 
@@ -62,7 +69,7 @@ export const validateDeck = async (composition: { [key: string]: number }): Prom
 
 export const createDeck = async (dto: CreateDeckDto): Promise<DeckResponseDto> => {
   // 1. 덱 검증
-  const validation = await validateDeck(dto.composition);
+  const validation = await validateDeck(dto.placement);
   if (!validation.valid) {
     const errorMsg = validation.errors[0];
     if (errorMsg.includes('킹')) throw new Error('KING_REQUIRED');
@@ -84,16 +91,16 @@ export const createDeck = async (dto: CreateDeckDto): Promise<DeckResponseDto> =
   if (!deck) throw new Error('DECK_CREATION_FAILED');
 
   // 4. 응답 DTO 생성
-  const composition: { [key: string]: number } = {};
-  deck.deck_composition.forEach((dc: any) => {
-    composition[dc.piece.action.toLowerCase()] = dc.quantity;
-  });
+  const placement: PlacedPieceDto[] = deck.deck_composition.map((dc: any) => ({
+    type: dc.piece.action.toLowerCase(),
+    position: dc.position
+  }));
 
   return {
     id: deck.id,
     userId: deck.user_id,
     name: dto.name,
-    composition,
+    placement,
     totalCost: validation.totalCost,
     winCnt: deck.win_cnt,
     loseCnt: deck.lose_cnt,
@@ -104,15 +111,23 @@ export const createDeck = async (dto: CreateDeckDto): Promise<DeckResponseDto> =
 
 export const getUserDecks = async (userId: number, sort?: string, limit?: number): Promise<DeckResponseDto[]> => {
   const decks = await deckRepo.findDecksByUser(userId, sort, limit);
+  const allPieces = await pieceRepo.findAllPieces();
+  const valueMap = new Map<string, number>();
+  allPieces.forEach((p: any) => {
+    valueMap.set(p.action.toLowerCase(), p.value);
+  });
 
   return decks.map((deck: any) => {
-    const composition: { [key: string]: number } = {};
+    const placement: PlacedPieceDto[] = [];
     let totalCost = 0;
 
     deck.deck_composition.forEach((dc: any) => {
       const code = dc.piece.action.toLowerCase();
-      composition[code] = dc.quantity;
-      totalCost += dc.piece.value * dc.quantity;
+      placement.push({
+        type: code,
+        position: dc.position
+      });
+      totalCost += dc.piece.value;
     });
 
     const totalGames = deck.win_cnt + deck.lose_cnt;
@@ -122,7 +137,7 @@ export const getUserDecks = async (userId: number, sort?: string, limit?: number
       id: deck.id,
       userId: deck.user_id,
       name: deck.name || `Deck ${deck.id}`,
-      composition,
+      placement,
       totalCost,
       winCnt: deck.win_cnt,
       loseCnt: deck.lose_cnt,
@@ -139,24 +154,16 @@ export const getDeckById = async (deckId: number): Promise<DeckWithPiecesDto> =>
     throw new Error('DECK_NOT_FOUND');
   }
 
-  const composition: { [key: string]: number } = {};
+  const placement: PlacedPieceDto[] = [];
   let totalCost = 0;
-  const pieces: PieceInDeckDto[] = [];
 
   deck.deck_composition.forEach((dc: any) => {
     const code = dc.piece.action.toLowerCase();
-    composition[code] = dc.quantity;
-    totalCost += dc.piece.value * dc.quantity;
-
-    pieces.push({
-      pieceId: dc.piece.id,
-      name: dc.piece.name,
+    placement.push({
       type: code,
-      value: dc.piece.value,
-      quantity: dc.quantity,
-      action: dc.piece.action,
-      imgUrl: dc.piece.img_url || undefined
+      position: dc.position
     });
+    totalCost += dc.piece.value;
   });
 
   const totalGames = deck.win_cnt + deck.lose_cnt;
@@ -190,21 +197,20 @@ export const getDeckById = async (deckId: number): Promise<DeckWithPiecesDto> =>
     id: deck.id,
     userId: deck.user_id,
     name: deck.name || `Deck ${deck.id}`,
-    composition,
+    placement,
     totalCost,
     winCnt: deck.win_cnt,
     loseCnt: deck.lose_cnt,
     winRate: Math.round(winRate * 1000) / 1000,
     createdAt: deck.created_at,
-    pieces,
     recentGames
   };
 };
 
 export const updateDeck = async (deckId: number, dto: UpdateDeckDto): Promise<DeckResponseDto> => {
-  // composition이 변경되는 경우 검증
-  if (dto.composition) {
-    const validation = await validateDeck(dto.composition);
+  // placement가 변경되는 경우 검증
+  if (dto.placement) {
+    const validation = await validateDeck(dto.placement);
     if (!validation.valid) {
       const errorMsg = validation.errors[0];
       if (errorMsg.includes('킹')) throw new Error('KING_REQUIRED');
@@ -223,16 +229,16 @@ export const updateDeck = async (deckId: number, dto: UpdateDeckDto): Promise<De
     const updatedDeck = await deckRepo.updateDeck(deckId, dto, pieceMap);
     if (!updatedDeck) throw new Error('DECK_NOT_FOUND');
 
-    const composition: { [key: string]: number } = {};
-    updatedDeck.deck_composition.forEach((dc: any) => {
-      composition[dc.piece.action.toLowerCase()] = dc.quantity;
-    });
+    const placement: PlacedPieceDto[] = updatedDeck.deck_composition.map((dc: any) => ({
+      type: dc.piece.action.toLowerCase(),
+      position: dc.position
+    }));
 
     return {
       id: updatedDeck.id,
       userId: updatedDeck.user_id,
-      name: dto.name || `Deck ${updatedDeck.id}`,
-      composition,
+      name: dto.name || updatedDeck.name || `Deck ${updatedDeck.id}`,
+      placement,
       totalCost: validation.totalCost,
       winCnt: updatedDeck.win_cnt,
       loseCnt: updatedDeck.lose_cnt,
@@ -240,8 +246,36 @@ export const updateDeck = async (deckId: number, dto: UpdateDeckDto): Promise<De
     };
   }
 
-  // name만 변경하는 경우 (현재 스키마에 name 없음)
-  throw new Error('UPDATE_NOT_SUPPORTED');
+  // name만 변경하는 경우
+  const allPieces = await pieceRepo.findAllPieces();
+  const pieceMap = new Map<string, number>();
+  allPieces.forEach((p: any) => {
+    pieceMap.set(p.action.toLowerCase(), p.id);
+  });
+
+  const updatedDeck = await deckRepo.updateDeck(deckId, dto, pieceMap);
+  if (!updatedDeck) throw new Error('DECK_NOT_FOUND');
+
+  const placement: PlacedPieceDto[] = updatedDeck.deck_composition.map((dc: any) => ({
+    type: dc.piece.action.toLowerCase(),
+    position: dc.position
+  }));
+
+  let totalCost = 0;
+  updatedDeck.deck_composition.forEach((dc: any) => {
+    totalCost += dc.piece.value;
+  });
+
+  return {
+    id: updatedDeck.id,
+    userId: updatedDeck.user_id,
+    name: dto.name || updatedDeck.name || `Deck ${updatedDeck.id}`,
+    placement,
+    totalCost,
+    winCnt: updatedDeck.win_cnt,
+    loseCnt: updatedDeck.lose_cnt,
+    createdAt: updatedDeck.created_at
+  };
 };
 
 export const removeDeck = async (deckId: number) => {

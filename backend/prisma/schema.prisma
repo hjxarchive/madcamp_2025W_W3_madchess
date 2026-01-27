@@ -25,13 +25,14 @@ model deck {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model deck_composition {
+  id       Int    @id @default(autoincrement())
   deck_id  Int
   piece_id Int
-  quantity Int   @default(1)
-  deck     deck  @relation(fields: [deck_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_deck_composition_deck")
-  piece    piece @relation(fields: [piece_id], references: [id], onUpdate: NoAction, map: "fk_deck_composition_piece")
+  position String @db.VarChar(2)  // e.g., "e1", "a2"
+  deck     deck   @relation(fields: [deck_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_deck_composition_deck")
+  piece    piece  @relation(fields: [piece_id], references: [id], onUpdate: NoAction, map: "fk_deck_composition_piece")
 
-  @@id([deck_id, piece_id])
+  @@unique([deck_id, position])
   @@index([deck_id], map: "idx_deck_composition_deck")
 }
 

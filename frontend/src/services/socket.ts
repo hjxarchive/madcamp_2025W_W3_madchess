@@ -114,6 +114,30 @@ class SocketService {
     }
   }
 
+  // 기권
+  resign(matchId: string) {
+    if (this.socket) {
+      this.socket.emit('resign', { matchId })
+      console.log('🏳️ Player resigned:', { matchId })
+    }
+  }
+
+  // 무승부 제안
+  offerDraw(matchId: string) {
+    if (this.socket) {
+      this.socket.emit('offer-draw', { matchId })
+      console.log('🤝 Draw offered:', { matchId })
+    }
+  }
+
+  // 무승부 제안 응답
+  respondToDraw(matchId: string, accept: boolean) {
+    if (this.socket) {
+      this.socket.emit('respond-draw', { matchId, accept })
+      console.log(`🤝 Draw ${accept ? 'accepted' : 'rejected'}:`, { matchId })
+    }
+  }
+
   // Event listeners
 
   // 게임 매칭 완료
@@ -229,6 +253,19 @@ class SocketService {
   onCastlingOptionsError(callback: (data: { message: string }) => void) {
     if (this.socket) {
       this.socket.on('castling-options-error', callback)
+    }
+  }
+
+  // 무승부 제안 받음
+  onDrawOffered(callback: (data: { from: string }) => void) {
+    if (this.socket) {
+      this.socket.on('draw-offered', callback)
+    }
+  }
+
+  offDrawOffered() {
+    if (this.socket) {
+      this.socket.off('draw-offered')
     }
   }
 
