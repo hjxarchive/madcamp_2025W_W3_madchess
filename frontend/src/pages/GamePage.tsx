@@ -372,7 +372,7 @@ export default function GamePage() {
     const handleLegalMoves = (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }>; gameState?: { isCheck: boolean; isCheckmate: boolean; isStalemate: boolean } }) => {
       setServerLegalMoves(data.legalMoves || [])
       setHasLegalMovesResponse(true)
-      
+
       // 체크 상태 업데이트
       if (data.gameState && gameState) {
         console.log(`♟️ Game state received - Check: ${data.gameState.isCheck}, Checkmate: ${data.gameState.isCheckmate}, Stalemate: ${data.gameState.isStalemate}`)
@@ -427,16 +427,16 @@ export default function GamePage() {
   // PGN이 업데이트될 때마다 보드 상태를 히스토리에 저장
   useEffect(() => {
     if (!gameState?.board || !gameState?.pgn) return
-    
+
     const currentMoveCount = gameState.moveCount
-    
+
     // 이미 저장된 수인지 확인
     const existingEntry = moveHistory.find(h => h.moveIndex === currentMoveCount)
     if (existingEntry) return
-    
+
     // 새로운 보드 상태 저장 (deep copy)
     const boardCopy = gameState.board.map(row => row.map(cell => cell ? { ...cell } : null))
-    
+
     setMoveHistory(prev => [
       ...prev,
       {
@@ -445,7 +445,7 @@ export default function GamePage() {
         moveIndex: currentMoveCount
       }
     ])
-    
+
     console.log(`📚 Saved board state for move ${currentMoveCount}`)
   }, [gameState?.pgn, gameState?.moveCount])
 
@@ -455,7 +455,7 @@ export default function GamePage() {
       // 게임이 막 시작되었을 때 (moveCount === 0)
       // 백의 턴이므로 백이 체크 상태인지 확인
       console.log('🎮 Game started, checking initial check state')
-      
+
       // 약간의 지연 후 체크 상태 확인 (배치가 완료된 후)
       setTimeout(() => {
         if (gameState.currentTurn === myColor) {
@@ -600,7 +600,7 @@ export default function GamePage() {
   // 히스토리 네비게이션 함수들
   const goToPreviousMove = () => {
     if (moveHistory.length === 0) return
-    
+
     if (!isViewingHistory) {
       // 처음 히스토리 모드 진입: 마지막 수에서 하나 이전으로
       const lastIndex = moveHistory.length - 2
@@ -618,13 +618,13 @@ export default function GamePage() {
 
   const goToNextMove = () => {
     if (!isViewingHistory) return
-    
+
     const nextIndex = viewingMoveIndex + 1
     if (nextIndex >= moveHistory.length - 1) {
       // 최신 상태로 돌아감
       setIsViewingHistory(false)
       setViewingMoveIndex(-1)
-      
+
       // "Current" 메시지 표시
       setShowCurrentMessage(true)
       setTimeout(() => setShowCurrentMessage(false), 1000)
@@ -636,7 +636,7 @@ export default function GamePage() {
   const goToLatestMove = () => {
     setIsViewingHistory(false)
     setViewingMoveIndex(-1)
-    
+
     // "Current" 메시지 표시
     setShowCurrentMessage(true)
     setTimeout(() => setShowCurrentMessage(false), 1000)
@@ -977,22 +977,22 @@ export default function GamePage() {
           <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-md w-full mx-4 text-center">
             <div className="w-12 h-12 mx-auto mb-4 bg-[#D4FF00] flex items-center justify-center">
               <span className="text-2xl">
-                {gameOverData.winner === 'draw' ? '🤝' : 
-                 gameOverData.reason === 'checkmate' ? '👑' : 
-                 gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
+                {gameOverData.winner === 'draw' ? '🤝' :
+                  gameOverData.reason === 'checkmate' ? '👑' :
+                    gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
               </span>
             </div>
             <h2 className="text-3xl font-serif mb-3 font-bold">
-              {gameOverData.winner === 'draw' ? 'DRAW!' : 
-               gameOverData.winner === 'white' ? 'WHITE won!' : 'BLACK won!'}
+              {gameOverData.winner === 'draw' ? 'DRAW!' :
+                gameOverData.winner === 'white' ? 'WHITE won!' : 'BLACK won!'}
             </h2>
             <p className="text-base text-gray-400 mb-6">
               by {gameOverData.reason === 'resignation' ? 'resignation' :
-                  gameOverData.reason === 'checkmate' ? 'checkmate' :
+                gameOverData.reason === 'checkmate' ? 'checkmate' :
                   gameOverData.reason === 'stalemate' ? 'stalemate' :
-                  gameOverData.reason === 'placement' ? 'placement advantage' :
-                  gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
-                  gameOverData.reason}
+                    gameOverData.reason === 'placement' ? 'placement advantage' :
+                      gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
+                        gameOverData.reason}
             </p>
             <button
               onClick={() => navigate('/')}
@@ -1112,9 +1112,8 @@ export default function GamePage() {
                 </div>
               )}
               {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
-              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${
-                showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-              }`}>
+              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                }`}>
                 Current
               </div>
             </div>
@@ -1196,30 +1195,29 @@ export default function GamePage() {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h2>
               </div>
-              
+
               <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-sm">
                 {parseMoves(gameState?.pgn || '').map((m, idx) => {
                   const whiteMoveIndex = idx * 2 + 1  // 백의 수는 홀수 인덱스 (1, 3, 5...)
                   const blackMoveIndex = idx * 2 + 2  // 흑의 수는 짝수 인덱스 (2, 4, 6...)
                   const totalMoves = parseMoves(gameState?.pgn || '').length
                   const isLastMove = idx === totalMoves - 1
-                  
+
                   // 현재 보고 있는 수 하이라이트
                   const viewingWhite = isViewingHistory && moveHistory[viewingMoveIndex]?.moveIndex === whiteMoveIndex
                   const viewingBlack = isViewingHistory && moveHistory[viewingMoveIndex]?.moveIndex === blackMoveIndex
-                  
+
                   // 최신 수 하이라이트 (히스토리 모드가 아닐 때)
                   const isLatestWhite = !isViewingHistory && isLastMove && !m.black
                   const isLatestBlack = !isViewingHistory && isLastMove && m.black
-                  
+
                   return (
                     <div
                       key={idx}
-                      className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${
-                        (isLatestWhite || isLatestBlack) && !isViewingHistory
+                      className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${(isLatestWhite || isLatestBlack) && !isViewingHistory
                           ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]'
                           : 'hover:bg-gray-900'
-                      }`}
+                        }`}
                     >
                       <span className="text-gray-600">{m.move}.</span>
                       <span
@@ -1230,13 +1228,12 @@ export default function GamePage() {
                             setViewingMoveIndex(historyIndex)
                           }
                         }}
-                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${
-                          viewingWhite
+                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${viewingWhite
                             ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
                             : isLatestWhite
                               ? 'text-[#D4FF00]'
                               : 'text-white'
-                        }`}
+                          }`}
                       >
                         {m.white}
                       </span>
@@ -1249,13 +1246,12 @@ export default function GamePage() {
                             setViewingMoveIndex(historyIndex)
                           }
                         }}
-                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${
-                          viewingBlack
+                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${viewingBlack
                             ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
                             : isLatestBlack
                               ? 'text-[#D4FF00]'
                               : 'text-gray-400'
-                        } ${m.black ? '' : 'cursor-default'}`}
+                          } ${m.black ? '' : 'cursor-default'}`}
                       >
                         {m.black || ''}
                       </span>
@@ -1268,7 +1264,7 @@ export default function GamePage() {
                   </div>
                 )}
               </div>
-              
+
               {/* 히스토리 네비게이션 버튼 */}
               <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-gray-900">
                 <button

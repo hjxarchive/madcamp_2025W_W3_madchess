@@ -70,16 +70,16 @@ export const getUserGames = async (userId: number, limit: number = 20, offset: n
 
   const gamesDto: UserGameHistoryDto[] = games.map((game: any) => {
     const isWhite = game.white_player_id === userId;
-    const opponent = isWhite 
-      ? game.user_game_black_player_idTouser 
+    const opponent = isWhite
+      ? game.user_game_black_player_idTouser
       : game.user_game_white_player_idTouser;
-    
-    const myDeck = isWhite 
-      ? game.deck_game_white_deck_idTodeck 
+
+    const myDeck = isWhite
+      ? game.deck_game_white_deck_idTodeck
       : game.deck_game_black_deck_idTodeck;
 
     const gameHistory = game.game_history[0];
-    
+
     let result = 'unknown';
     if (gameHistory && gameHistory.result) {
       result = gameHistory.result;
@@ -190,16 +190,112 @@ export const resignGame = async (gameId: number, userId: number): Promise<Resign
   };
 };
 
+/**
+ * 게임 종료 시 결과를 DB에 저장하는 함수 (소켓 핸들러에서 호출)
+ * @param whiteUserId - 백 플레이어 userId (문자열 또는 숫자)
+ * @param blackUserId - 흑 플레이어 userId (문자열 또는 숫자)
+ * @param whiteDeckId - 백 플레이어 deckId (문자열 또는 숫자)
+ * @param blackDeckId - 흑 플레이어 deckId (문자열 또는 숫자)
+ * @param winner - 승자 ('white', 'black', 'draw')
+ * @param reason - 종료 사유 ('checkmate', 'stalemate', 'resignation', 'placement', 'mutual agreement')
+ * @param pgn - PGN 기록 (선택)
+ */
+export const saveGameResult = async (
+  whiteUserId: string | number,
+  blackUserId: string | number,
+  whiteDeckId: string | number,
+  blackDeckId: string | number,
+  winner: 'white' | 'black' | 'draw',
+  reason: string,
+  pgn?: string
+): Promise<{ success: boolean; gameId?: number; error?: string }> => {
+  try {
+    // userId와 deckId를 숫자로 변환
+    const whiteId = typeof whiteUserId === 'string' ? parseInt(whiteUserId) : whiteUserId;
+    const blackId = typeof blackUserId === 'string' ? parseInt(blackUserId) : blackUserId;
+    const whiteDeck = typeof whiteDeckId === 'string' ? parseInt(whiteDeckId) : whiteDeckId;
+    const blackDeck = typeof blackDeckId === 'string' ? parseInt(blackDeckId) : blackDeckId;
+
+    // NaN 체크
+    if (isNaN(whiteId) || isNaN(blackId)) {
+      console.log(`⚠️ Invalid userId: white=${whiteUserId}, black=${blackUserId}`);
+      return { success: false, error: 'Invalid userId' };
+    }
+
+    // deckId가 없으면 기본값 사용 (1)
+    const whiteDeckFinal = isNaN(whiteDeck) ? 1 : whiteDeck;
+    const blackDeckFinal = isNaN(blackDeck) ? 1 : blackDeck;
+
+    // 게임 결과 문자열
+    let gameResult: string;
+    if (winner === 'white') {
+      gameResult = 'white_win';
+    } else if (winner === 'black') {
+      gameResult = 'black_win';
+    } else {
+      gameResult = 'draw';
+    }
+
+    // 1. 게임 레코드 생성
+    const game = await gameRepo.createGame(whiteId, blackId, whiteDeckFinal, blackDeckFinal);
+    console.log(`📝 Game created: ${game.id}`);
+
+    // 2. 게임 결과 업데이트
+    await gameRepo.updateGameResult(game.id, gameResult);
+
+    // 3. 레이팅 변화 계산 (간단한 고정값)
+    const whiteRatingChange = winner === 'white' ? 12 : winner === 'black' ? -12 : 0;
+    const blackRatingChange = winner === 'black' ? 12 : winner === 'white' ? -12 : 0;
+
+    // 4. 게임 히스토리 생성 (각 플레이어별)
+    const whiteResult = winner === 'white' ? 'win' : winner === 'black' ? 'lose' : 'draw';
+    const blackResult = winner === 'black' ? 'win' : winner === 'white' ? 'lose' : 'draw';
+
+    await gameRepo.createGameHistory(whiteId, game.id, 'white', whiteResult, whiteRatingChange);
+    await gameRepo.createGameHistory(blackId, game.id, 'black', blackResult, blackRatingChange);
+
+    // 5. 사용자 레이팅 업데이트
+    const whiteUser = await userRepo.findUserById(whiteId);
+    const blackUser = await userRepo.findUserById(blackId);
+
+    if (whiteUser) {
+      await userRepo.updateUserRating(
+        whiteId,
+        whiteUser.rating + whiteRatingChange,
+        whiteUser.rd,
+        whiteUser.volatility
+      );
+    }
+
+    if (blackUser) {
+      await userRepo.updateUserRating(
+        blackId,
+        blackUser.rating + blackRatingChange,
+        blackUser.rd,
+        blackUser.volatility
+      );
+    }
+
+    console.log(`✅ Game ${game.id} saved: ${gameResult} by ${reason}`);
+    console.log(`📊 Rating changes: White ${whiteRatingChange > 0 ? '+' : ''}${whiteRatingChange}, Black ${blackRatingChange > 0 ? '+' : ''}${blackRatingChange}`);
+
+    return { success: true, gameId: game.id };
+  } catch (error) {
+    console.error('❌ Error saving game result:', error);
+    return { success: false, error: String(error) };
+  }
+};
+
 // 유틸리티 함수: FEN을 보드로 파싱
 function parseFenToBoard(fen: string): any[][] {
   const board: any[][] = [];
-  
+
   if (!fen) {
     return Array(8).fill(null).map(() => Array(8).fill(null));
   }
 
   const rows = fen.split(' ')[0].split('/');
-  
+
   for (const row of rows) {
     const boardRow: any[] = [];
     for (const char of row) {
