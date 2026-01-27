@@ -44,6 +44,9 @@ export default function PlacementPage() {
   const [usedBudget, setUsedBudget] = useState(0)
   const [waitingForOpponent, setWaitingForOpponent] = useState(false)
 
+  // Timer state (2 minutes = 120 seconds)
+  const [timeLeft, setTimeLeft] = useState(120)
+
   // Saved decks from database
   const { user } = useAuthStore()
   const [savedDecks, setSavedDecks] = useState<DeckWithStats[]>([])
@@ -401,6 +404,36 @@ export default function PlacementPage() {
     }
   }
 
+  // Timer countdown - auto-submit when time runs out
+  useEffect(() => {
+    // Don't run timer if already waiting for opponent or no gameId
+    if (waitingForOpponent || !gameId) return
+
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          // Time's up! Auto-submit
+          clearInterval(timer)
+
+          // Ensure King is placed before auto-submit
+          const kingPlaced = placedPieces.some(p => p.type === 'k')
+          if (kingPlaced && gameId) {
+            socketService.sendPlacement(gameId, {
+              color: myColor,
+              placement: placedPieces,
+            })
+            console.log('⏰ 시간 종료! 자동 배치 전송:', { color: myColor, placement: placedPieces })
+            setWaitingForOpponent(true)
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [waitingForOpponent, gameId, myColor, placedPieces])
+
   const availablePieces = getAvailablePieces()
 
   // 배치된 기물 요약
@@ -422,7 +455,9 @@ export default function PlacementPage() {
             <div className="text-xs text-slate-400">배치 단계</div>
             <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-slate-800">
               <span className="text-xs">남은 시간:</span>
-              <span className="font-semibold text-orange-400">0:58</span>
+              <span className={`font-semibold font-mono ${timeLeft <= 30 ? 'text-red-400 animate-pulse' : 'text-orange-400'}`}>
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </span>
             </div>
             <button className="h-8 w-8 grid place-items-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors">⚙</button>
           </div>
