@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { socketService } from '../services/socket'
+import { useAuthStore } from '../stores/authStore'
 
 const KING_IMAGES = {
   white: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
@@ -17,6 +18,7 @@ export default function MatchmakingPage() {
   const [inputRoomCode, setInputRoomCode] = useState('')
   const [waiting, setWaiting] = useState(false)
   const [error, setError] = useState('')
+  const { user } = useAuthStore()
 
   // WebSocket 연결
   useEffect(() => {
@@ -75,7 +77,8 @@ export default function MatchmakingPage() {
   const handleCreateRoom = () => {
     if (!selectedColor) return
 
-    const userId = `user-${Date.now()}`
+    // 실제 로그인된 사용자 ID 사용 (DB 저장 위해 숫자 ID 필요)
+    const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
     const deckId = 'default-deck'
 
     socketService.createRoom(userId, deckId, selectedColor)
@@ -87,7 +90,8 @@ export default function MatchmakingPage() {
       return
     }
 
-    const userId = `user-${Date.now()}`
+    // 실제 로그인된 사용자 ID 사용 (DB 저장 위해 숫자 ID 필요)
+    const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
     const deckId = 'default-deck'
 
     socketService.joinRoom(inputRoomCode.trim().toUpperCase(), userId, deckId)
