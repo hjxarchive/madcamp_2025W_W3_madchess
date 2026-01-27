@@ -1194,7 +1194,7 @@ export default function GamePage() {
             {/* 대국 기록 */}
             <div className="flex-1 border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs uppercase tracking-widest text-gray-500">Move History</h2>
+                <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h2>
               </div>
               
               <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-sm">

@@ -464,9 +464,9 @@ export default function PlacementPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-xs text-gray-500 uppercase tracking-widest">Placement Phase</div>
+            <div className="text-xs text-[#D4FF00] uppercase tracking-widest font-bold">Placement Phase</div>
             <div className="flex items-center gap-2 px-4 py-2 bg-[#0A0A0A] border border-gray-800">
-              <span className="text-xs text-gray-500 uppercase">Time:</span>
+              <span className="text-xs text-[#D4FF00] uppercase font-bold">Time:</span>
               <span className={`font-mono text-lg ${timeLeft <= 30 ? 'text-red-500 animate-pulse' : 'text-[#D4FF00]'}`}>
                 {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
               </span>
@@ -580,7 +580,7 @@ export default function PlacementPage() {
           <div className="flex flex-col gap-6">
             {/* 덱 선택 */}
             <section className="border border-gray-900 bg-[#0A0A0A] p-4">
-              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Load Saved Deck</div>
+              <div className="text-xs text-[#D4FF00] uppercase tracking-widest mb-3 font-bold">Load Saved Deck</div>
               <select
                 className="w-full px-4 py-2 bg-[#050505] border border-gray-800 text-white focus:outline-none focus:border-[#D4FF00] transition-colors"
                 value={selectedDeckId || ''}
@@ -605,7 +605,7 @@ export default function PlacementPage() {
 
             {/* 보유 기물 */}
             <section className="border border-gray-900 bg-[#0A0A0A] p-4">
-              <div className="text-xs text-gray-500 uppercase tracking-widest mb-4">Available Pieces</div>
+              <div className="text-xs text-[#D4FF00] uppercase tracking-widest mb-4 font-bold">Available Pieces</div>
               <div className="grid grid-cols-3 gap-3">
                 {availablePieces.map((piece) => {
                   const isKing = piece.type === 'k'
@@ -616,9 +616,9 @@ export default function PlacementPage() {
                       <div
                         onClick={() => handlePieceSelect(piece.type)}
                         className={`
-                          border bg-[#050505] p-3 text-center
+                          border bg-gray-700 p-3 text-center
                           transition-all duration-200
-                          ${isKing ? 'opacity-50 cursor-not-allowed border-gray-800' : 'cursor-pointer hover:border-gray-600 border-gray-800'}
+                          ${isKing ? 'opacity-50 cursor-not-allowed border-gray-800' : 'cursor-pointer hover:border-gray-600 hover:bg-gray-600 border-gray-800'}
                           ${isSelected ? 'border-[#D4FF00] bg-[#D4FF00]/10' : ''}
                         `}
                       >
@@ -645,10 +645,10 @@ export default function PlacementPage() {
 
             {/* 배치된 기물 요약 */}
             <section className="border border-gray-900 bg-[#0A0A0A] p-4">
-              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Placed Pieces</div>
+              <div className="text-xs text-[#D4FF00] uppercase tracking-widest mb-3 font-bold">Placed Pieces</div>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(placedSummary).map(([type, count]) => (
-                  <div key={type} className="flex items-center gap-2 px-3 py-1.5 bg-[#050505] border border-gray-800">
+                  <div key={type} className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 border border-gray-600">
                     <img
                       src={PIECE_IMAGES[myColor][type as PieceType]}
                       alt={type}
