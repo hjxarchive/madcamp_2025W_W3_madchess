@@ -19,10 +19,11 @@ interface Match {
   id: string
   player1SocketId: string
   player2SocketId: string
-  player1: { userId: string; deckId: string; username?: string; picture?: string; rating?: number }
-  player2: { userId: string; deckId: string; username?: string; picture?: string; rating?: number }
+  player1: { userId: string; deckId: string; color: 'white' | 'black'; username?: string; picture?: string; rating?: number }
+  player2: { userId: string; deckId: string; color: 'white' | 'black'; username?: string; picture?: string; rating?: number }
   player1Color: 'white' | 'black'
   player2Color: 'white' | 'black'
+  standardPgn: string
   player1Placement?: Array<{ type: string; file: string; rank: number }>
   player2Placement?: Array<{ type: string; file: string; rank: number }>
   whitePlacement?: Array<{ type: string; file: string; rank: number }>
@@ -111,8 +112,8 @@ export class GameManager {
           id: matchId,
           player1SocketId: player1.socketId,
           player2SocketId: player2.socketId,
-          player1: { userId: player1.userId, deckId: player1.deckId, username: player1.username, picture: player1.picture, rating: player1.rating },
-          player2: { userId: player2.userId, deckId: player2.deckId, username: player2.username, picture: player2.picture, rating: player2.rating },
+          player1: { userId: player1.userId, deckId: player1.deckId, color: 'white', username: player1.username, picture: player1.picture, rating: player1.rating },
+          player2: { userId: player2.userId, deckId: player2.deckId, color: 'black', username: player2.username, picture: player2.picture, rating: player2.rating },
           player1Color: 'white',
           player2Color: 'black',
           chessEngine,
@@ -122,6 +123,7 @@ export class GameManager {
           timeControl: { limit, increment, label: tc },
           whiteTime: limit * 1000, // ms
           blackTime: limit * 1000, // ms
+          standardPgn: '',
         }
 
         this.matches.set(matchId, match)
@@ -230,7 +232,7 @@ export class GameManager {
     const blackPlacementStr = JSON.stringify(match.player2Placement)
     const movesStr = match.chessEngine.getPGN()
 
-    return `${whitePlacementStr}|${blackPlacementStr}|${movesStr}`
+    return `${whitePlacementStr}|${blackPlacementStr}|${match.standardPgn || ''}`
   }
 
   makeMove(matchId: string, socketId: string, move: any): {
@@ -360,14 +362,30 @@ export class GameManager {
       winner = moverColor
     }
 
-    // Sync GameState from Engine
+    // Sync GameState from Engine and Update standardPgn
+    const moverColor = match.player1SocketId === socketId ? match.player1Color : match.player2Color
+    // We don't have algebraic yet, so use UCI space-separated for PGN logic
+    const moveStr = move.uci
+
+    if (moverColor === 'white') {
+      const moveNumber = Math.floor(match.gameState.moveCount / 2) + 1
+      if (match.standardPgn) {
+        match.standardPgn += ` ${moveNumber}. ${moveStr}`
+      } else {
+        match.standardPgn = `1. ${moveStr}`
+      }
+    } else {
+      match.standardPgn += ` ${moveStr}`
+    }
+
     const engineBoard = match.chessEngine.getBoard()
     match.gameState = {
       ...match.gameState,
       board: [...engineBoard].reverse(),
       currentTurn: match.chessEngine.getTurn(),
-      pgn: match.chessEngine.getPGN(),
-      isCheck: result.isCheck
+      pgn: match.standardPgn,
+      isCheck: result.isCheck,
+      moveCount: match.gameState.moveCount + 1
     }
 
     console.log(`✅ Move validated: ${move.uci}`)
@@ -475,8 +493,8 @@ export class GameManager {
       id: room.matchId,
       player1SocketId: room.hostSocketId,
       player2SocketId: guestSocketId,
-      player1: { userId: room.host.userId, deckId: room.host.deckId, username: room.host.username, picture: room.host.picture, rating: room.host.rating },
-      player2: { userId, deckId, username, picture, rating },
+      player1: { userId: room.host.userId, deckId: room.host.deckId, color: room.host.color, username: room.host.username, picture: room.host.picture, rating: room.host.rating },
+      player2: { userId, deckId, color: guestColor, username, picture, rating },
       player1Color: room.host.color,
       player2Color: guestColor,
       gameState: this.initializeGame(),
@@ -486,6 +504,7 @@ export class GameManager {
       timeControl: { limit: 600, increment: 0, label: '10+0' },
       whiteTime: 600000,
       blackTime: 600000,
+      standardPgn: '',
     }
 
     this.matches.set(room.matchId, match)

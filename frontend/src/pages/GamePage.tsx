@@ -347,7 +347,8 @@ export default function GamePage() {
       if (data.blackTime !== undefined) setBlackTime(data.blackTime)
 
       // Apply server-confirmed move
-      applyOpponentMove(data.move)
+      // If I moved, skip increment because optimistic update already did it
+      applyOpponentMove(data.move, iMoved)
 
       // 히스토리 보기 모드에서 벗어나기 (상대가 수를 두면 최신 상태로)
       setIsViewingHistory(false)
@@ -1197,6 +1198,23 @@ export default function GamePage() {
         <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6">
           {/* 왼쪽: 체스판 */}
           <div className="flex flex-col gap-4">
+            {/* Premove Indicator */}
+            <div className={`h-8 flex items-center px-4 text-xs font-bold uppercase tracking-widest transition-all duration-300 ${premove ? 'bg-red-900/40 text-red-400 border border-red-900/50 opacity-100' : 'opacity-0'}`}>
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                Premove Active: {premove?.uci}
+              </span>
+              <button
+                onClick={() => {
+                  setPremove(null)
+                  premoveRef.current = null
+                }}
+                className="ml-auto hover:text-white underline transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+
             <div className="inline-block relative">
               <ChessBoard
                 board={displayBoard}
