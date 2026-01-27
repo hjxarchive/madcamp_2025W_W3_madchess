@@ -743,12 +743,16 @@ export class GameManager {
     const aiPlacement = []
     const pieces = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
 
+    // Determine AI ranks based on its color
+    const majorRank = player2Color === 'white' ? 1 : 8
+    const pawnRank = player2Color === 'white' ? 2 : 7
+
     for (let i = 0; i < 8; i++) {
       const file = String.fromCharCode(97 + i) // a,b,c...
       // Major pieces
-      aiPlacement.push({ type: pieces[i], file, rank: 1 })
+      aiPlacement.push({ type: pieces[i], file, rank: majorRank })
       // Pawns
-      aiPlacement.push({ type: 'p', file, rank: 2 })
+      aiPlacement.push({ type: 'p', file, rank: pawnRank })
     }
 
     const match: Match = {
