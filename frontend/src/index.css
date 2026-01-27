@@ -7,8 +7,8 @@
 :root {
   font-family: 'Outfit', sans-serif;
   line-height: 1.5;
-  font-weight: 400;
-  
+  font-weight: 300;
+
   color-scheme: dark;
   --color-bg: #050505;
   --color-text: #ffffff;
@@ -19,24 +19,45 @@
 
 body {
   margin: 0;
-  min-width: 320px;
   min-height: 100vh;
   background-color: var(--color-bg);
   color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.font-serif {
-  font-family: 'Zilla Slab', serif;
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.text-accent {
-  color: var(--color-accent);
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
 }
 
-.bg-accent {
-  background-color: var(--color-accent);
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
 }
 
-.border-accent {
-  border-color: var(--color-accent);
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Utility */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Hide Spline Watermark */
+a[href^="https://spline.design"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#spline-watermark {
+  display: none !important;
 }
