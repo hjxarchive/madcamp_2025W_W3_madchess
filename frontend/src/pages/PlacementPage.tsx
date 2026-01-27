@@ -2,6 +2,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { PieceType, PieceColor, PIECE_COSTS, PIECE_MAX_COUNT, PlacedPiece, File, Rank } from '../types/game'
 import { socketService } from '../services/socket'
+import { useAuthStore } from '../stores/authStore'
+import { getUserDecks } from '../services/userApi'
+import type { DeckWithStats } from '../types/api.types'
 
 interface AvailablePiece {
   type: PieceType
@@ -41,6 +44,11 @@ export default function PlacementPage() {
   const [usedBudget, setUsedBudget] = useState(0)
   const [waitingForOpponent, setWaitingForOpponent] = useState(false)
 
+  // Saved decks from database
+  const { user } = useAuthStore()
+  const [savedDecks, setSavedDecks] = useState<DeckWithStats[]>([])
+  const [selectedDeckId, setSelectedDeckId] = useState<number | null>(null)
+
   // 초기화: sessionStorage에서 색상 정보 읽기 및 킹 자동 배치
   useEffect(() => {
     const savedColor = sessionStorage.getItem('selectedColor') as PieceColor | null
@@ -53,6 +61,61 @@ export default function PlacementPage() {
       setPlacedPieces([{ type: 'k', file: 'e', rank: kingRank }])
     }
   }, [])
+
+  // Fetch saved decks from database
+  useEffect(() => {
+    if (user?.id) {
+      getUserDecks(user.id).then(res => {
+        if (res?.success && res.data) {
+          setSavedDecks(res.data)
+        }
+      }).catch(() => { })
+    }
+  }, [user])
+
+  // Load a saved deck onto the board
+  const handleLoadDeck = (deckId: number) => {
+    const deck = savedDecks.find(d => d.id === deckId)
+    if (!deck || !deck.placement) return
+
+    // Convert API placement to PlacedPiece[] with correct ranks for color
+    const baseRankOffset = myColor === 'white' ? 0 : 4  // white: 1-4, black: 5-8
+    const newPlacement: PlacedPiece[] = []
+
+    deck.placement.forEach((p: any) => {
+      const pos = p.position || 'a1'
+      const file = pos[0] as File
+      let rank = parseInt(pos[1]) as Rank
+
+      // Adjust rank for black player (mirror placement)
+      if (myColor === 'black') {
+        rank = (9 - rank) as Rank  // 1->8, 2->7, 3->6, 4->5
+      }
+
+      newPlacement.push({
+        type: p.type as PieceType,
+        file,
+        rank
+      })
+    })
+
+    // Ensure King is placed correctly
+    const kingRank: Rank = myColor === 'white' ? 1 : 8
+    const hasKing = newPlacement.some(p => p.type === 'k')
+    if (!hasKing) {
+      newPlacement.push({ type: 'k', file: 'e', rank: kingRank })
+    } else {
+      // Update King position to correct rank
+      const kingIdx = newPlacement.findIndex(p => p.type === 'k')
+      if (kingIdx >= 0) {
+        newPlacement[kingIdx].rank = kingRank
+        newPlacement[kingIdx].file = 'e'
+      }
+    }
+
+    setPlacedPieces(newPlacement)
+    setSelectedDeckId(deckId)
+  }
 
   // 개발 모드에서 테스트 함수 노출
   useEffect(() => {
@@ -472,11 +535,26 @@ export default function PlacementPage() {
             {/* 덱 선택 */}
             <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
               <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">저장된 덱 불러오기</div>
-              <select className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-gray-700 text-white focus:outline-none focus:border-blue-500 transition-colors">
-                <option>기본 밸런스 덱</option>
-                <option>공격형 덱</option>
-                <option>방어형 덱</option>
+              <select
+                className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-gray-700 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                value={selectedDeckId || ''}
+                onChange={(e) => {
+                  const deckId = parseInt(e.target.value)
+                  if (!isNaN(deckId)) {
+                    handleLoadDeck(deckId)
+                  }
+                }}
+              >
+                <option value="">-- 덱 선택 --</option>
+                {savedDecks.map(deck => (
+                  <option key={deck.id} value={deck.id}>
+                    {deck.name} ({deck.totalCost}pts)
+                  </option>
+                ))}
               </select>
+              {savedDecks.length === 0 && (
+                <div className="text-xs text-slate-500 mt-2">저장된 덱이 없습니다. 덱 빌더에서 덱을 만들어 보세요!</div>
+              )}
             </section>
 
             {/* 보유 기물 */}
