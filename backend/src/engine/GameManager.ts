@@ -117,7 +117,11 @@ export class GameManager {
           player1Color: 'white',
           player2Color: 'black',
           chessEngine,
-          gameState: this.initializeGame(),
+          gameState: this.initializeGame(
+            matchId,
+            { userId: player1.userId, username: player1.username || 'Player 1', rating: player1.rating || 1500, deckId: player1.deckId, color: 'white', picture: player1.picture },
+            { userId: player2.userId, username: player2.username || 'Player 2', rating: player2.rating || 1500, deckId: player2.deckId, color: 'black', picture: player2.picture }
+          ),
 
           // Timer Setup
           timeControl: { limit, increment, label: tc },
@@ -497,7 +501,11 @@ export class GameManager {
       player2: { userId, deckId, color: guestColor, username, picture, rating },
       player1Color: room.host.color,
       player2Color: guestColor,
-      gameState: this.initializeGame(),
+      gameState: this.initializeGame(
+        room.matchId,
+        { userId: room.host.userId, username: room.host.username || 'Host', rating: room.host.rating || 1500, deckId: room.host.deckId, color: room.host.color, picture: room.host.picture },
+        { userId: userId, username: username || 'Guest', rating: rating || 1500, deckId: deckId, color: guestColor, picture: picture }
+      ),
       chessEngine,
 
       // Default Timer for Friendly Rooms: Rapid 10+0
@@ -547,14 +555,20 @@ export class GameManager {
     }
   }
 
-  private initializeGame(): any {
+  private initializeGame(roomId: string, white: any, black: any): any {
     // Initialize 8x8 chess board
     const board = Array(8).fill(null).map(() => Array(8).fill(null))
 
     return {
+      roomId,
+      white,
+      black,
       board,
       currentTurn: 'white',
-      status: 'playing',
+      moveCount: 0,
+      pgn: '',
+      status: 'playing', // or 'placement' depending on flow
+      isCheck: false,
       capturedPieces: { white: [], black: [] },
     }
   }

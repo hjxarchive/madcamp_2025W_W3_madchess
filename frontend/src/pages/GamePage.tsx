@@ -330,20 +330,21 @@ export default function GamePage() {
 
         if (moverColor === 'white') {
           // 백의 수: "1. e4" 형식
-          const moveNumber = Math.floor(currentState.moveCount / 2) + 1
+          const currentCount = currentState.moveCount ?? 0
+          const moveNumber = Math.floor(currentCount / 2) + 1
           if (newPgn) {
             newPgn += ` ${moveNumber}. ${algebraicMove}`
           } else {
-            newPgn = `1. ${algebraicMove}`
+            newPgn = `${moveNumber}. ${algebraicMove}`
           }
-          console.log(`⚪ White move ${moveNumber}: ${algebraicMove}`)
+          console.log(`⚪ White move ${moveNumber}: ${algebraicMove} (Total count: ${currentCount})`)
         } else {
           // 흑의 수: 같은 줄에 추가
           newPgn += ` ${algebraicMove}`
           console.log(`⚫ Black move: ${algebraicMove}`)
         }
 
-        console.log(`📝 New PGN: "${newPgn}"`)
+        console.log(`📝 Calculated New PGN: "${newPgn}"`)
         useGameStore.getState().updatePgn(newPgn)
       }
 
@@ -352,9 +353,24 @@ export default function GamePage() {
       if (data.blackTime !== undefined) setBlackTime(data.blackTime)
 
       // Apply server-confirmed game state directly for perfect sync
-      if (data.gameState) {
+      // Critical: Only sync if it's a valid and complete gameState
+      if (data.gameState && data.gameState.roomId && data.gameState.moveCount !== undefined && data.gameState.moveCount !== null) {
         console.log('🔄 Syncing game state from server:', data.gameState)
         setGameState(data.gameState)
+      } else if (data.gameState) {
+        console.warn('⚠️ Received incomplete gameState from server, syncing partially...', data.gameState)
+        // Merge with existing state to preserve roomId/moveCount if missing from server
+        const currentLocalState = useGameStore.getState().gameState
+        if (currentLocalState) {
+          setGameState({
+            ...currentLocalState,
+            ...data.gameState,
+            roomId: data.gameState.roomId || currentLocalState.roomId,
+            moveCount: data.gameState.moveCount !== undefined && data.gameState.moveCount !== null
+              ? data.gameState.moveCount
+              : currentLocalState.moveCount
+          })
+        }
       } else {
         // Fallback
         applyOpponentMove(data.move, iMoved)
