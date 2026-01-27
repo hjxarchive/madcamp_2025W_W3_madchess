@@ -423,6 +423,7 @@ export default function GamePage() {
 
       if (data.gameState) {
         setGameState({
+          capturedPieces: { white: [], black: [] },
           ...data.gameState,
           roomId: data.matchId
         })

@@ -200,7 +200,8 @@ export class GameManager {
         ...match.gameState,
         currentTurn: 'white',
         board: frontendBoard,
-        status: 'playing'
+        status: 'playing',
+        capturedPieces: { white: [], black: [] }
       }
 
       // Start Timer
@@ -532,6 +533,7 @@ export class GameManager {
       board,
       currentTurn: 'white',
       status: 'playing',
+      capturedPieces: { white: [], black: [] },
     }
   }
 }
