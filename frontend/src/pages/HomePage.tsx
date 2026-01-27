@@ -10,6 +10,7 @@ export default function HomePage() {
   const { user: authUser, isAuthenticated } = useAuthStore()
 
   const [recentGames, setRecentGames] = useState<UserGame[]>([])
+  const [userStats, setUserStats] = useState<{ totalGames: number; winRate: number } | null>(null)
   const [serverOnline, setServerOnline] = useState<boolean>(true)
   const [onlineCount, setOnlineCount] = useState<number>(1429)
 
@@ -17,6 +18,17 @@ export default function HomePage() {
     if (authUser?.id) {
       getUserGames(authUser.id).then(res => {
         if (res.success && res.data) setRecentGames(res.data.games.slice(0, 3))
+      })
+      // Fetch user stats (mocked or real)
+      // Note: Assuming logic to calculate stats if API doesn't return them directly in this view, 
+      // but assuming getUserStats is available or we derive from games for now to be safe if types mismatch.
+      // Actually we imported getUserStats from userApi, let's use it.
+      import('../services/userApi').then(({ getUserStats }) => {
+        getUserStats(authUser.id).then(res => {
+          if (res.success && res.data) {
+            setUserStats(res.data)
+          }
+        })
       })
     }
   }, [authUser])
@@ -90,18 +102,30 @@ export default function HomePage() {
         <div className="hidden lg:flex lg:col-span-3 flex-col justify-center px-12 border-r border-gray-900 z-10 bg-[#050505]">
           <div className="mb-16">
             <div className="flex items-start text-[#D4FF00]">
-              <span className="text-8xl font-serif font-light leading-none">53</span>
+              <span className="text-8xl font-serif font-light leading-none">
+                {isAuthenticated && userStats ? userStats.totalGames : '53'}
+              </span>
               <span className="text-lg mt-2 ml-1">↗</span>
             </div>
-            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Tournaments Today</div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">
+              {isAuthenticated ? 'Total Matches' : 'Tournaments Today'}
+            </div>
           </div>
 
           <div>
             <div className="flex items-start text-white">
-              <span className="text-8xl font-serif font-light leading-none">{onlineCount}</span>
-              <span className="text-lg mt-2 ml-1 text-[#D4FF00]">↗</span>
+              <span className="text-8xl font-serif font-light leading-none">
+                {isAuthenticated && userStats ?
+                  (userStats.winRate > 1 ? userStats.winRate : Math.round(userStats.winRate * 100))
+                  : onlineCount}
+              </span>
+              <span className="text-lg mt-2 ml-1 text-[#D4FF00]">
+                {isAuthenticated ? '%' : '↗'}
+              </span>
             </div>
-            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Grandmasters Online</div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">
+              {isAuthenticated ? 'Win Rate' : 'Grandmasters Online'}
+            </div>
           </div>
         </div>
 
