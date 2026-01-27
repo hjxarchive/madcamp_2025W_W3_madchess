@@ -156,10 +156,10 @@ export default function HomePage() {
             ) : (
               <div className="h-full flex flex-col lg:flex-row items-center justify-center gap-8 px-8">
                 {/* 3D Queen */}
-                <div className="flex-1 w-full max-w-lg">
+                <div className="flex-1 w-full max-w-2xl h-[500px] lg:h-[600px] -ml-12">
                   <Suspense fallback={
-                    <div className="h-[400px] flex items-center justify-center text-gray-500">
-                      Loading 3D...
+                    <div className="h-full flex items-center justify-center text-gray-500">
+                      Loading 3D Scene...
                     </div>
                   }>
                     <Hero3D />
