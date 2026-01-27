@@ -84,9 +84,9 @@ export function setupSocketHandlers(io: Server) {
     // ===== 기존 큐 시스템 이벤트 (유지) =====
 
     // Join game queue
-    socket.on('join-queue', (data: { userId: string; deckId: string }) => {
-      console.log(`User ${data.userId} joined queue`)
-      gameManager.addToQueue(socket.id, data.userId, data.deckId)
+    socket.on('join-queue', (data: { userId: string; deckId: string; timeControl?: string }) => {
+      console.log(`User ${data.userId} joined queue (${data.timeControl})`)
+      gameManager.addToQueue(socket.id, data.userId, data.deckId, data.timeControl)
 
       // Try to match players
       const match = gameManager.tryMatchPlayers()
@@ -141,14 +141,16 @@ export function setupSocketHandlers(io: Server) {
           socketId: socket.id,
           isCheck: result.isCheck,
           isCheckmate: result.isCheckmate,
+          whiteTime: result.whiteTime,
+          blackTime: result.blackTime
         })
 
-        // Handle checkmate
-        if (result.isCheckmate) {
-          console.log(`👑 Checkmate! Winner: ${result.winner}`)
+        // Handle Game Over (Checkmate, Timeout)
+        if (result.winner) {
+          console.log(`👑 Game Over! Winner: ${result.winner}, Reason: ${result.drawReason || 'checkmate'}`)
           io.to(data.matchId).emit('game-over', {
             winner: result.winner,
-            reason: 'checkmate',
+            reason: result.drawReason || 'checkmate',
           })
           // DB에 게임 결과 저장
           const match = gameManager.getMatch(data.matchId)
@@ -158,7 +160,10 @@ export function setupSocketHandlers(io: Server) {
             const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
             const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
             const pgn = gameManager.getMatchPGN(data.matchId)
-            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, result.winner as 'white' | 'black', 'checkmate', pgn)
+            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, result.winner as 'white' | 'black', result.drawReason || 'checkmate', pgn)
+
+            // Cleanup handled by disconnect or explicit room leave?
+            // Usually we keep match for a while.
           }
         }
         // Handle stalemate

@@ -144,6 +144,8 @@ export interface GameState {
     white: PieceType[]
     black: PieceType[]
   }
+  whiteTime?: number // ms
+  blackTime?: number // ms
 }
 
 // 게임 결과

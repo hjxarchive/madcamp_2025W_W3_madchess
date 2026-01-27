@@ -1,3 +1,4 @@
+
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { socketService } from '../services/socket'
@@ -8,12 +9,36 @@ const KING_IMAGES = {
   black: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
 }
 
-type Mode = 'select' | 'create' | 'join'
+type Mode = 'select' | 'create' | 'join' | 'quick'
+
+const TIME_CONTROLS = {
+  bullet: [
+    { label: '1 min', value: '1+0' },
+    { label: '1 | 1', value: '1+1' },
+    { label: '2 | 1', value: '2+1' },
+  ],
+  blitz: [
+    { label: '3 min', value: '3+0' },
+    { label: '3 | 2', value: '3+2' },
+    { label: '5 min', value: '5+0' },
+  ],
+  rapid: [
+    { label: '10 min', value: '10+0' },
+    { label: '15 | 10', value: '15+10' },
+    { label: '30 min', value: '30+0' },
+  ]
+}
 
 export default function MatchmakingPage() {
   const navigate = useNavigate()
   const [mode, setMode] = useState<Mode>('select')
   const [selectedColor, setSelectedColor] = useState<'white' | 'black' | null>(null)
+
+  // Quick Match State
+  const [timeCategory, setTimeCategory] = useState<'bullet' | 'blitz' | 'rapid'>('blitz')
+  const [selectedTime, setSelectedTime] = useState<string>('3+0')
+  const [isQueueing, setIsQueueing] = useState(false)
+
   const [roomCode, setRoomCode] = useState('')
   const [inputRoomCode, setInputRoomCode] = useState('')
   const [waiting, setWaiting] = useState(false)
@@ -23,6 +48,14 @@ export default function MatchmakingPage() {
   // WebSocket 연결
   useEffect(() => {
     socketService.connect()
+
+    // 게임 매칭 성공 (Quick Match)
+    socketService.onGameFound((data) => {
+      console.log('Game found:', data)
+      sessionStorage.setItem('matchId', data.matchId)
+      // opponent info is in data.opponent
+      navigate(`/placement/${data.matchId}`)
+    })
 
     // 방 생성 성공
     socketService.onRoomCreated((data) => {
@@ -66,6 +99,7 @@ export default function MatchmakingPage() {
     })
 
     return () => {
+      socketService.offGameFound()
       socketService.offRoomCreated()
       socketService.offPlayerJoined()
       socketService.offRoomJoined()
@@ -90,11 +124,24 @@ export default function MatchmakingPage() {
       return
     }
 
-    // 실제 로그인된 사용자 ID 사용 (DB 저장 위해 숫자 ID 필요)
     const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
     const deckId = 'default-deck'
 
     socketService.joinRoom(inputRoomCode.trim().toUpperCase(), userId, deckId)
+  }
+
+  const handleQuickMatch = () => {
+    setIsQueueing(true)
+    const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
+    const deckId = 'default-deck'
+    socketService.joinQueue(userId, deckId, selectedTime)
+  }
+
+  const handleCancelQueue = () => {
+    socketService.leaveQueue()
+    setIsQueueing(false)
+    // Don't switch mode immediately, let user cancel queue but stay in quick match screen? 
+    // Or go back to select. Let's stay in quick match screen.
   }
 
   const handleCopyRoomCode = () => {
@@ -108,9 +155,14 @@ export default function MatchmakingPage() {
       }
     }
   }
+
   const handleCancel = () => {
     if (waiting) {
       socketService.leaveRoom()
+    }
+    if (isQueueing) {
+      socketService.leaveQueue()
+      setIsQueueing(false)
     }
     setMode('select')
     setSelectedColor(null)
@@ -143,7 +195,7 @@ export default function MatchmakingPage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-16">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           <h1 className="text-5xl font-serif font-light mb-12 text-center">
             <span className="text-white">MATCH</span>
             <span className="text-[#D4FF00]">MAKING</span>
@@ -151,23 +203,107 @@ export default function MatchmakingPage() {
 
           {/* 모드 선택 */}
           {mode === 'select' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <button
+                onClick={() => setMode('quick')}
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-8 text-left transition-all duration-300 relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-10 font-serif text-6xl group-hover:scale-110 transition-transform">⚡</div>
+                <div className="text-4xl mb-6 opacity-60 group-hover:opacity-100 transition-all">⚡</div>
+                <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Quick Match</h3>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Find opponent</p>
+              </button>
+
               <button
                 onClick={() => setMode('create')}
-                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-10 text-left transition-all duration-300"
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-8 text-left transition-all duration-300"
               >
-                <div className="text-5xl mb-6 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all">🏠</div>
+                <div className="text-4xl mb-6 opacity-60 group-hover:opacity-100 transition-all">🏠</div>
                 <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Create Room</h3>
-                <p className="text-sm text-gray-500 uppercase tracking-widest">Host a private match</p>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Host private match</p>
               </button>
 
               <button
                 onClick={() => setMode('join')}
-                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-10 text-left transition-all duration-300"
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-8 text-left transition-all duration-300"
               >
-                <div className="text-5xl mb-6 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all">🚪</div>
+                <div className="text-4xl mb-6 opacity-60 group-hover:opacity-100 transition-all">🚪</div>
                 <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Join Room</h3>
-                <p className="text-sm text-gray-500 uppercase tracking-widest">Enter with a code</p>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Enter code</p>
+              </button>
+            </div>
+          )}
+
+          {/* Quick Match - Time Selection */}
+          {mode === 'quick' && !isQueueing && (
+            <div className="border border-gray-800 p-8">
+              <h2 className="text-2xl font-serif mb-8 text-center">Select Time Control</h2>
+
+              {/* Tabs */}
+              <div className="flex justify-center mb-8 border-b border-gray-800">
+                {(['bullet', 'blitz', 'rapid'] as const).map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setTimeCategory(cat)}
+                    className={`px-8 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${timeCategory === cat
+                        ? 'text-[#D4FF00] border-[#D4FF00]'
+                        : 'text-gray-500 border-transparent hover:text-white'
+                      }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Time Options */}
+              <div className="grid grid-cols-3 gap-4 mb-10">
+                {TIME_CONTROLS[timeCategory].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setSelectedTime(option.value)}
+                    className={`p-6 border transition-all ${selectedTime === option.value
+                        ? 'border-[#D4FF00] bg-[#D4FF00]/10 text-white'
+                        : 'border-gray-800 hover:border-gray-600 text-gray-400'
+                      }`}
+                  >
+                    <div className="text-xl font-bold font-mono">{option.label}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 py-4 border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-white uppercase tracking-widest text-sm font-bold transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleQuickMatch}
+                  className="flex-[2] py-4 bg-[#D4FF00] text-black hover:bg-white font-bold uppercase tracking-widest text-sm transition-all"
+                >
+                  Find Match
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Match - Queueing */}
+          {mode === 'quick' && isQueueing && (
+            <div className="border border-gray-800 p-10 text-center">
+              <div className="inline-block mb-8">
+                <div className="text-6xl animate-pulse">🔍</div>
+              </div>
+              <h2 className="text-3xl font-serif text-white mb-2">Searching for Opponent</h2>
+              <p className="text-gray-500 mb-10 uppercase tracking-widest text-sm">
+                Time Control: <span className="text-[#D4FF00] font-mono">{selectedTime}</span>
+              </p>
+
+              <button
+                onClick={handleCancelQueue}
+                className="py-3 px-10 border border-red-900 text-red-500 hover:bg-red-900/20 uppercase tracking-widest text-sm font-bold transition-colors"
+              >
+                Cancel Search
               </button>
             </div>
           )}
@@ -234,7 +370,7 @@ export default function MatchmakingPage() {
             </div>
           )}
 
-          {/* 대기 중 */}
+          {/* 대기 중 (Create Room) */}
           {mode === 'create' && waiting && (
             <div className="border border-gray-800 p-10 text-center">
               <div className="inline-block mb-8">

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { useAuthStore } from '../stores/authStore'
 import ChessBoard from '../components/ChessBoard'
+import { Timer } from '../components/Timer'
 import { Move, Piece, PlacedPiece, PieceColor, squareToRowCol, PieceType, rowColToSquare, squareToUci } from '../types/game'
 import { socketService } from '../services/socket'
 
@@ -76,9 +77,10 @@ export default function GamePage() {
   const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
 
-  // 타이머 상태 (초 단위)
-  const [myTime, setMyTime] = useState(10 * 60) // 10분
-  const [opponentTime, setOpponentTime] = useState(10 * 60) // 10분
+  // 타이머 상태 (ms 단위)
+  const [whiteTime, setWhiteTime] = useState(600 * 1000)
+  const [blackTime, setBlackTime] = useState(600 * 1000)
+  // myTime/opponentTime 대신 whiteTime/blackTime 사용
 
   // 잡힌 기물 추적
   const [myCapturedPieces, setMyCapturedPieces] = useState<PieceType[]>([]) // 내가 잡은 기물
@@ -313,6 +315,10 @@ export default function GamePage() {
         useGameStore.getState().updatePgn(newPgn)
       }
 
+      // Update Timer from Server
+      if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
+      if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+
       // Apply server-confirmed move
       applyOpponentMove(data.move)
 
@@ -510,19 +516,12 @@ export default function GamePage() {
   }, [hasLegalMovesResponse, serverLegalMoves, isCheck, gameState?.currentTurn, myColor, gameOverData])
 
   // 타이머 카운트다운
+  // 타이머 카운트다운을 Timer 컴포넌트가 처리하므로 불필요한 useEffect 제거
+  // 그러나 초기 시간 동기화나 게임 상태 변경 시 업데이트 필요할 수 있음
   useEffect(() => {
-    if (!gameState || gameState.status !== 'playing' || gameOverData) return
-
-    const interval = setInterval(() => {
-      if (gameState.currentTurn === myColor) {
-        setMyTime(prev => Math.max(0, prev - 1))
-      } else {
-        setOpponentTime(prev => Math.max(0, prev - 1))
-      }
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [gameState?.currentTurn, gameState?.status, gameOverData, myColor])
+    if (gameState?.whiteTime) setWhiteTime(gameState.whiteTime)
+    if (gameState?.blackTime) setBlackTime(gameState.blackTime)
+  }, [gameState?.whiteTime, gameState?.blackTime])
 
   // 보드 변화 감지하여 잡힌 기물 추적
   useEffect(() => {
@@ -1186,7 +1185,10 @@ export default function GamePage() {
               {/* 타이머 */}
               <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#050505] border border-gray-900">
                 <span className="text-xs text-gray-600 uppercase tracking-widest">Time</span>
-                <span className="text-2xl font-mono font-light">{formatTime(opponentTime)}</span>
+                <Timer
+                  initialTime={myColor === 'white' ? blackTime : whiteTime}
+                  isActive={!gameOverData && gameState?.currentTurn === (myColor === 'white' ? 'black' : 'white')}
+                />
               </div>
             </div>
 
@@ -1215,8 +1217,8 @@ export default function GamePage() {
                     <div
                       key={idx}
                       className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${(isLatestWhite || isLatestBlack) && !isViewingHistory
-                          ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]'
-                          : 'hover:bg-gray-900'
+                        ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]'
+                        : 'hover:bg-gray-900'
                         }`}
                     >
                       <span className="text-gray-600">{m.move}.</span>
@@ -1229,10 +1231,10 @@ export default function GamePage() {
                           }
                         }}
                         className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${viewingWhite
-                            ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
-                            : isLatestWhite
-                              ? 'text-[#D4FF00]'
-                              : 'text-white'
+                          ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
+                          : isLatestWhite
+                            ? 'text-[#D4FF00]'
+                            : 'text-white'
                           }`}
                       >
                         {m.white}
@@ -1247,10 +1249,10 @@ export default function GamePage() {
                           }
                         }}
                         className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${viewingBlack
-                            ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
-                            : isLatestBlack
-                              ? 'text-[#D4FF00]'
-                              : 'text-gray-400'
+                          ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
+                          : isLatestBlack
+                            ? 'text-[#D4FF00]'
+                            : 'text-gray-400'
                           } ${m.black ? '' : 'cursor-default'}`}
                       >
                         {m.black || ''}
@@ -1348,7 +1350,13 @@ export default function GamePage() {
               {/* 타이머 */}
               <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#050505] border border-[#D4FF00]/30">
                 <span className="text-xs text-[#D4FF00] uppercase tracking-widest">Your Time</span>
-                <span className="text-2xl font-mono font-light text-[#D4FF00]">{formatTime(myTime)}</span>
+                <div className="text-[#D4FF00]">
+                  <Timer
+                    initialTime={myColor === 'white' ? whiteTime : blackTime}
+                    isActive={!gameOverData && gameState?.currentTurn === myColor}
+                    onTimeout={() => console.log('My time out!')}
+                  />
+                </div>
               </div>
             </div>
 

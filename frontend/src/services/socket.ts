@@ -33,10 +33,11 @@ class SocketService {
   }
 
   // 게임 큐에 참가
-  joinQueue(userId: string, deckId: string) {
+  // 게임 큐에 참가
+  joinQueue(userId: string, deckId: string, timeControl?: string) {
     if (this.socket) {
-      this.socket.emit('join-queue', { userId, deckId })
-      console.log('Joined queue:', { userId, deckId })
+      this.socket.emit('join-queue', { userId, deckId, timeControl })
+      console.log('Joined queue:', { userId, deckId, timeControl })
     }
   }
 
