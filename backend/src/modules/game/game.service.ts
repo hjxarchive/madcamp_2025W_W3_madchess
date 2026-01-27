@@ -48,6 +48,20 @@ export const getGameById = async (gameId: number): Promise<GameStateDto> => {
       deckId: game.black_deck_id,
       color: 'black'
     },
+    player1: {
+      userId: game.user_game_white_player_idTouser.id,
+      username: game.user_game_white_player_idTouser.username,
+      rating: game.user_game_white_player_idTouser.rating,
+      deckId: game.white_deck_id,
+      color: 'white'
+    },
+    player2: {
+      userId: game.user_game_black_player_idTouser.id,
+      username: game.user_game_black_player_idTouser.username,
+      rating: game.user_game_black_player_idTouser.rating,
+      deckId: game.black_deck_id,
+      color: 'black'
+    },
     board,
     currentTurn: 'white', // FEN에서 파싱 가능
     moveCount: 0, // PGN에서 계산 가능

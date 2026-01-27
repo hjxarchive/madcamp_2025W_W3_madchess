@@ -27,6 +27,8 @@ export interface GameStateDto {
   id: number;
   white: PlayerInfoDto;
   black: PlayerInfoDto;
+  player1: PlayerInfoDto;
+  player2: PlayerInfoDto;
   board: any[][];
   currentTurn: string;
   moveCount: number;
