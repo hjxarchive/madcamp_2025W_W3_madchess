@@ -253,6 +253,35 @@ export function setupSocketHandlers(io: Server) {
       }
     })
 
+
+
+    // Rejoin game
+    socket.on('rejoin-game', (data: { matchId: string; userId: string }) => {
+      console.log(`🔄 User ${data.userId} rejoining match ${data.matchId}`)
+      const result = gameManager.reconnectPlayer(data.matchId, data.userId, socket.id)
+
+      if (result.success && result.match) {
+        socket.join(data.matchId)
+
+        const whitePlayer = result.match.player1Color === 'white' ? result.match.player1 : result.match.player2
+        const blackPlayer = result.match.player1Color === 'black' ? result.match.player1 : result.match.player2
+
+        socket.emit('game-rejoined', {
+          matchId: data.matchId,
+          gameState: result.match.gameState,
+          whiteTime: result.match.whiteTime,
+          blackTime: result.match.blackTime,
+          yourColor: result.playerColor,
+          white: whitePlayer,
+          black: blackPlayer,
+          pgn: gameManager.getMatchPGN(data.matchId)
+        })
+        console.log(`✅ User ${data.userId} rejoined match ${data.matchId}`)
+      } else {
+        socket.emit('rejoin-error', { message: result.error || 'Failed to rejoin' })
+      }
+    })
+
     // Resign - 기권
     socket.on('resign', (data: { matchId: string }) => {
       console.log(`🏳️ Player ${socket.id} resigned in match ${data.matchId}`)

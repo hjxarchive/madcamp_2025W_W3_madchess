@@ -412,6 +412,27 @@ export default function GamePage() {
       console.error('Castling options error:', data.message)
     }
 
+    const handleGameRejoined = (data: any) => {
+      console.log('✅ Game rejoined:', data)
+      if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
+      if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+
+      if (data.yourColor) {
+        setMyColor(data.yourColor)
+      }
+
+      if (data.gameState) {
+        setGameState({
+          ...data.gameState,
+          roomId: data.matchId
+        })
+      }
+    }
+
+    const handleRejoinError = (data: { message: string }) => {
+      console.error('❌ Rejoin error:', data.message)
+    }
+
     socketService.onMoveMade(handleMoveMade)
     socketService.onGameOver(handleGameOver)
     socketService.onMoveError(handleMoveError)
@@ -419,6 +440,8 @@ export default function GamePage() {
     socketService.onLegalMovesError(handleLegalMovesError)
     socketService.onCastlingOptions(handleCastlingOptions)
     socketService.onCastlingOptionsError(handleCastlingOptionsError)
+    socketService.onGameRejoined(handleGameRejoined)
+    socketService.onRejoinError(handleRejoinError)
 
     // 정리
     return () => {
@@ -427,8 +450,20 @@ export default function GamePage() {
       socketService.offMoveError()
       socketService.offLegalMoves()
       socketService.offLegalMovesError()
+      socketService.offGameRejoined()
+      socketService.offRejoinError()
     }
   }, []) // 빈 배열: 한 번만 등록
+
+  // 게임 페이지 로드 시 재참가 시도 (소켓 재연결 및 상태 동기화)
+  useEffect(() => {
+    if (gameId && user?.id) {
+      console.log(`🔄 Attempting to rejoin game ${gameId}...`)
+      setTimeout(() => {
+        socketService.rejoinGame(gameId, user.id.toString())
+      }, 500)
+    }
+  }, [gameId, user?.id])
 
   // PGN이 업데이트될 때마다 보드 상태를 히스토리에 저장
   useEffect(() => {

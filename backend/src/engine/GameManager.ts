@@ -129,6 +129,32 @@ export class GameManager {
     return null
   }
 
+  // Reconnect player to match (update socket ID)
+  reconnectPlayer(matchId: string, userId: string, newSocketId: string): { success: boolean; match?: Match; error?: string; playerColor?: 'white' | 'black' } {
+    const match = this.matches.get(matchId)
+    if (!match) {
+      return { success: false, error: 'Match not found' }
+    }
+
+    let playerColor: 'white' | 'black' | undefined
+
+    if (match.player1.userId === userId) {
+      match.player1SocketId = newSocketId
+      playerColor = match.player1Color
+    } else if (match.player2.userId === userId) {
+      match.player2SocketId = newSocketId
+      playerColor = match.player2Color
+    } else {
+      return { success: false, error: 'User not in this match' }
+    }
+
+    return {
+      success: true,
+      match,
+      playerColor
+    }
+  }
+
   submitPlacement(matchId: string, socketId: string, placementData: PlacementData): { success?: boolean; waiting?: boolean; error?: string } {
     const match = this.matches.get(matchId)
     if (!match) {

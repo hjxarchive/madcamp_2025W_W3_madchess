@@ -264,6 +264,37 @@ class SocketService {
     }
   }
 
+  // 게임 재참가
+  rejoinGame(matchId: string, userId: string) {
+    if (this.socket) {
+      this.socket.emit('rejoin-game', { matchId, userId })
+    }
+  }
+
+  onGameRejoined(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.on('game-rejoined', callback)
+    }
+  }
+
+  onRejoinError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('rejoin-error', callback)
+    }
+  }
+
+  offGameRejoined() {
+    if (this.socket) {
+      this.socket.off('game-rejoined')
+    }
+  }
+
+  offRejoinError() {
+    if (this.socket) {
+      this.socket.off('rejoin-error')
+    }
+  }
+
   offDrawOffered() {
     if (this.socket) {
       this.socket.off('draw-offered')
