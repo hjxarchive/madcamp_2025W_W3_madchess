@@ -1,11 +1,10 @@
-
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getGameReplay, getGameById } from '../services/gameApi'
 import ChessBoard from '../components/ChessBoard'
 import { useAuthStore } from '../stores/authStore'
 import type { Game } from '../types/api.types'
-import type { Move } from '../types/game'
+import type { Move, Piece } from '../types/game'
 
 export default function ReplayPage() {
   const { gameId } = useParams()
@@ -57,6 +56,27 @@ export default function ReplayPage() {
       if (isBlack) setIsFlipped(true)
     }
   }, [gameInfo, user])
+
+  // Detect if data is mirrored (White pieces in top half, Rank 8)
+  const isDataMirrored = useMemo(() => {
+    if (!history.length) return false
+
+    // Check initial board placement
+    const initialBoard = history[0].board as (Piece | null)[][]
+
+    // Scan top 4 rows (Rank 8, 7, 6, 5 -> index 0, 1, 2, 3)
+    // If we find White King here, it's definitely mirrored (or very weird strategy)
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 8; c++) {
+        const p = initialBoard[r][c]
+        if (p && p.type === 'k' && p.color === 'white') {
+          console.log("🔄 Detected mirrored replay data (White King at top)")
+          return true
+        }
+      }
+    }
+    return false
+  }, [history])
 
   // Key controls
   useEffect(() => {
@@ -133,8 +153,34 @@ export default function ReplayPage() {
     const uci = promotion ? `${from}${to}${promotion}` : `${from}${to}`
     lastMove = {
       uci,
-      piece: 'p', // Dummy piece type, only uci is used for highlighting
+      piece: 'p', // Dummy piece type
     } as Move
+  }
+
+  // Fix mirrored data for display
+  let displayBoard = currentState.board
+  let displayLastMove = lastMove
+
+  if (isDataMirrored) {
+    // Reverse board rows (Top <-> Bottom)
+    displayBoard = [...displayBoard].reverse()
+
+    // Reverse Move Ranks (1 <-> 8, 2 <-> 7, etc.)
+    if (displayLastMove) {
+      const flipUci = (uci: string) => {
+        if (!uci || uci.length < 4) return uci
+        const fromFile = uci[0]
+        const fromRank = parseInt(uci[1])
+        const toFile = uci[2]
+        const toRank = parseInt(uci[3])
+        const prom = uci.substring(4)
+
+        const newFromRank = 9 - fromRank
+        const newToRank = 9 - toRank
+        return `${fromFile}${newFromRank}${toFile}${newToRank}${prom}`
+      }
+      displayLastMove = { ...displayLastMove, uci: flipUci(displayLastMove.uci) }
+    }
   }
 
   return (
@@ -178,11 +224,11 @@ export default function ReplayPage() {
       <main className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-8 p-6">
         <div className="relative">
           <ChessBoard
-            board={currentState.board}
+            board={displayBoard}
             currentTurn={currentState.turn}
             myColor={isFlipped ? 'black' : 'white'}
             isMyTurn={false}
-            lastMove={lastMove}
+            lastMove={displayLastMove}
             onMove={() => { }}
             isCheck={false} // TODO: Add check status to replay data
             useImages={true}
