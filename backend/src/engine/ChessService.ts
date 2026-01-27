@@ -656,113 +656,17 @@ export class ChessService {
      */
     isCheckmate(color: 'white' | 'black'): boolean {
         if (!this.isKingInCheck(color)) return false
-
-        // Try all possible moves to see if any can get out of check
-        for (let fromRank = 0; fromRank < 8; fromRank++) {
-            for (let fromFile = 0; fromFile < 8; fromFile++) {
-                const piece = this.board[fromRank][fromFile]
-                if (piece && piece.color === color) {
-                    for (let toRank = 0; toRank < 8; toRank++) {
-                        for (let toFile = 0; toFile < 8; toFile++) {
-                            // Try this move
-                            const from = { file: fromFile, rank: fromRank }
-                            const to = { file: toFile, rank: toRank }
-
-                            // Save state
-                            const originalTarget = this.getPiece(to)
-                            const originalTurn = this.turn
-
-                            // Try move (simplified check)
-                            this.turn = color
-                            this.setPiece(to, piece)
-                            this.setPiece(from, null)
-
-                            const stillInCheck = this.isKingInCheck(color)
-
-                            // Restore state
-                            this.setPiece(from, piece)
-                            this.setPiece(to, originalTarget)
-                            this.turn = originalTurn
-
-                            if (!stillInCheck) {
-                                return false // Found a move that gets out of check
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return true // No move can get out of check
+        const legalMoves = this.getLegalMovesForColor(color)
+        return legalMoves.length === 0
     }
 
     /**
      * Check if current player is in stalemate (no legal moves but not in check)
      */
     isStalemate(color: 'white' | 'black'): boolean {
-        // Must NOT be in check
         if (this.isKingInCheck(color)) return false
-
-        // Check if there are any legal moves
-        for (let fromRank = 0; fromRank < 8; fromRank++) {
-            for (let fromFile = 0; fromFile < 8; fromFile++) {
-                const piece = this.board[fromRank][fromFile]
-                if (piece && piece.color === color) {
-                    for (let toRank = 0; toRank < 8; toRank++) {
-                        for (let toFile = 0; toFile < 8; toFile++) {
-                            const from = { file: fromFile, rank: fromRank }
-                            const to = { file: toFile, rank: toRank }
-
-                            // Skip if target has own piece
-                            const targetPiece = this.getPiece(to)
-                            if (targetPiece && targetPiece.color === color) continue
-
-                            // Try to validate the move
-                            let isValidPieceMove = false
-                            switch (piece.type) {
-                                case 'p':
-                                    isValidPieceMove = this.isValidPawnMove(from, to, piece)
-                                    break
-                                case 'n':
-                                    isValidPieceMove = this.isValidKnightMove(from, to)
-                                    break
-                                case 'b':
-                                    isValidPieceMove = this.isValidBishopMove(from, to)
-                                    break
-                                case 'r':
-                                    isValidPieceMove = this.isValidRookMove(from, to)
-                                    break
-                                case 'q':
-                                    isValidPieceMove = this.isValidQueenMove(from, to)
-                                    break
-                                case 'k':
-                                    isValidPieceMove = this.isValidKingMove(from, to)
-                                    break
-                            }
-
-                            if (!isValidPieceMove) continue
-
-                            // Test if move would put own king in check
-                            const originalTarget = this.getPiece(to)
-                            this.setPiece(to, piece)
-                            this.setPiece(from, null)
-
-                            const wouldBeInCheck = this.isKingInCheck(color)
-
-                            // Restore board
-                            this.setPiece(from, piece)
-                            this.setPiece(to, originalTarget)
-
-                            if (!wouldBeInCheck) {
-                                return false // Found a legal move
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return true // No legal moves available
+        const legalMoves = this.getLegalMovesForColor(color)
+        return legalMoves.length === 0
     }
 
     /**

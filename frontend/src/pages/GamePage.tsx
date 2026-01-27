@@ -75,7 +75,7 @@ export function EvalBar({ evaluation }: { evaluation: { type: 'cp' | 'mate', val
       label = `M${evaluation.value}`
     } else {
       percent = 0
-      label = `M${Math.abs(evaluation.value)}`
+      label = evaluation.value === 0 ? '#' : `M${Math.abs(evaluation.value)}`
     }
   } else {
     // Sigmoid mapping for CP
@@ -409,22 +409,26 @@ export default function GamePage() {
         const algebraicMove = uciToAlgebraic(data.move.uci, data.move.piece, data.move.captured)
         console.log(`✨ Algebraic Move: ${algebraicMove}`)
 
+        // Check/Checkmate symbol
+        let moveSymbol = ''
+        if (data.isCheckmate) moveSymbol = '#'
+        else if (data.isCheck) moveSymbol = '+'
+
+        const finalMoveNotation = algebraicMove + moveSymbol
         let newPgn = currentState.pgn
 
         if (moverColor === 'white') {
-          // 백의 수: "1. e4" 형식
           const currentCount = currentState.moveCount ?? 0
           const moveNumber = Math.floor(currentCount / 2) + 1
           if (newPgn) {
-            newPgn += ` ${moveNumber}. ${algebraicMove}`
+            newPgn += ` ${moveNumber}. ${finalMoveNotation}`
           } else {
-            newPgn = `${moveNumber}. ${algebraicMove}`
+            newPgn = `${moveNumber}. ${finalMoveNotation}`
           }
-          console.log(`⚪ White move ${moveNumber}: ${algebraicMove} (Total count: ${currentCount})`)
+          console.log(`⚪ White move ${moveNumber}: ${finalMoveNotation} (Total count: ${currentCount})`)
         } else {
-          // 흑의 수: 같은 줄에 추가
-          newPgn += ` ${algebraicMove}`
-          console.log(`⚫ Black move: ${algebraicMove}`)
+          newPgn += ` ${finalMoveNotation}`
+          console.log(`⚫ Black move: ${finalMoveNotation}`)
         }
 
         console.log(`📝 Calculated New PGN: "${newPgn}"`)
