@@ -5,6 +5,7 @@ class SocketService {
   private socket: Socket | null = null
 
   connect() {
+    if (this.socket) return this.socket
     const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:5001'
     this.socket = io(socketUrl, {
       transports: ['websocket'],

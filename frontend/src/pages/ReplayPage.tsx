@@ -113,8 +113,7 @@ export default function ReplayPage() {
 
   // Analysis socket listener
   useEffect(() => {
-    const socket = socketService.getSocket()
-    if (!socket) return
+    const socket = socketService.connect() // Connect if not connected
 
     const handleAnalysis = (data: { type: 'cp' | 'mate', value: number }) => {
       setEvalScore(data)
@@ -255,8 +254,9 @@ export default function ReplayPage() {
       <main className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-8 p-6">
 
         {/* Center: Chess Board */}
-        <div className="order-1 lg:order-2 flex gap-4 justify-center items-start">
+        <div className="flex gap-4 justify-center items-start">
           <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center">
+            <div className="text-[10px] text-red-500 font-mono mb-1">{evalScore?.value}</div>
             <EvalBar evaluation={evalScore} />
           </div>
           <div className="flex flex-col items-center">
