@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { socketService } from '../services/socket'
 import ChessBoard from '../components/ChessBoard'
 import { Piece, PieceColor, Move } from '../types/game'
+import { EvalBar } from './GamePage'
 
 interface PlayerInfo {
     username: string
@@ -26,6 +27,7 @@ export default function SpectatorPage() {
     const [gameOver, setGameOver] = useState<{ winner: string; reason: string } | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [evalScore, setEvalScore] = useState<{ type: 'cp' | 'mate', value: number } | null>(null)
 
     // Timer interval refs
     const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -87,7 +89,10 @@ export default function SpectatorPage() {
         socketService.onSpectateJoined(handleSpectateJoined)
         socketService.onMoveMade(handleMoveMade)
         socketService.onGameOver(handleGameOver)
+        socketService.onGameOver(handleGameOver)
         socketService.onSpectateError(handleSpectateError)
+
+        socketService.onAnalysisResult(setEvalScore)
 
         // Join as spectator
         if (matchId) {
@@ -102,13 +107,22 @@ export default function SpectatorPage() {
             socketService.offSpectateJoined()
             socketService.offMoveMade()
             socketService.offGameOver()
+            socketService.offMoveMade()
+            socketService.offGameOver()
             socketService.offSpectateError()
+            socketService.offAnalysisResult()
 
             if (timerRef.current) {
                 clearInterval(timerRef.current)
             }
         }
     }, [matchId])
+
+    useEffect(() => {
+        if (matchId) {
+            socketService.requestAnalysis(matchId)
+        }
+    }, [matchId, pgn, lastMove, board])
 
     // Timer countdown (client-side)
     useEffect(() => {
@@ -209,28 +223,33 @@ export default function SpectatorPage() {
                     </div>
 
                     {/* Center: Chess Board */}
-                    <div className="order-1 lg:order-2 flex flex-col items-center">
-                        <ChessBoard
-                            board={board}
-                            currentTurn={currentTurn}
-                            myColor="white" // Always show from white's perspective
-                            isMyTurn={false}
-                            lastMove={lastMove || undefined}
-                            isCheck={isCheck}
-                            onMove={() => { }} // No-op for spectators
-                            useImages={true}
-                            isSpectator={true}
-                        />
-
-                        {/* Time Control Badge */}
-                        <div className="mt-4 px-4 py-2 bg-[#0A0A0A] border border-gray-800 text-sm text-gray-400 uppercase tracking-widest">
-                            {timeControl}
+                    <div className="order-1 lg:order-2 flex gap-4 justify-center">
+                        <div className="h-[600px] shrink-0 pt-8 pb-8">
+                            <EvalBar evaluation={evalScore} />
                         </div>
+                        <div className="flex flex-col items-center">
+                            <ChessBoard
+                                board={board}
+                                currentTurn={currentTurn}
+                                myColor="white" // Always show from white's perspective
+                                isMyTurn={false}
+                                lastMove={lastMove || undefined}
+                                isCheck={isCheck}
+                                onMove={() => { }} // No-op for spectators
+                                useImages={true}
+                                isSpectator={true}
+                            />
 
-                        {/* Spectator Badge */}
-                        <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                            <span>👁️</span>
-                            <span>Watching Live</span>
+                            {/* Time Control Badge */}
+                            <div className="mt-4 px-4 py-2 bg-[#0A0A0A] border border-gray-800 text-sm text-gray-400 uppercase tracking-widest">
+                                {timeControl}
+                            </div>
+
+                            {/* Spectator Badge */}
+                            <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                                <span>👁️</span>
+                                <span>Watching Live</span>
+                            </div>
                         </div>
                     </div>
 

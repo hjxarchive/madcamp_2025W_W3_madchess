@@ -447,16 +447,7 @@ export function setupSocketHandlers(io: Server) {
         const match = gameManager.getMatch(data.matchId)
         if (!match) throw new Error('Match not found')
 
-        // Security Check: Active players cannot analyze during game
-        const isPlayer = match.player1SocketId === socket.id || match.player2SocketId === socket.id
-        const isGameActive = match.gameState.status === 'playing'
-
-        if (isPlayer && isGameActive) {
-          console.warn(`⚠️ Player ${socket.id} tried to request analysis during active game! Blocked.`)
-          socket.emit('analysis-error', { message: 'Analysis is not available while playing' })
-          return
-        }
-
+        // Allow live analysis for players (User request)
         const result = await gameManager.analyzeGame(data.matchId)
         console.log(`🧠 Analysis result sent to ${socket.id}`)
         socket.emit('analysis-result', result)
