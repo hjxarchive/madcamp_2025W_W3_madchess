@@ -921,35 +921,6 @@ export default function GamePage() {
     setPromotionMove(null)
   }
 
-  // 서버 제공 합법수 기반으로 특정 말의 legal moves 반환
-  const fetchLegalMovesFromServer = async ({ row, col }: { row: number; col: number; piece?: Piece }) => {
-    if (!gameState) return []
-
-    const square = rowColToSquare(row, col)
-    const fromUci = squareToUci(square)
-
-    // serverLegalMoves가 비어있다면 즉시 요청
-    if (serverLegalMoves.length === 0) {
-      console.log('⚠️ Legal moves list empty, requesting...')
-      socketService.requestLegalMoves(gameState.roomId)
-      // 소켓 통신은 비동기이므로 이번 호출에서는 빈 배열을 반환할 수밖에 없음
-      // 하지만 proactive useEffect가 대부분의 상황을 커버할 것임
-    }
-
-    const moves = serverLegalMoves
-      .filter(m => m.from === fromUci)
-      .map(m => {
-        const to = m.to
-        const toPos = squareToRowCol({
-          file: to[0] as any,
-          rank: parseInt(to[1]) as any
-        })
-        return { row: toPos.row, col: toPos.col }
-      })
-
-    console.log(`📍 Found ${moves.length} legal moves for ${fromUci}`)
-    return moves
-  }
 
   // 백엔드 연동 시 fetchLegalMoves를 교체하세요.
   // 모든 기물의 합법적 수를 계산하는 함수
@@ -1059,6 +1030,39 @@ export default function GamePage() {
       }
     }
 
+    return moves
+  }
+
+  // Refactored: Uses client-side calc for premoves, server moves for valid turns
+  const fetchLegalMovesFromServer = async ({ row, col, piece }: { row: number; col: number; piece?: Piece }) => {
+    if (!gameState) return []
+
+    // Premove logic: use client-side calculation if not my turn
+    if (gameState.currentTurn !== myColor) {
+      if (!piece) return []
+      return fetchLegalMovesMock({ row, col, piece }) // Use client-side logic for premoves
+    }
+
+    const square = rowColToSquare(row, col)
+    const fromUci = squareToUci(square)
+
+    // If server moves empty, request them (async)
+    if (serverLegalMoves.length === 0) {
+      socketService.requestLegalMoves(gameState.roomId)
+    }
+
+    const moves = serverLegalMoves
+      .filter(m => m.from === fromUci)
+      .map(m => {
+        const to = m.to
+        const toPos = squareToRowCol({
+          file: to[0] as any,
+          rank: parseInt(to[1]) as any
+        })
+        return { row: toPos.row, col: toPos.col }
+      })
+
+    console.log(`📍 Found ${moves.length} legal moves for ${fromUci}`)
     return moves
   }
 
