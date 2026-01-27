@@ -162,7 +162,6 @@ export default function ReplayPage() {
             isMyTurn={false}
             lastMove={lastMove}
             onMove={() => { }}
-            onSquareClick={() => { }}
             isCheck={false} // TODO: Add check status to replay data
           />
         </div>
