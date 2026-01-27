@@ -92,6 +92,8 @@ export class StockfishService {
 
             // Wait a bit or accept uciok? Best to just send config.
             // Fairy-Stockfish needs variant set
+            const variantPath = path.join(cwd, 'variants.ini')
+            sf.stdin.write(`setoption name VariantPath value ${variantPath}\n`)
             sf.stdin.write(`setoption name UCI_Variant value madchess\n`)
             sf.stdin.write(`isready\n`)
             sf.stdin.write(`position fen ${fen}\n`)
