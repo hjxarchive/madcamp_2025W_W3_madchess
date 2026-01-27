@@ -14,7 +14,7 @@ interface GameStoreState {
   clearSelection: () => void
   setLegalMoves: (moves: { row: number; col: number }[]) => void
   makeMove: (move: Move) => void
-  applyOpponentMove: (move: Move) => void
+  applyOpponentMove: (move: Move, skipIncrement?: boolean) => void
   addCapturedPiece: (color: PieceColor, piece: PieceType) => void
   updatePgn: (pgn: string) => void
   rollbackMove: () => void
@@ -148,7 +148,7 @@ export const useGameStore = create<GameStoreState>((set) => ({
       }
     }),
 
-  applyOpponentMove: (move) =>
+  applyOpponentMove: (move, skipIncrement = false) =>
     set((state) => {
       if (!state.gameState) return state
 
@@ -177,7 +177,6 @@ export const useGameStore = create<GameStoreState>((set) => ({
         for (let col = 0; col < 8; col++) {
           const p = newBoard[fromRow][col]
           if (p && piece && p.type === 'r' && p.color === piece.color) {
-            // 킹사이드: f-h 파일의 룩 / 퀸사이드: a-d 파일의 룩
             if (isKingside && col >= 5) {
               rookCol = col
               break
@@ -215,20 +214,18 @@ export const useGameStore = create<GameStoreState>((set) => ({
         newCapturedPieces[capturingColor] = [...newCapturedPieces[capturingColor], move.captured]
       }
 
-      // 턴 변경 (내 차례로)
+      // 턴 변경
       const newTurn = state.gameState.currentTurn === 'white' ? 'black' : 'white'
 
-      console.log('👥 Opponent move applied:', move)
+      console.log('👥 Move applied:', move)
       console.log(`🔄 Turn changed: ${state.gameState.currentTurn} → ${newTurn}`)
-      console.log(`📝 Current PGN: "${state.gameState.pgn}"`)
-      console.log(`📊 moveCount: ${state.gameState.moveCount} → ${state.gameState.moveCount + 1}`)
 
       return {
         gameState: {
           ...state.gameState,
           board: newBoard,
           currentTurn: newTurn,
-          moveCount: state.gameState.moveCount + 1,
+          moveCount: skipIncrement ? state.gameState.moveCount : state.gameState.moveCount + 1,
           lastMove: move,
           capturedPieces: newCapturedPieces,
         },

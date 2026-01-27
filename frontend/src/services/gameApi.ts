@@ -38,3 +38,19 @@ export const resignGame = async (
     )
     return response.data
 }
+
+/**
+ * Get game replay history
+ * GET /api/games/:gameId/replay
+ */
+export const getGameReplay = async (gameId: string | number): Promise<ApiResponse<any[]>> => {
+    const response = await apiClient.get<ApiResponse<any> & { history: any[] }>(`/api/games/${gameId}/replay`)
+    // Server returns { success, history: [] }
+    if (response.data.success && (response.data as any).history) {
+        return {
+            ...response.data,
+            data: (response.data as any).history
+        }
+    }
+    return response.data as unknown as ApiResponse<any[]>
+}

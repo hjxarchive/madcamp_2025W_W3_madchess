@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import { useAuthStore } from '../stores/authStore'
 import ChessBoard from '../components/ChessBoard'
+import { Timer } from '../components/Timer'
 import { Move, Piece, PlacedPiece, PieceColor, squareToRowCol, PieceType, rowColToSquare, squareToUci } from '../types/game'
 import { socketService } from '../services/socket'
 
@@ -75,10 +76,16 @@ export default function GamePage() {
   const [showPromotion, setShowPromotion] = useState(false)
   const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null)
   const [moveError, setMoveError] = useState<string | null>(null)
+  const [premove, setPremove] = useState<Move | null>(null)
+  const premoveRef = useRef<Move | null>(null)
 
-  // 타이머 상태 (초 단위)
-  const [myTime, setMyTime] = useState(10 * 60) // 10분
-  const [opponentTime, setOpponentTime] = useState(10 * 60) // 10분
+  const gameOverDataRef = useRef<{ winner: string; reason: string } | null>(null)
+  useEffect(() => { gameOverDataRef.current = gameOverData }, [gameOverData])
+
+  // 타이머 상태 (ms 단위)
+  const [whiteTime, setWhiteTime] = useState(600 * 1000)
+  const [blackTime, setBlackTime] = useState(600 * 1000)
+  // myTime/opponentTime 대신 whiteTime/blackTime 사용
 
   // 잡힌 기물 추적
   const [myCapturedPieces, setMyCapturedPieces] = useState<PieceType[]>([]) // 내가 잡은 기물
@@ -101,6 +108,8 @@ export default function GamePage() {
   }>>([])  // 각 수에 대한 보드 상태 저장
   const [viewingMoveIndex, setViewingMoveIndex] = useState<number>(-1)  // -1 = 최신 상태, 0+ = 해당 수의 보드 상태
   const [isViewingHistory, setIsViewingHistory] = useState(false)  // 히스토리 모드 여부
+  const isViewingHistoryRef = useRef(false)
+  useEffect(() => { isViewingHistoryRef.current = isViewingHistory }, [isViewingHistory])
   const [showCurrentMessage, setShowCurrentMessage] = useState(false)  // "Current" 메시지 표시 여부
 
   // Ref for myColor to access in socket callbacks without closure issues
@@ -126,7 +135,7 @@ export default function GamePage() {
 
   // sessionStorage에서 배치 정보 로드
   useEffect(() => {
-    const savedColor = sessionStorage.getItem('myColor') as PieceColor | null
+    const savedColor = (sessionStorage.getItem('myColor') || sessionStorage.getItem('selectedColor')) as PieceColor | null
     if (savedColor) {
       setMyColor(savedColor)
     }
@@ -163,24 +172,49 @@ export default function GamePage() {
         })
       }
 
-      // gameStore 업데이트
+      // 내 정보 (auth store에서)
+      const myUserId = user?.id ? String(user.id) : 'me'
+      const myUsername = user?.name || 'You'
+      const myRating = user?.rating || 1500
+      const myPicture = user?.picture
 
+      // 상대 정보 (sessionStorage에서)
+      const opponentInfoStr = sessionStorage.getItem('opponentInfo')
+      let opponentUsername = 'Opponent'
+      let opponentRating = 1500
+      let opponentUserId = 'opponent'
+      let opponentDeckId = 'deck-2'
+      let opponentPicture: string | undefined
+
+      if (opponentInfoStr) {
+        try {
+          const opponentInfo = JSON.parse(opponentInfoStr)
+          opponentUsername = opponentInfo.username || opponentInfo.name || 'Opponent'
+          opponentRating = opponentInfo.rating || 1500
+          opponentUserId = opponentInfo.userId || 'opponent'
+          opponentDeckId = opponentInfo.deckId || 'deck-2'
+          opponentPicture = opponentInfo.picture
+        } catch (e) {
+          console.error('Failed to parse opponent info:', e)
+        }
+        sessionStorage.removeItem('opponentInfo')
+      }
+
+      const currentColor = savedColor || myColor
+
+      const whitePlayer = currentColor === 'white'
+        ? { userId: myUserId, username: myUsername, rating: myRating, deckId: 'deck-1', color: 'white' as const, picture: myPicture }
+        : { userId: opponentUserId, username: opponentUsername, rating: opponentRating, deckId: opponentDeckId, color: 'white' as const, picture: opponentPicture }
+
+      const blackPlayer = currentColor === 'black'
+        ? { userId: myUserId, username: myUsername, rating: myRating, deckId: 'deck-1', color: 'black' as const, picture: myPicture }
+        : { userId: opponentUserId, username: opponentUsername, rating: opponentRating, deckId: opponentDeckId, color: 'black' as const, picture: opponentPicture }
+
+      // gameStore 업데이트
       setGameState({
         roomId: gameId || 'test-room',
-        white: {
-          userId: 'white-player',
-          username: 'White Player',
-          rating: 1500,
-          deckId: 'deck-1',
-          color: 'white',
-        },
-        black: {
-          userId: 'black-player',
-          username: 'Black Player',
-          rating: 1500,
-          deckId: 'deck-2',
-          color: 'black',
-        },
+        white: whitePlayer,
+        black: blackPlayer,
         board: newBoard,
         currentTurn: 'white',
         moveCount: 0,
@@ -275,8 +309,21 @@ export default function GamePage() {
       console.log('📥 Received move-made from server:', data)
 
       const mySocketId = socketService.getSocket()?.id
-      const iMoved = data.socketId === mySocketId
-      const currentMyColor = myColorRef.current
+      const currentGameState = useGameStore.getState().gameState
+      const myId = user?.id?.toString()
+
+      // 내 색상 판별 (스토어 정보가 가장 정확함)
+      let currentMyColor = myColorRef.current
+      if (currentGameState) {
+        if (currentGameState.white.userId === myId) currentMyColor = 'white'
+        else if (currentGameState.black.userId === myId) currentMyColor = 'black'
+      }
+
+      // 내가 움직였는지 판별 (소켓 ID 또는 색상 일치 여부)
+      const iMoved = data.socketId === mySocketId || data.moverColor === currentMyColor
+
+      console.log(`📥 handleMoveMade: iMoved=${iMoved}, mover=${data.moverColor}, me=${currentMyColor}, socketId=${data.socketId}`)
+
       const opponentColor = currentMyColor === 'white' ? 'black' : 'white'
 
       // Update check status
@@ -296,25 +343,51 @@ export default function GamePage() {
 
         if (moverColor === 'white') {
           // 백의 수: "1. e4" 형식
-          const moveNumber = Math.floor(currentState.moveCount / 2) + 1
+          const currentCount = currentState.moveCount ?? 0
+          const moveNumber = Math.floor(currentCount / 2) + 1
           if (newPgn) {
             newPgn += ` ${moveNumber}. ${algebraicMove}`
           } else {
-            newPgn = `1. ${algebraicMove}`
+            newPgn = `${moveNumber}. ${algebraicMove}`
           }
-          console.log(`⚪ White move ${moveNumber}: ${algebraicMove}`)
+          console.log(`⚪ White move ${moveNumber}: ${algebraicMove} (Total count: ${currentCount})`)
         } else {
           // 흑의 수: 같은 줄에 추가
           newPgn += ` ${algebraicMove}`
           console.log(`⚫ Black move: ${algebraicMove}`)
         }
 
-        console.log(`📝 New PGN: "${newPgn}"`)
+        console.log(`📝 Calculated New PGN: "${newPgn}"`)
         useGameStore.getState().updatePgn(newPgn)
       }
 
-      // Apply server-confirmed move
-      applyOpponentMove(data.move)
+      // Update Timer from Server
+      if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
+      if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+
+      // Apply server-confirmed game state directly for perfect sync
+      // Critical: Only sync if it's a valid and complete gameState
+      if (data.gameState && data.gameState.roomId && data.gameState.moveCount !== undefined && data.gameState.moveCount !== null) {
+        console.log('🔄 Syncing game state from server:', data.gameState)
+        setGameState(data.gameState)
+      } else if (data.gameState) {
+        console.warn('⚠️ Received incomplete gameState from server, syncing partially...', data.gameState)
+        // Merge with existing state to preserve roomId/moveCount if missing from server
+        const currentLocalState = useGameStore.getState().gameState
+        if (currentLocalState) {
+          setGameState({
+            ...currentLocalState,
+            ...data.gameState,
+            roomId: data.gameState.roomId || currentLocalState.roomId,
+            moveCount: data.gameState.moveCount !== undefined && data.gameState.moveCount !== null
+              ? data.gameState.moveCount
+              : currentLocalState.moveCount
+          })
+        }
+      } else {
+        // Fallback
+        applyOpponentMove(data.move, iMoved)
+      }
 
       // 히스토리 보기 모드에서 벗어나기 (상대가 수를 두면 최신 상태로)
       setIsViewingHistory(false)
@@ -336,14 +409,25 @@ export default function GamePage() {
       if (iMoved && data.isCheck) {
         console.log('⏳ I made a check move, waiting for opponent mate confirmation...')
         setTimeout(() => {
-          // gameOverData가 이미 설정되었으면 무시
           setGameOverData(prev => {
             if (prev) return prev
-            // 아직 game-over가 안 왔으면 상대가 합법수가 없을 경우 서버에서 곧 올 것
-            // 여기서는 로그만 남김 (상대 클라이언트의 backup detection이 작동)
             return prev
           })
         }, 2000)
+      }
+
+      // 내 턴이 되었을 때 프리무브가 있다면 자동 실행
+      if (!iMoved) {
+        setTimeout(() => {
+          // 최신 보드 상태와 턴 정보를 기반으로 프리무브 실행
+          const latestState = useGameStore.getState()
+          const latestPremove = premoveRef.current
+
+          if (latestPremove) {
+            console.log('🚀 Executing premove after server sync:', latestPremove)
+            handleMove(latestPremove)
+          }
+        }, 250) // 서버 상태가 완전히 반영될 시간을 충분히 확보 (Zustand + React)
       }
     }
 
@@ -372,7 +456,7 @@ export default function GamePage() {
     const handleLegalMoves = (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }>; gameState?: { isCheck: boolean; isCheckmate: boolean; isStalemate: boolean } }) => {
       setServerLegalMoves(data.legalMoves || [])
       setHasLegalMovesResponse(true)
-      
+
       // 체크 상태 업데이트
       if (data.gameState && gameState) {
         console.log(`♟️ Game state received - Check: ${data.gameState.isCheck}, Checkmate: ${data.gameState.isCheckmate}, Stalemate: ${data.gameState.isStalemate}`)
@@ -406,6 +490,31 @@ export default function GamePage() {
       console.error('Castling options error:', data.message)
     }
 
+    const handleGameRejoined = (data: any) => {
+      console.log('✅ Game rejoined:', data)
+      if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
+      if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+
+      if (data.yourColor) {
+        setMyColor(data.yourColor)
+      }
+
+      const currentState = useGameStore.getState().gameState
+      if (data.gameState) {
+        setGameState({
+          ...data.gameState,
+          white: data.white || currentState?.white,
+          black: data.black || currentState?.black,
+          capturedPieces: data.gameState.capturedPieces || currentState?.capturedPieces || { white: [], black: [] },
+          roomId: data.matchId
+        })
+      }
+    }
+
+    const handleRejoinError = (data: { message: string }) => {
+      console.error('❌ Rejoin error:', data.message)
+    }
+
     socketService.onMoveMade(handleMoveMade)
     socketService.onGameOver(handleGameOver)
     socketService.onMoveError(handleMoveError)
@@ -413,6 +522,8 @@ export default function GamePage() {
     socketService.onLegalMovesError(handleLegalMovesError)
     socketService.onCastlingOptions(handleCastlingOptions)
     socketService.onCastlingOptionsError(handleCastlingOptionsError)
+    socketService.onGameRejoined(handleGameRejoined)
+    socketService.onRejoinError(handleRejoinError)
 
     // 정리
     return () => {
@@ -421,22 +532,34 @@ export default function GamePage() {
       socketService.offMoveError()
       socketService.offLegalMoves()
       socketService.offLegalMovesError()
+      socketService.offGameRejoined()
+      socketService.offRejoinError()
     }
   }, []) // 빈 배열: 한 번만 등록
+
+  // 게임 페이지 로드 시 재참가 시도 (소켓 재연결 및 상태 동기화)
+  useEffect(() => {
+    if (gameId && user?.id && gameId !== 'test-room') {
+      console.log(`🔄 Attempting to rejoin game ${gameId}...`)
+      setTimeout(() => {
+        socketService.rejoinGame(gameId, user.id.toString())
+      }, 500)
+    }
+  }, [gameId, user?.id])
 
   // PGN이 업데이트될 때마다 보드 상태를 히스토리에 저장
   useEffect(() => {
     if (!gameState?.board || !gameState?.pgn) return
-    
+
     const currentMoveCount = gameState.moveCount
-    
+
     // 이미 저장된 수인지 확인
     const existingEntry = moveHistory.find(h => h.moveIndex === currentMoveCount)
     if (existingEntry) return
-    
+
     // 새로운 보드 상태 저장 (deep copy)
     const boardCopy = gameState.board.map(row => row.map(cell => cell ? { ...cell } : null))
-    
+
     setMoveHistory(prev => [
       ...prev,
       {
@@ -445,29 +568,21 @@ export default function GamePage() {
         moveIndex: currentMoveCount
       }
     ])
-    
+
     console.log(`📚 Saved board state for move ${currentMoveCount}`)
   }, [gameState?.pgn, gameState?.moveCount])
 
-  // 게임 시작 시 초기 체크 상태 확인 (배치 완료 후)
+  // 보드나 턴이 바뀔 때마다 합법수 선제 요청 (이동 지연 방지)
   useEffect(() => {
-    if (gameState && gameState.moveCount === 0 && gameState.roomId) {
-      // 게임이 막 시작되었을 때 (moveCount === 0)
-      // 백의 턴이므로 백이 체크 상태인지 확인
-      console.log('🎮 Game started, checking initial check state')
-      
-      // 약간의 지연 후 체크 상태 확인 (배치가 완료된 후)
-      setTimeout(() => {
-        if (gameState.currentTurn === myColor) {
-          socketService.requestLegalMoves(gameState.roomId)
-        }
-      }, 500)
+    if (gameState?.roomId && gameState?.status === 'playing' && gameState?.roomId !== 'test-room') {
+      console.log('📡 Proactively requesting legal moves for sync...')
+      socketService.requestLegalMoves(gameState.roomId)
     }
-  }, [gameState?.roomId, gameState?.moveCount])
+  }, [gameState?.board, gameState?.currentTurn, myColor])
 
-  // 내 턴이 시작될 때 합법수 요청
+  // 내 턴이 시작될 때 합법수 및 캐슬링 옵션 요청
   useEffect(() => {
-    if (gameState && gameState.currentTurn === myColor && !gameOverData) {
+    if (gameState && gameState.currentTurn === myColor && !gameOverDataRef.current && gameState.roomId !== 'test-room') {
       console.log('🎯 My turn started, requesting legal moves and castling options')
       setHasLegalMovesResponse(false)
       setServerLegalMoves([])
@@ -476,7 +591,7 @@ export default function GamePage() {
       // 캐슬링 옵션 요청
       socketService.requestCastlingOptions(gameState.roomId, myColor)
     }
-  }, [gameState?.currentTurn, gameState?.roomId, myColor, gameOverData])
+  }, [gameState?.currentTurn, gameState?.roomId, myColor])
 
   // 내 턴이 시작될 때 스테일메이트/체크메이트 백업 판정
   // (서버 game-over 이벤트가 누락된 경우에만 작동)
@@ -510,19 +625,12 @@ export default function GamePage() {
   }, [hasLegalMovesResponse, serverLegalMoves, isCheck, gameState?.currentTurn, myColor, gameOverData])
 
   // 타이머 카운트다운
+  // 타이머 카운트다운을 Timer 컴포넌트가 처리하므로 불필요한 useEffect 제거
+  // 그러나 초기 시간 동기화나 게임 상태 변경 시 업데이트 필요할 수 있음
   useEffect(() => {
-    if (!gameState || gameState.status !== 'playing' || gameOverData) return
-
-    const interval = setInterval(() => {
-      if (gameState.currentTurn === myColor) {
-        setMyTime(prev => Math.max(0, prev - 1))
-      } else {
-        setOpponentTime(prev => Math.max(0, prev - 1))
-      }
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [gameState?.currentTurn, gameState?.status, gameOverData, myColor])
+    if (gameState?.whiteTime) setWhiteTime(gameState.whiteTime)
+    if (gameState?.blackTime) setBlackTime(gameState.blackTime)
+  }, [gameState?.whiteTime, gameState?.blackTime])
 
   // 보드 변화 감지하여 잡힌 기물 추적
   useEffect(() => {
@@ -600,7 +708,7 @@ export default function GamePage() {
   // 히스토리 네비게이션 함수들
   const goToPreviousMove = () => {
     if (moveHistory.length === 0) return
-    
+
     if (!isViewingHistory) {
       // 처음 히스토리 모드 진입: 마지막 수에서 하나 이전으로
       const lastIndex = moveHistory.length - 2
@@ -618,13 +726,13 @@ export default function GamePage() {
 
   const goToNextMove = () => {
     if (!isViewingHistory) return
-    
+
     const nextIndex = viewingMoveIndex + 1
     if (nextIndex >= moveHistory.length - 1) {
       // 최신 상태로 돌아감
       setIsViewingHistory(false)
       setViewingMoveIndex(-1)
-      
+
       // "Current" 메시지 표시
       setShowCurrentMessage(true)
       setTimeout(() => setShowCurrentMessage(false), 1000)
@@ -636,7 +744,7 @@ export default function GamePage() {
   const goToLatestMove = () => {
     setIsViewingHistory(false)
     setViewingMoveIndex(-1)
-    
+
     // "Current" 메시지 표시
     setShowCurrentMessage(true)
     setTimeout(() => setShowCurrentMessage(false), 1000)
@@ -655,26 +763,57 @@ export default function GamePage() {
     : gameState?.board || []
 
   const handleMove = (move: Move) => {
-    // 히스토리 보기 모드에서는 수를 둘 수 없음
-    if (isViewingHistory) {
+    // 최신 게임 상태 가져오기 (클로저 stale state 방지)
+    const storeState = useGameStore.getState()
+    const currentGameState = storeState.gameState
+    const currentTurn = currentGameState?.currentTurn
+    const currentMyColor = myColorRef.current
+
+    console.log(`🕹 handleMove called. Turn: ${currentTurn}, Me: ${currentMyColor}, Move: ${move.uci}`)
+
+    // 내 색상 결정을 더 확실히 하기 (Store 정보 활용)
+    const myId = user?.id?.toString()
+    let verifiedMyColor = currentMyColor
+    if (currentGameState) {
+      if (currentGameState.white.userId === myId) verifiedMyColor = 'white'
+      else if (currentGameState.black.userId === myId) verifiedMyColor = 'black'
+    }
+
+    if (verifiedMyColor !== currentMyColor) {
+      console.warn(`🎨 Color mismatch! Ref: ${currentMyColor}, Verified: ${verifiedMyColor}`)
+    }
+
+    // 내 턴이 아니면 프리무브로 설정
+    if (currentTurn !== verifiedMyColor) {
+      console.log(`🔴 Setting premove (Turn=${currentTurn}, Me=${verifiedMyColor}):`, move)
+      setPremove(move)
+      premoveRef.current = move
+      return
+    }
+
+    // 내 턴이면 프리무브 초기화
+    setPremove(null)
+    premoveRef.current = null
+
+    // 히스토리 보기 모드에서는 수를 둘 수 없음 (Ref 사용)
+    if (isViewingHistoryRef.current) {
       console.log('Cannot move while viewing history')
       return
     }
 
-    // Prevent moves if game is over
-    if (gameOverData || gameState?.status !== 'playing') {
+    // Prevent moves if game is over (Ref 사용)
+    if (gameOverDataRef.current || currentGameState?.status !== 'playing') {
       console.log('Game is over, move prevented')
       return
     }
 
     // 프로모션 체크: 폰이 끝 랭크로 이동하는지 확인
-    if (gameState) {
-      // UCI 파싱: "e2e4" 또는 "e7e8" (프로모션 후보)
+    if (currentGameState) {
       const from = move.uci.substring(0, 2)
       const to = move.uci.substring(2, 4)
       const fromSquare = squareToRowCol({ file: from[0] as any, rank: parseInt(from[1]) as any })
       const toSquare = squareToRowCol({ file: to[0] as any, rank: parseInt(to[1]) as any })
-      const piece = gameState.board[fromSquare.row][fromSquare.col]
+      const piece = currentGameState.board[fromSquare.row][fromSquare.col]
 
       // 폰이 끝 랭크(1랭크 또는 8랭크)에 도달하는 경우
       if (piece && piece.type === 'p') {
@@ -688,19 +827,21 @@ export default function GamePage() {
       }
     }
 
-    // 내가 둔 수이므로 직전에 둔 색을 저장
-    setLastMoverColor(myColor)
-
     // Server-authoritative: send move without optimistic local update
-    if (gameState) {
-      socketService.sendMove(gameState.roomId, move)
-      console.log('Move sent to server:', move)
+    if (currentGameState && currentGameState.roomId) {
+      socketService.sendMove(currentGameState.roomId, move)
+      console.log(`Move sent to server (Room: ${currentGameState.roomId}):`, move)
+    } else {
+      console.error('❌ Cannot send move: Current gameState or roomId is missing', { currentGameState })
     }
   }
 
   // 프로모션 선택 핸들러
   const handlePromotionSelect = (pieceType: 'q' | 'r' | 'b' | 'n') => {
-    if (!promotionMove || !gameState) return
+    const storeState = useGameStore.getState()
+    const currentGameState = storeState.gameState
+
+    if (!promotionMove || !currentGameState) return
 
     console.log(`✅ Promotion selected: ${pieceType}`)
 
@@ -711,12 +852,13 @@ export default function GamePage() {
       piece: 'p',
     }
 
-    // 내가 둔 수이므로 직전에 둔 색을 저장
-    setLastMoverColor(myColor)
-
-    // 서버로 프로모션 정보 포함하여 전송
-    socketService.sendMove(gameState.roomId, move)
-    console.log('Promotion move sent to server:', move)
+    // 전송
+    if (currentGameState.roomId) {
+      socketService.sendMove(currentGameState.roomId, move)
+      console.log(`Promotion move sent to server (Room: ${currentGameState.roomId}):`, move)
+    } else {
+      console.error('❌ Cannot send promotion: RoomId missing')
+    }
 
     // 프로모션 UI 닫기
     setShowPromotion(false)
@@ -733,14 +875,30 @@ export default function GamePage() {
   // 서버 제공 합법수 기반으로 특정 말의 legal moves 반환
   const fetchLegalMovesFromServer = async ({ row, col }: { row: number; col: number; piece?: Piece }) => {
     if (!gameState) return []
-    // ensure we have latest legal moves; request if empty
-    if (serverLegalMoves.length === 0) {
-      socketService.requestLegalMoves(gameState.roomId)
-    }
 
     const square = rowColToSquare(row, col)
     const fromUci = squareToUci(square)
-    const moves = serverLegalMoves.filter(m => m.from === fromUci).map(m => ({ row: squareToRowCol({ file: m.to[0] as any, rank: parseInt(m.to[1]) as any }).row, col: squareToRowCol({ file: m.to[0] as any, rank: parseInt(m.to[1]) as any }).col }))
+
+    // serverLegalMoves가 비어있다면 즉시 요청
+    if (serverLegalMoves.length === 0) {
+      console.log('⚠️ Legal moves list empty, requesting...')
+      socketService.requestLegalMoves(gameState.roomId)
+      // 소켓 통신은 비동기이므로 이번 호출에서는 빈 배열을 반환할 수밖에 없음
+      // 하지만 proactive useEffect가 대부분의 상황을 커버할 것임
+    }
+
+    const moves = serverLegalMoves
+      .filter(m => m.from === fromUci)
+      .map(m => {
+        const to = m.to
+        const toPos = squareToRowCol({
+          file: to[0] as any,
+          rank: parseInt(to[1]) as any
+        })
+        return { row: toPos.row, col: toPos.col }
+      })
+
+    console.log(`📍 Found ${moves.length} legal moves for ${fromUci}`)
     return moves
   }
 
@@ -902,6 +1060,24 @@ export default function GamePage() {
     }
   }, [])
 
+  // 시간 초과 처리
+  const handleMyTimeout = () => {
+    if (gameOverData) return // 이미 게임 종료 상태면 무시
+    console.log(`My time out! (${myColor}) Reporting to server...`)
+    if (gameState) {
+      socketService.reportTimeout(gameState.roomId, myColor)
+    }
+  }
+
+  const handleOpponentTimeout = () => {
+    if (gameOverData) return
+    const oppColor = myColor === 'white' ? 'black' : 'white'
+    console.log(`Opponent time out! (${oppColor}) Reporting to server...`)
+    if (gameState) {
+      socketService.reportTimeout(gameState.roomId, oppColor)
+    }
+  }
+
   // 시간 포맷팅 (mm:ss)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -977,22 +1153,24 @@ export default function GamePage() {
           <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-md w-full mx-4 text-center">
             <div className="w-12 h-12 mx-auto mb-4 bg-[#D4FF00] flex items-center justify-center">
               <span className="text-2xl">
-                {gameOverData.winner === 'draw' ? '🤝' : 
-                 gameOverData.reason === 'checkmate' ? '👑' : 
-                 gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
+                {gameOverData.winner === 'draw' ? '🤝' :
+                  gameOverData.reason === 'checkmate' ? '👑' :
+                    gameOverData.reason === 'timeout' ? '⏰' :
+                      gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
               </span>
             </div>
             <h2 className="text-3xl font-serif mb-3 font-bold">
-              {gameOverData.winner === 'draw' ? 'DRAW!' : 
-               gameOverData.winner === 'white' ? 'WHITE won!' : 'BLACK won!'}
+              {gameOverData.winner === 'draw' ? 'DRAW!' :
+                gameOverData.winner === 'white' ? 'WHITE won!' : 'BLACK won!'}
             </h2>
             <p className="text-base text-gray-400 mb-6">
               by {gameOverData.reason === 'resignation' ? 'resignation' :
-                  gameOverData.reason === 'checkmate' ? 'checkmate' :
-                  gameOverData.reason === 'stalemate' ? 'stalemate' :
-                  gameOverData.reason === 'placement' ? 'placement advantage' :
-                  gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
-                  gameOverData.reason}
+                gameOverData.reason === 'checkmate' ? 'checkmate' :
+                  gameOverData.reason === 'timeout' ? 'timeout' :
+                    gameOverData.reason === 'stalemate' ? 'stalemate' :
+                      gameOverData.reason === 'placement' ? 'placement advantage' :
+                        gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
+                          gameOverData.reason}
             </p>
             <button
               onClick={() => navigate('/')}
@@ -1092,6 +1270,23 @@ export default function GamePage() {
         <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6">
           {/* 왼쪽: 체스판 */}
           <div className="flex flex-col gap-4">
+            {/* Premove Indicator */}
+            <div className={`h-8 flex items-center px-4 text-xs font-bold uppercase tracking-widest transition-all duration-300 ${premove ? 'bg-red-900/40 text-red-400 border border-red-900/50 opacity-100' : 'opacity-0'}`}>
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                Premove Active: {premove?.uci}
+              </span>
+              <button
+                onClick={() => {
+                  setPremove(null)
+                  premoveRef.current = null
+                }}
+                className="ml-auto hover:text-white underline transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+
             <div className="inline-block relative">
               <ChessBoard
                 board={displayBoard}
@@ -1104,6 +1299,11 @@ export default function GamePage() {
                 useImages={useImages}
                 fetchLegalMoves={fetchLegalMovesFromServer}
                 castlingOptions={isViewingHistory ? [] : castlingOptions}
+                premove={premove || undefined}
+                onClearPmove={() => {
+                  setPremove(null)
+                  premoveRef.current = null
+                }}
               />
               {/* 히스토리 보기 모드 표시 */}
               {isViewingHistory && (
@@ -1112,9 +1312,8 @@ export default function GamePage() {
                 </div>
               )}
               {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
-              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${
-                showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-              }`}>
+              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                }`}>
                 Current
               </div>
             </div>
@@ -1187,7 +1386,11 @@ export default function GamePage() {
               {/* 타이머 */}
               <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#050505] border border-gray-900">
                 <span className="text-xs text-gray-600 uppercase tracking-widest">Time</span>
-                <span className="text-2xl font-mono font-light">{formatTime(opponentTime)}</span>
+                <Timer
+                  initialTime={myColor === 'white' ? blackTime : whiteTime}
+                  isActive={!gameOverData && gameState?.currentTurn === (myColor === 'white' ? 'black' : 'white')}
+                  onTimeout={handleOpponentTimeout}
+                />
               </div>
             </div>
 
@@ -1196,30 +1399,29 @@ export default function GamePage() {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h2>
               </div>
-              
+
               <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-sm">
                 {parseMoves(gameState?.pgn || '').map((m, idx) => {
                   const whiteMoveIndex = idx * 2 + 1  // 백의 수는 홀수 인덱스 (1, 3, 5...)
                   const blackMoveIndex = idx * 2 + 2  // 흑의 수는 짝수 인덱스 (2, 4, 6...)
                   const totalMoves = parseMoves(gameState?.pgn || '').length
                   const isLastMove = idx === totalMoves - 1
-                  
+
                   // 현재 보고 있는 수 하이라이트
                   const viewingWhite = isViewingHistory && moveHistory[viewingMoveIndex]?.moveIndex === whiteMoveIndex
                   const viewingBlack = isViewingHistory && moveHistory[viewingMoveIndex]?.moveIndex === blackMoveIndex
-                  
+
                   // 최신 수 하이라이트 (히스토리 모드가 아닐 때)
                   const isLatestWhite = !isViewingHistory && isLastMove && !m.black
                   const isLatestBlack = !isViewingHistory && isLastMove && m.black
-                  
+
                   return (
                     <div
                       key={idx}
-                      className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${
-                        (isLatestWhite || isLatestBlack) && !isViewingHistory
-                          ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]'
-                          : 'hover:bg-gray-900'
-                      }`}
+                      className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${(isLatestWhite || isLatestBlack) && !isViewingHistory
+                        ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]'
+                        : 'hover:bg-gray-900'
+                        }`}
                     >
                       <span className="text-gray-600">{m.move}.</span>
                       <span
@@ -1230,13 +1432,12 @@ export default function GamePage() {
                             setViewingMoveIndex(historyIndex)
                           }
                         }}
-                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${
-                          viewingWhite
-                            ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
-                            : isLatestWhite
-                              ? 'text-[#D4FF00]'
-                              : 'text-white'
-                        }`}
+                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${viewingWhite
+                          ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
+                          : isLatestWhite
+                            ? 'text-[#D4FF00]'
+                            : 'text-white'
+                          }`}
                       >
                         {m.white}
                       </span>
@@ -1249,13 +1450,12 @@ export default function GamePage() {
                             setViewingMoveIndex(historyIndex)
                           }
                         }}
-                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${
-                          viewingBlack
-                            ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
-                            : isLatestBlack
-                              ? 'text-[#D4FF00]'
-                              : 'text-gray-400'
-                        } ${m.black ? '' : 'cursor-default'}`}
+                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${viewingBlack
+                          ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
+                          : isLatestBlack
+                            ? 'text-[#D4FF00]'
+                            : 'text-gray-400'
+                          } ${m.black ? '' : 'cursor-default'}`}
                       >
                         {m.black || ''}
                       </span>
@@ -1268,7 +1468,7 @@ export default function GamePage() {
                   </div>
                 )}
               </div>
-              
+
               {/* 히스토리 네비게이션 버튼 */}
               <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-gray-900">
                 <button
@@ -1352,7 +1552,13 @@ export default function GamePage() {
               {/* 타이머 */}
               <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#050505] border border-[#D4FF00]/30">
                 <span className="text-xs text-[#D4FF00] uppercase tracking-widest">Your Time</span>
-                <span className="text-2xl font-mono font-light text-[#D4FF00]">{formatTime(myTime)}</span>
+                <div className="text-[#D4FF00]">
+                  <Timer
+                    initialTime={myColor === 'white' ? whiteTime : blackTime}
+                    isActive={!gameOverData && gameState?.currentTurn === myColor}
+                    onTimeout={handleMyTimeout}
+                  />
+                </div>
               </div>
             </div>
 

@@ -1,6 +1,7 @@
 import * as gameRepo from './game.repository';
 import * as userRepo from '../user/user.repository';
 import { CreateGameDto, GameResponseDto, GameStateDto, UserGameHistoryDto, ResignResponseDto } from './DTOS/game.dto';
+import { ChessService } from '../../engine/ChessService';
 
 export const createGame = async (dto: CreateGameDto): Promise<GameResponseDto> => {
   const game = await gameRepo.createGame(
@@ -47,6 +48,20 @@ export const getGameById = async (gameId: number): Promise<GameStateDto> => {
       deckId: game.black_deck_id,
       color: 'black'
     },
+    player1: {
+      userId: game.user_game_white_player_idTouser.id,
+      username: game.user_game_white_player_idTouser.username,
+      rating: game.user_game_white_player_idTouser.rating,
+      deckId: game.white_deck_id,
+      color: 'white'
+    },
+    player2: {
+      userId: game.user_game_black_player_idTouser.id,
+      username: game.user_game_black_player_idTouser.username,
+      rating: game.user_game_black_player_idTouser.rating,
+      deckId: game.black_deck_id,
+      color: 'black'
+    },
     board,
     currentTurn: 'white', // FEN에서 파싱 가능
     moveCount: 0, // PGN에서 계산 가능
@@ -70,28 +85,29 @@ export const getUserGames = async (userId: number, limit: number = 20, offset: n
 
   const gamesDto: UserGameHistoryDto[] = games.map((game: any) => {
     const isWhite = game.white_player_id === userId;
-    const opponent = isWhite 
-      ? game.user_game_black_player_idTouser 
+    const opponent = isWhite
+      ? game.user_game_black_player_idTouser
       : game.user_game_white_player_idTouser;
-    
-    const myDeck = isWhite 
-      ? game.deck_game_white_deck_idTodeck 
+
+    const myDeck = isWhite
+      ? game.deck_game_white_deck_idTodeck
       : game.deck_game_black_deck_idTodeck;
 
     const gameHistory = game.game_history[0];
-    
-    let result = 'unknown';
+
+    let result = 'UNKNOWN';
     if (gameHistory && gameHistory.result) {
-      result = gameHistory.result;
+      result = gameHistory.result.toUpperCase();
     } else if (game.result) {
-      if (game.result === 'white_win' && isWhite) result = 'win';
-      else if (game.result === 'black_win' && !isWhite) result = 'win';
-      else if (game.result === 'draw') result = 'draw';
-      else result = 'lose';
+      if (game.result === 'white_win' && isWhite) result = 'WIN';
+      else if (game.result === 'black_win' && !isWhite) result = 'WIN';
+      else if (game.result === 'draw') result = 'DRAW';
+      else result = 'LOSE';
     }
 
     return {
       id: game.id,
+      gameId: game.id,
       opponent: {
         userId: opponent.id,
         username: opponent.username,
@@ -190,16 +206,112 @@ export const resignGame = async (gameId: number, userId: number): Promise<Resign
   };
 };
 
+/**
+ * 게임 종료 시 결과를 DB에 저장하는 함수 (소켓 핸들러에서 호출)
+ * @param whiteUserId - 백 플레이어 userId (문자열 또는 숫자)
+ * @param blackUserId - 흑 플레이어 userId (문자열 또는 숫자)
+ * @param whiteDeckId - 백 플레이어 deckId (문자열 또는 숫자)
+ * @param blackDeckId - 흑 플레이어 deckId (문자열 또는 숫자)
+ * @param winner - 승자 ('white', 'black', 'draw')
+ * @param reason - 종료 사유 ('checkmate', 'stalemate', 'resignation', 'placement', 'mutual agreement')
+ * @param pgn - PGN 기록 (선택)
+ */
+export const saveGameResult = async (
+  whiteUserId: string | number,
+  blackUserId: string | number,
+  whiteDeckId: string | number,
+  blackDeckId: string | number,
+  winner: 'white' | 'black' | 'draw',
+  reason: string,
+  pgn?: string
+): Promise<{ success: boolean; gameId?: number; error?: string }> => {
+  try {
+    // userId와 deckId를 숫자로 변환
+    const whiteId = typeof whiteUserId === 'string' ? parseInt(whiteUserId) : whiteUserId;
+    const blackId = typeof blackUserId === 'string' ? parseInt(blackUserId) : blackUserId;
+    const whiteDeck = typeof whiteDeckId === 'string' ? parseInt(whiteDeckId) : whiteDeckId;
+    const blackDeck = typeof blackDeckId === 'string' ? parseInt(blackDeckId) : blackDeckId;
+
+    // NaN 체크
+    if (isNaN(whiteId) || isNaN(blackId)) {
+      console.log(`⚠️ Invalid userId: white=${whiteUserId}, black=${blackUserId}`);
+      return { success: false, error: 'Invalid userId' };
+    }
+
+    // deckId가 없으면 기본값 사용 (1)
+    const whiteDeckFinal = isNaN(whiteDeck) ? 1 : whiteDeck;
+    const blackDeckFinal = isNaN(blackDeck) ? 1 : blackDeck;
+
+    // 게임 결과 문자열
+    let gameResult: string;
+    if (winner === 'white') {
+      gameResult = 'white_win';
+    } else if (winner === 'black') {
+      gameResult = 'black_win';
+    } else {
+      gameResult = 'draw';
+    }
+
+    // 1. 게임 레코드 생성
+    const game = await gameRepo.createGame(whiteId, blackId, whiteDeckFinal, blackDeckFinal);
+    console.log(`📝 Game created: ${game.id}`);
+
+    // 2. 게임 결과 업데이트 (PGN 포함)
+    await gameRepo.updateGameResult(game.id, gameResult, pgn);
+
+    // 3. 레이팅 변화 계산 (간단한 고정값)
+    const whiteRatingChange = winner === 'white' ? 12 : winner === 'black' ? -12 : 0;
+    const blackRatingChange = winner === 'black' ? 12 : winner === 'white' ? -12 : 0;
+
+    // 4. 게임 히스토리 생성 (각 플레이어별)
+    const whiteResult = winner === 'white' ? 'win' : winner === 'black' ? 'lose' : 'draw';
+    const blackResult = winner === 'black' ? 'win' : winner === 'white' ? 'lose' : 'draw';
+
+    await gameRepo.createGameHistory(whiteId, game.id, 'white', whiteResult, whiteRatingChange);
+    await gameRepo.createGameHistory(blackId, game.id, 'black', blackResult, blackRatingChange);
+
+    // 5. 사용자 레이팅 업데이트
+    const whiteUser = await userRepo.findUserById(whiteId);
+    const blackUser = await userRepo.findUserById(blackId);
+
+    if (whiteUser) {
+      await userRepo.updateUserRating(
+        whiteId,
+        whiteUser.rating + whiteRatingChange,
+        whiteUser.rd,
+        whiteUser.volatility
+      );
+    }
+
+    if (blackUser) {
+      await userRepo.updateUserRating(
+        blackId,
+        blackUser.rating + blackRatingChange,
+        blackUser.rd,
+        blackUser.volatility
+      );
+    }
+
+    console.log(`✅ Game ${game.id} saved: ${gameResult} by ${reason}`);
+    console.log(`📊 Rating changes: White ${whiteRatingChange > 0 ? '+' : ''}${whiteRatingChange}, Black ${blackRatingChange > 0 ? '+' : ''}${blackRatingChange}`);
+
+    return { success: true, gameId: game.id };
+  } catch (error) {
+    console.error('❌ Error saving game result:', error);
+    return { success: false, error: String(error) };
+  }
+};
+
 // 유틸리티 함수: FEN을 보드로 파싱
 function parseFenToBoard(fen: string): any[][] {
   const board: any[][] = [];
-  
+
   if (!fen) {
     return Array(8).fill(null).map(() => Array(8).fill(null));
   }
 
   const rows = fen.split(' ')[0].split('/');
-  
+
   for (const row of rows) {
     const boardRow: any[] = [];
     for (const char of row) {
@@ -223,3 +335,56 @@ function parseFenToBoard(fen: string): any[][] {
 
   return board;
 }
+
+export const getGameReplay = async (gameId: number): Promise<any[]> => {
+  const game = await gameRepo.findGameById(gameId);
+  if (!game || !game.pgn) return [];
+
+  const parts = game.pgn.split('|');
+  // PGN 형식이 맞지 않으면 빈 배열 반환 (whitePlacement|blackPlacement|moves)
+  if (parts.length < 3) return [];
+
+  try {
+    const whitePlacement = JSON.parse(parts[0]);
+    const blackPlacement = JSON.parse(parts[1]);
+    const movesStr = parts[2];
+    const moves = movesStr && movesStr.trim() !== '' ? movesStr.split(' ') : [];
+
+    const engine = new ChessService();
+    engine.initializeFromPlacement(whitePlacement, blackPlacement);
+
+    const history = [];
+
+    // Initial state
+    history.push({
+      board: JSON.parse(JSON.stringify(engine.getBoard())),
+      turn: engine.getTurn()
+    });
+
+    // Apply moves
+    for (const move of moves) {
+      if (!move || move.length < 4) continue;
+
+      const from = move.substring(0, 2);
+      const to = move.substring(2, 4);
+      const promotion = move.length > 4 ? move.substring(4, 5) : undefined;
+
+      // UCI 포맷을 engine.makeMove에 맞게 사용 (내부적으로 UCI 파싱함)
+      const uciFrom = move.substring(0, 2);
+      const uciTo = move.substring(2, 4);
+
+      engine.makeMove(uciFrom, uciTo, promotion);
+
+      history.push({
+        board: JSON.parse(JSON.stringify(engine.getBoard())),
+        turn: engine.getTurn(),
+        lastMove: { from: uciFrom, to: uciTo, promotion }
+      });
+    }
+
+    return history;
+  } catch (e) {
+    console.error('Error parsing replay data:', e);
+    return [];
+  }
+};

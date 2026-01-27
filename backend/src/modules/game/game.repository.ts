@@ -36,10 +36,13 @@ export const findGameById = async (id: number) => {
   });
 };
 
-export const updateGameResult = async (gameId: number, result: string) => {
+export const updateGameResult = async (gameId: number, result: string, pgn?: string) => {
   return await prisma.game.update({
     where: { id: gameId },
-    data: { result }
+    data: {
+      result,
+      ...(pgn && { pgn }) // pgn이 있을 때만 업데이트
+    }
   });
 };
 

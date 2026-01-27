@@ -171,12 +171,16 @@ export default function MyPage() {
                     {matchHistory.length > 0 ? (
                         <div className="border-t border-gray-800">
                             {matchHistory.map((game) => (
-                                <div key={game.gameId} className="group grid grid-cols-12 py-6 border-b border-gray-800 hover:bg-white/5 transition-colors items-center">
+                                <div
+                                    key={game.gameId}
+                                    className="group grid grid-cols-12 py-6 border-b border-gray-800 hover:bg-white/5 transition-colors items-center cursor-pointer"
+                                    onClick={() => navigate(`/replay/${game.gameId}`)}
+                                >
                                     <div className="col-span-4 flex items-center gap-4">
-                                        <div className={`w-3 h-3 ${true ? 'bg-white' : 'bg-gray-800 border border-gray-600'}`}></div>
+                                        <div className={`w-3 h-3 ${game.result === 'WIN' ? 'bg-[#D4FF00]' : game.result === 'LOSE' ? 'bg-red-500' : 'bg-white'}`}></div>
                                         <div>
                                             <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Opponent</div>
-                                            <div className="font-bold text-lg">{game.opponent}</div>
+                                            <div className="font-bold text-lg">{typeof game.opponent === 'object' ? (game.opponent as any).username : game.opponent}</div>
                                         </div>
                                     </div>
                                     <div className="col-span-3">
@@ -189,8 +193,9 @@ export default function MyPage() {
                                             {game.ratingChange > 0 ? '+' : ''}{game.ratingChange}
                                         </div>
                                     </div>
-                                    <div className="col-span-2 text-right text-gray-500 font-mono text-xs">
-                                        {timeAgo(game.playedAt)} AGO
+                                    <div className="col-span-2 flex items-center justify-end gap-2">
+                                        <span className="text-gray-500 font-mono text-xs">{timeAgo(game.playedAt)} AGO</span>
+                                        <span className="text-gray-600 group-hover:text-[#D4FF00] transition-colors">→</span>
                                     </div>
                                 </div>
                             ))}

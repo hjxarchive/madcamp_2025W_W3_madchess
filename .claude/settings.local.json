@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(git -C /Users/hjxarchive/madcamp_2025W_W3_madchess/madcamp_2025W_W3_madchess rev-parse:*)"
+    ]
+  }
+}

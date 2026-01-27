@@ -12,4 +12,7 @@ router.get('/:gameId', gameController.getGame);
 // POST /api/games/:gameId/resign - 게임 항복
 router.post('/:gameId/resign', gameController.resignGame);
 
+// GET /api/games/:gameId/replay - 게임 리플레이 조회
+router.get('/:gameId/replay', gameController.getReplay);
+
 export default router;

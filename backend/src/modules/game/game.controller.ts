@@ -68,8 +68,8 @@ export const createGame = async (req: Request, res: Response) => {
     const game = await gameService.createGame(req.body);
     res.status(201).json({ success: true, data: game });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -145,13 +145,13 @@ export const getGame = async (req: Request, res: Response) => {
     res.json({ success: true, data: game });
   } catch (error: any) {
     if (error.message === 'GAME_NOT_FOUND') {
-      return res.status(404).json({ 
-        success: false, 
+      return res.status(404).json({
+        success: false,
         error: { code: 'GAME_NOT_FOUND', message: '게임을 찾을 수 없습니다.' }
       });
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -235,8 +235,8 @@ export const getUserGames = async (req: Request, res: Response) => {
     const result = await gameService.getUserGames(userId, limit, offset, status);
     res.json({ success: true, data: result });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -311,26 +311,41 @@ export const resignGame = async (req: Request, res: Response) => {
     res.json({ success: true, data: result });
   } catch (error: any) {
     if (error.message === 'GAME_NOT_FOUND') {
-      return res.status(404).json({ 
-        success: false, 
+      return res.status(404).json({
+        success: false,
         error: { code: 'GAME_NOT_FOUND', message: '게임을 찾을 수 없습니다.' }
       });
     }
     if (error.message === 'GAME_ENDED') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: { code: 'GAME_ENDED', message: '게임이 이미 종료되었습니다.' }
       });
     }
     if (error.message === 'NOT_AUTHORIZED') {
-      return res.status(403).json({ 
-        success: false, 
+      return res.status(403).json({
+        success: false,
         error: { code: 'NOT_AUTHORIZED', message: '권한이 없습니다.' }
       });
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
+  }
+};
+
+export const getReplay = async (req: Request, res: Response) => {
+  try {
+    const gameId = parseInt(req.params.gameId);
+    if (isNaN(gameId)) {
+      return res.status(400).json({ success: false, error: 'Invalid game ID' });
+    }
+
+    const history = await gameService.getGameReplay(gameId);
+    return res.status(200).json({ success: true, history });
+  } catch (error) {
+    console.error('Get replay error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch replay' });
   }
 };

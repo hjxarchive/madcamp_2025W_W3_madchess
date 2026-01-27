@@ -6,6 +6,7 @@ import PlacementPage from './pages/PlacementPage'
 import GamePage from './pages/GamePage'
 import DeckBuilderPage from './pages/DeckBuilderPage'
 import MyPage from './pages/MyPage'
+import ReplayPage from './pages/ReplayPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -36,6 +37,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <GamePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/replay/:gameId"
+            element={
+              <ProtectedRoute>
+                <ReplayPage />
               </ProtectedRoute>
             }
           />

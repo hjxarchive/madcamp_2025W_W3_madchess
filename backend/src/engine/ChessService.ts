@@ -26,10 +26,15 @@ export class ChessService {
         blackKingSide: false,
         blackQueenSide: false,
     }
+    private moves: string[] = []
 
     /** Get current turn */
     getTurn(): 'white' | 'black' {
         return this.turn
+    }
+
+    getBoard(): (Piece | null)[][] {
+        return this.board
     }
 
     /** Snapshot engine state for reversible simulations */
@@ -42,6 +47,7 @@ export class ChessService {
             castlingRights: { ...this.castlingRights },
             kingMoved: { ...this.kingMoved },
             rookMoved: { ...this.rookMoved },
+            moves: [...this.moves], // Save moves
         }
     }
 
@@ -54,6 +60,7 @@ export class ChessService {
         this.castlingRights = { ...snapshot.castlingRights }
         this.kingMoved = { ...snapshot.kingMoved }
         this.rookMoved = { ...snapshot.rookMoved }
+        this.moves = [...snapshot.moves] // Restore moves
     }
 
     /** Position to UCI helper */
@@ -117,7 +124,7 @@ export class ChessService {
             // Check if path is clear
             const minFile = Math.min(kingFile, rookFile, kingTargetFile, rookTargetFile)
             const maxFile = Math.max(kingFile, rookFile, kingTargetFile, rookTargetFile)
-            
+
             let pathClear = true
             for (let file = minFile; file <= maxFile; file++) {
                 if (file === kingFile || file === rookFile) continue
@@ -479,29 +486,20 @@ export class ChessService {
         const fromPos = this.uciToPosition(from)
         const toPos = this.uciToPosition(to)
 
-        console.log(`🔍 makeMove called: ${from} -> ${to}`)
-        console.log(`  From position:`, fromPos)
-        console.log(`  To position:`, toPos)
-
         const piece = this.getPiece(fromPos)
-        console.log(`  Piece at ${from}:`, piece)
-        console.log(`  Current turn:`, this.turn)
 
         if (!piece) {
-            console.log(`  ❌ No piece at ${from}`)
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Check if it's the right player's turn
         if (piece.color !== this.turn) {
-            console.log(`  ❌ Wrong turn. Piece is ${piece.color}, turn is ${this.turn}`)
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Check if destination has own piece
         const targetPiece = this.getPiece(toPos)
         if (targetPiece && targetPiece.color === piece.color) {
-            console.log(`  ❌ Destination has own piece`)
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
@@ -527,8 +525,6 @@ export class ChessService {
                 isValid = this.isValidKingMove(fromPos, toPos)
                 break
         }
-
-        console.log(`  Move validation result: ${isValid}`)
 
         if (!isValid) {
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
@@ -628,7 +624,8 @@ export class ChessService {
             drawReason = 'insufficient material'
         }
 
-        console.log(`  ✅ Move completed. Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}, Draw: ${isDraw} ${drawReason ? `(${drawReason})` : ''}`)
+        const moveString = promotion ? `${from}${to}${promotion}` : `${from}${to}`
+        this.moves.push(moveString)
 
         return { success: true, isCheck, isCheckmate, isStalemate, isDraw, drawReason }
     }
@@ -640,9 +637,9 @@ export class ChessService {
         const isCheck = this.isKingInCheck(this.turn)
         const isCheckmate = isCheck && this.isCheckmate(this.turn)
         const isStalemate = !isCheck && this.isStalemate(this.turn)
-        
+
         console.log(`🔍 Current state check - Turn: ${this.turn}, Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}`)
-        
+
         return { isCheck, isCheckmate, isStalemate }
     }
 
@@ -826,8 +823,9 @@ export class ChessService {
      * Initialize board from custom placement
      */
     initializeFromPlacement(whitePlacement: any[], blackPlacement: any[]): void {
-        // Clear board
+        // Clear board and moves
         this.board = Array(8).fill(null).map(() => Array(8).fill(null))
+        this.moves = []
 
         // Place white pieces
         whitePlacement.forEach((p: any) => {
@@ -845,4 +843,12 @@ export class ChessService {
 
         this.turn = 'white'
     }
+
+    /**
+     * Get moves in UCI format space-separated (simple PGN)
+     */
+    getPGN(): string {
+        return this.moves.join(' ')
+    }
+
 }

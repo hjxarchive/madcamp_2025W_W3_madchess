@@ -9,9 +9,11 @@ interface ChessBoardProps {
   lastMove?: Move
   isCheck: boolean
   onMove: (move: Move) => void
-  useImages?: boolean  // 이미지 사용 여부 (기본값: false = 유니코드 사용)
-  fetchLegalMoves?: (from: { row: number; col: number; piece: Piece }) => Promise<{ row: number; col: number }[]>  // 백엔드로부터 합법적 수 요청
+  useImages?: boolean
+  fetchLegalMoves?: (from: { row: number; col: number; piece: Piece }) => Promise<{ row: number; col: number }[]>
   castlingOptions?: Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }>
+  premove?: Move
+  onClearPmove?: () => void
 }
 
 // 유니코드 체스 기물 심볼
@@ -70,6 +72,8 @@ export default function ChessBoard({
   useImages = false,  // 기본값은 유니코드 심볼 사용
   fetchLegalMoves,
   castlingOptions = [],
+  premove,
+  onClearPmove,
 }: ChessBoardProps) {
   const [selectedSquare, setSelectedSquare] = useState<{ row: number; col: number } | null>(null)
   const [legalMoves, setLegalMoves] = useState<{ row: number; col: number }[]>([])
@@ -93,7 +97,8 @@ export default function ChessBoard({
   }
 
   const handleSquareClick = async (displayRow: number, displayCol: number) => {
-    if (!isMyTurn) return
+    // If it's not my turn, we support premoves.
+    // If it's my turn, we do normal moves.
 
     const actual = getActualPosition(displayRow, displayCol)
     const piece = board[actual.row][actual.col]
@@ -124,7 +129,7 @@ export default function ChessBoard({
         return
       }
 
-      // Calculate legal moves (or use fetchLegalMoves if provided)
+      // Calculate legal moves
       if (fetchLegalMoves) {
         fetchLegalMoves({ row: actual.row, col: actual.col, piece })
           .then(moves => setLegalMoves(moves))
@@ -133,12 +138,12 @@ export default function ChessBoard({
             setLegalMoves([])
           })
       } else {
-        // Show all possible squares as hints (server will validate)
+        // Pseudo-legal moves for premove or if fetchLegalMoves not provided
+        // Just show all squares not occupied by own pieces
         const possibleMoves: { row: number; col: number }[] = []
         for (let r = 0; r < 8; r++) {
           for (let c = 0; c < 8; c++) {
             const targetPiece = board[r][c]
-            // Don't show own pieces as targets
             if (!targetPiece || targetPiece.color !== piece.color) {
               possibleMoves.push({ row: r, col: c })
             }
@@ -228,6 +233,18 @@ export default function ChessBoard({
     return piece?.type === 'k' && piece.color === currentTurn
   }
 
+  const isSquarePremove = (displayRow: number, displayCol: number) => {
+    if (!premove) return false
+    const actual = getActualPosition(displayRow, displayCol)
+    const { from, to } = parseUci(premove.uci)
+    const fromPos = squareToRowCol(from)
+    const toPos = squareToRowCol(to)
+    return (
+      (fromPos.row === actual.row && fromPos.col === actual.col) ||
+      (toPos.row === actual.row && toPos.col === actual.col)
+    )
+  }
+
   return (
     <div className="flex flex-col items-center">
       {/* 상단 좌표 (파일) */}
@@ -270,6 +287,7 @@ export default function ChessBoard({
                 const lastMoveHighlight = isSquareLastMove(rowIndex, colIndex)
                 const kingCheck = isKingInCheck(rowIndex, colIndex)
                 const castlingRook = isCastlingRook(rowIndex, colIndex) && isMyTurn
+                const premoveHighlight = isSquarePremove(rowIndex, colIndex)
 
                 return (
                   <div
@@ -281,9 +299,10 @@ export default function ChessBoard({
                       ${isLight ? 'bg-amber-100' : 'bg-amber-700'}
                       ${selected ? 'ring-4 ring-blue-500 ring-inset' : ''}
                       ${lastMoveHighlight ? 'bg-yellow-300' : ''}
+                      ${premoveHighlight ? 'bg-red-400/50' : ''}
                       ${kingCheck ? 'bg-red-500' : ''}
                       ${castlingRook ? 'ring-4 ring-green-400 ring-inset' : ''}
-                      ${isMyTurn ? 'hover:brightness-90' : 'cursor-not-allowed'}
+                      ${isMyTurn || true ? 'hover:brightness-90' : 'cursor-not-allowed'}
                     `}
                   >
                     {/* 체크된 왕 하이라이트 - 칸 전체 붉은 오버레이 */}
