@@ -9,6 +9,7 @@ datasource db {
 
 model deck {
   id                            Int                @id @default(autoincrement())
+  name                          String             @default("Untitled Deck") @db.VarChar(100)
   user_id                       Int
   win_cnt                       Int                @default(0)
   lose_cnt                      Int                @default(0)

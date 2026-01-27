@@ -82,7 +82,7 @@ export default function ChessBoard({
   // 캐슬링 가능한 룩 위치 확인
   const isCastlingRook = (row: number, col: number): boolean => {
     const square = rowColToSquare(row, col)
-    return castlingOptions.some(option => option.rookPos === square)
+    return castlingOptions.some(option => option.rookPos === (square as any))
   }
 
   const getActualPosition = (displayRow: number, displayCol: number) => {
@@ -111,14 +111,14 @@ export default function ChessBoard({
 
       // 룩 클릭 시 캐슬링 옵션 확인
       const square = rowColToSquare(actual.row, actual.col)
-      const castlingOption = castlingOptions.find(opt => opt.rookPos === square)
-      
+      const castlingOption = castlingOptions.find(opt => opt.rookPos === (square as any))
+
       if (castlingOption && piece.type === 'r') {
         // 캐슬링 가능한 룩: 킹의 목적지를 합법수로 표시
         console.log(`♜ Castling option for rook at ${square}: ${castlingOption.side}`)
-        const kingTarget = squareToRowCol({ 
-          file: castlingOption.kingTarget[0] as any, 
-          rank: parseInt(castlingOption.kingTarget[1]) as any 
+        const kingTarget = squareToRowCol({
+          file: castlingOption.kingTarget[0] as any,
+          rank: parseInt(castlingOption.kingTarget[1]) as any
         })
         setLegalMoves([kingTarget])
         return
@@ -161,11 +161,11 @@ export default function ChessBoard({
         if (movingPiece) {
           const fromSquare = rowColToSquare(selectedSquare.row, selectedSquare.col)
           const toSquare = rowColToSquare(actual.row, actual.col)
-          
+
           // 캐슬링 체크: 룩을 선택하고 킹의 목적지를 클릭한 경우
           const selectedSquareUci = rowColToSquare(selectedSquare.row, selectedSquare.col)
-          const castlingOpt = castlingOptions.find(opt => opt.rookPos === selectedSquareUci)
-          
+          const castlingOpt = castlingOptions.find(opt => opt.rookPos === (selectedSquareUci as any))
+
           if (castlingOpt && movingPiece.type === 'r') {
             // 캐슬링 실행: 킹 이동으로 변환
             console.log(`♜ Executing castling: ${castlingOpt.side}`)

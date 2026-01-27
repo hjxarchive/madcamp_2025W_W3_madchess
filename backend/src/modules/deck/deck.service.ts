@@ -17,7 +17,7 @@ const BUDGET = 30; // 예산 제한
 export const validateDeck = async (composition: { [key: string]: number }): Promise<ValidateDeckResponseDto> => {
   const allPieces = await pieceRepo.findAllPieces();
   const valueMap = new Map<string, number>();
-  
+
   allPieces.forEach((p: any) => {
     valueMap.set(p.action.toLowerCase(), p.value);
   });
@@ -28,7 +28,7 @@ export const validateDeck = async (composition: { [key: string]: number }): Prom
 
   for (const [code, qty] of Object.entries(composition)) {
     const normalizedCode = code.toLowerCase();
-    
+
     // 킹 확인
     if (normalizedCode === 'k') {
       hasKing = true;
@@ -74,7 +74,7 @@ export const createDeck = async (dto: CreateDeckDto): Promise<DeckResponseDto> =
   // 2. 기물 정보 가져오기
   const allPieces = await pieceRepo.findAllPieces();
   const pieceMap = new Map<string, number>();
-  
+
   allPieces.forEach((p: any) => {
     pieceMap.set(p.action.toLowerCase(), p.id);
   });
@@ -104,7 +104,7 @@ export const createDeck = async (dto: CreateDeckDto): Promise<DeckResponseDto> =
 
 export const getUserDecks = async (userId: number, sort?: string, limit?: number): Promise<DeckResponseDto[]> => {
   const decks = await deckRepo.findDecksByUser(userId, sort, limit);
-  
+
   return decks.map((deck: any) => {
     const composition: { [key: string]: number } = {};
     let totalCost = 0;
@@ -121,7 +121,7 @@ export const getUserDecks = async (userId: number, sort?: string, limit?: number
     return {
       id: deck.id,
       userId: deck.user_id,
-      name: `Deck ${deck.id}`, // name 필드가 없어서 임시
+      name: deck.name || `Deck ${deck.id}`,
       composition,
       totalCost,
       winCnt: deck.win_cnt,
@@ -134,7 +134,7 @@ export const getUserDecks = async (userId: number, sort?: string, limit?: number
 
 export const getDeckById = async (deckId: number): Promise<DeckWithPiecesDto> => {
   const deck = await deckRepo.findDeckById(deckId);
-  
+
   if (!deck) {
     throw new Error('DECK_NOT_FOUND');
   }
@@ -166,8 +166,8 @@ export const getDeckById = async (deckId: number): Promise<DeckWithPiecesDto> =>
   const allGames = [...deck.game_game_white_deck_idTodeck, ...deck.game_game_black_deck_idTodeck];
   const recentGames = allGames.slice(0, 10).map(game => {
     const isWhite = game.white_deck_id === deckId;
-    const opponent = isWhite 
-      ? game.user_game_black_player_idTouser.username 
+    const opponent = isWhite
+      ? game.user_game_black_player_idTouser.username
       : game.user_game_white_player_idTouser.username;
 
     let result = 'unknown';
@@ -189,7 +189,7 @@ export const getDeckById = async (deckId: number): Promise<DeckWithPiecesDto> =>
   return {
     id: deck.id,
     userId: deck.user_id,
-    name: `Deck ${deck.id}`,
+    name: deck.name || `Deck ${deck.id}`,
     composition,
     totalCost,
     winCnt: deck.win_cnt,

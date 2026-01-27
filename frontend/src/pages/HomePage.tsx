@@ -31,164 +31,163 @@ export default function HomePage() {
   const timeAgo = (iso: string) => {
     const diff = Date.now() - new Date(iso).getTime()
     const mins = Math.floor(diff / (60 * 1000))
-    if (mins < 60) return `${mins} mins ago`
+    if (mins < 60) return `${mins}m`
     const hours = Math.floor(mins / 60)
-    return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  }
-
-  const resultBadge = (r: UserGame['result']) => {
-    const map = {
-      WIN: 'bg-emerald-700/60 text-emerald-200',
-      LOSE: 'bg-rose-700/60 text-rose-200',
-      DRAW: 'bg-slate-700/60 text-slate-200',
-    } as const
-    const label = r === 'WIN' ? 'WIN' : r === 'LOSE' ? 'LOSE' : 'DRAW'
-    return (
-      <span className={`px-3 py-1 rounded-md text-xs font-bold tracking-wide ${map[r]}`}>{label}</span>
-    )
-  }
-
-  const ratingDelta = (d: number) => {
-    const positive = d > 0
-    const color = positive ? 'text-emerald-400' : d < 0 ? 'text-rose-400' : 'text-slate-400'
-    const sign = positive ? '+' : ''
-    return <span className={`text-sm ${color}`}>{`${sign}${d} pts`}</span>
+    return `${hours}h`
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      {/* Top Nav */}
-      <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-900/80 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 grid place-items-center rounded-sm bg-yellow-500 text-gray-900 font-black">♟</div>
-            <span className="font-semibold">Mad Chess</span>
+    <div className="min-h-screen bg-[#050505] text-white overflow-hidden flex flex-col font-sans relative">
+      {/* Navbar */}
+      <nav className="flex items-center justify-between px-8 py-6 border-b border-gray-900 z-10">
+        <div className="flex items-center gap-12">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white skew-x-12 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+            </div>
+            <div>
+              <div className="font-serif text-2xl leading-none tracking-tight text-[#D4FF00]">MAD</div>
+              <div className="font-serif text-2xl leading-none tracking-tight text-white">CHESS</div>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            {isAuthenticated && authUser ? (
-              <>
-                <div className="text-xs text-slate-400">Grandmaster Rank</div>
-                <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-slate-800">
-                  <span className="text-yellow-400">★</span>
-                  <span className="font-semibold">{authUser.rating || 1500}</span>
-                </div>
-                <button
-                  onClick={() => navigate('/mypage')}
-                  className="flex items-center gap-2 hover:bg-slate-800 px-2 py-1 rounded-lg transition-colors"
-                >
-                  <img
-                    src={authUser.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(authUser.name)}`}
-                    alt="avatar"
-                    className="h-8 w-8 rounded-full bg-slate-700"
-                  />
-                  <span className="text-sm text-slate-200">{authUser.name}</span>
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => navigate('/login')}
-                className="bg-yellow-500 text-gray-900 px-4 py-2 rounded-lg font-bold hover:bg-yellow-400 transition-colors"
-              >
-                Login
-              </button>
-            )}
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-400 uppercase tracking-widest">
+            <button onClick={() => navigate('/deck-builder')} className="hover:text-white transition-colors">Deck</button>
+            <button className="hover:text-white transition-colors">Tournaments</button>
+            <button className="hover:text-white transition-colors">Leaderboard</button>
+            <button className="hover:text-white transition-colors">Watch</button>
           </div>
         </div>
-      </header>
 
-      {/* Content */}
-      <main className="mx-auto max-w-6xl px-6">
-        {/* Hero Banner */}
-        <section className="mt-8 rounded-xl border border-gray-800 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-gray-900 overflow-hidden">
-          <div className="px-10 py-12">
-            <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight">
-              <span className="text-slate-200">Master the </span>
-              <span className="text-yellow-400">Board</span>
-            </h1>
-            <p className="mt-4 max-w-2xl text-slate-300">
-              Experience Mad Chess: The ultimate PvP chess deck-builder. Collect cards, craft your strategy, and crush your opponents.
-            </p>
-            <button
-              onClick={handleStartGame}
-              className="mt-8 inline-flex items-center gap-2 rounded-lg bg-yellow-500 px-6 py-3 font-semibold text-gray-900 hover:bg-yellow-400 transition-colors"
-            >
-              START GAME <span>♔ ♝ ♛</span>
+        <div className="flex items-center gap-6">
+          {isAuthenticated && authUser ? (
+            <button onClick={() => navigate('/mypage')} className="flex items-center gap-3 group">
+              <div className="text-right hidden sm:block">
+                <div className="text-sm font-bold text-white group-hover:text-[#D4FF00] transition-colors">{authUser.name}</div>
+                <div className="text-xs text-gray-500 font-mono">{authUser.rating || 1500} ELO</div>
+              </div>
+              <img
+                src={authUser.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(authUser.name)}`}
+                alt="Avatar"
+                className="w-10 h-10 rounded-sm border border-gray-700 group-hover:border-[#D4FF00] transition-colors"
+              />
             </button>
-          </div>
-        </section>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="text-[#D4FF00] font-bold border border-[#D4FF00] px-6 py-2 hover:bg-[#D4FF00] hover:text-black transition-all uppercase tracking-wider text-sm"
+            >
+              Login
+            </button>
+          )}
+        </div>
+      </nav>
 
-        {/* Recent Matches */}
-        <section className="mt-10">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Recent Matches</h2>
-            <button className="text-xs text-yellow-400 hover:underline">View History</button>
+      {/* Main Content Grid */}
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 relative">
+
+        {/* Left Stats Column */}
+        <div className="hidden lg:flex lg:col-span-3 flex-col justify-center px-12 border-r border-gray-900 z-10 bg-[#050505]">
+          <div className="mb-16">
+            <div className="flex items-start text-[#D4FF00]">
+              <span className="text-8xl font-serif font-light leading-none">53</span>
+              <span className="text-lg mt-2 ml-1">↗</span>
+            </div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Tournaments Today</div>
           </div>
-          <div className="mt-4 overflow-hidden rounded-xl border border-gray-800">
-            {recentGames.length > 0 ? (
-              <>
-                <div className="grid grid-cols-12 bg-slate-800/60 px-4 py-3 text-xs text-slate-300">
-                  <div className="col-span-3">SIDE</div>
-                  <div className="col-span-3">RESULT</div>
-                  <div className="col-span-3">RATING CHANGE</div>
-                  <div className="col-span-3">TIME</div>
-                </div>
-                <ul className="divide-y divide-gray-800">
-                  {recentGames.map((g, idx) => (
-                    <li key={g.gameId} className="grid grid-cols-12 items-center px-4 py-4 bg-slate-900/40">
-                      <div className="col-span-3 flex items-center gap-2 text-sm">
-                        <span className={`h-2.5 w-2.5 rounded-full ${idx % 2 === 0 ? 'bg-white' : 'bg-black border border-slate-500'}`}></span>
-                        <span className="text-slate-200">{idx % 2 === 0 ? 'White' : 'Black'}</span>
+
+          <div>
+            <div className="flex items-start text-white">
+              <span className="text-8xl font-serif font-light leading-none">{onlineCount}</span>
+              <span className="text-lg mt-2 ml-1 text-[#D4FF00]">↗</span>
+            </div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Grandmasters Online</div>
+          </div>
+        </div>
+
+        {/* Center/Right Content */}
+        <div className="col-span-1 lg:col-span-9 relative flex flex-col">
+          {/* Background Graphic */}
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+            <div className="absolute right-0 top-0 w-3/4 h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 via-[#050505] to-[#050505]"></div>
+            <div className="grid grid-cols-8 grid-rows-8 h-full w-full absolute top-0 right-0 opacity-10">
+              {Array.from({ length: 64 }).map((_, i) => (
+                <div key={i} className={`border border-gray-800 ${((Math.floor(i / 8) + i) % 2 === 0) ? 'bg-transparent' : 'bg-gray-900/50'}`}></div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Games Area */}
+          <div className="flex-1 p-8 lg:p-12 z-10 overflow-y-auto">
+            {isAuthenticated ? (
+              <div>
+                <h2 className="text-2xl font-serif text-white mb-6 flex items-center gap-4">
+                  <span className="w-2 h-2 bg-[#D4FF00]"></span>
+                  Recent Matches
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {recentGames.map((game) => (
+                    <div key={game.gameId} className="bg-[#0A0A0A] border border-gray-800 p-4 hover:border-[#D4FF00] transition-colors group">
+                      <div className="flex justify-between items-center mb-4 text-xs tracking-widest text-gray-500 uppercase">
+                        <span>{timeAgo(game.playedAt)} AGO</span>
+                        <span className={game.result === 'WIN' ? 'text-[#D4FF00]' : 'text-gray-400'}>{game.result}</span>
                       </div>
-                      <div className="col-span-3">{resultBadge(g.result)}</div>
-                      <div className="col-span-3">{ratingDelta(g.ratingChange)}</div>
-                      <div className="col-span-3 text-sm text-slate-400">{timeAgo(g.playedAt)}</div>
-                    </li>
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-400">VS</div>
+                          <div className="text-lg font-bold text-white truncate">{game.opponent}</div>
+                        </div>
+                        <div className={`text-xl font-mono ${game.ratingChange > 0 ? 'text-[#D4FF00]' : 'text-gray-500'}`}>
+                          {game.ratingChange > 0 ? '+' : ''}{game.ratingChange}
+                        </div>
+                      </div>
+                      <div className="h-1 w-full bg-gray-900 relative overflow-hidden">
+                        <div className={`absolute left-0 top-0 h-full ${game.result === 'WIN' ? 'bg-[#D4FF00] w-full' : 'bg-gray-700 w-1/3'}`}></div>
+                      </div>
+                    </div>
                   ))}
-                </ul>
-              </>
+                  {recentGames.length === 0 && (
+                    <div className="col-span-full py-12 text-center text-gray-500 border border-gray-900 border-dashed">
+                      NO REGENT GAMES PLAYED
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
-              <div className="p-8 text-center text-gray-500">
-                {isAuthenticated ? "No recent matches." : "Login to see your matches."}
+              <div className="h-full flex flex-col justify-center items-center text-center">
+                <h1 className="text-6xl md:text-8xl font-serif font-light leading-none mb-6">
+                  <span className="block text-white">WORLD</span>
+                  <span className="block text-[#D4FF00]">CLASS</span>
+                  <span className="block text-white">STRATEGY</span>
+                </h1>
+                <p className="text-gray-400 max-w-md text-lg font-light tracking-wide">
+                  Join the ultimate deck-building chess arena. Compete globally.
+                </p>
               </div>
             )}
           </div>
-        </section>
 
-        {/* Actions */}
-        <section className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <button
-            onClick={handleDeck}
-            className="rounded-xl border border-gray-800 bg-slate-800/40 px-6 py-6 text-left hover:bg-slate-800/60 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-lg">📦</span>
-              <span className="font-semibold">내 덱</span>
+          {/* Bottom Action Bar */}
+          <div className="p-8 lg:px-12 lg:py-8 border-t border-gray-900 bg-[#050505] z-20 flex justify-between items-center">
+            <div className="hidden sm:flex items-center gap-8 text-xs text-gray-500 font-mono">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${serverOnline ? 'bg-[#D4FF00]' : 'bg-red-500'} animate-pulse`}></div>
+                SERVER {serverOnline ? 'ONLINE' : 'OFFLINE'}
+              </div>
+              <div>PING: 24ms</div>
+              <div>VER: 2.1.0</div>
             </div>
-          </button>
-          <button
-            className="rounded-xl border border-gray-800 bg-slate-800/40 px-6 py-6 text-left hover:bg-slate-800/60 transition-colors"
-            onClick={() => navigate('/')}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-lg">📊</span>
-              <span className="font-semibold">리더보드</span>
-            </div>
-          </button>
-        </section>
-      </main>
 
-      {/* Footer */}
-      <footer className="mt-10 border-t border-gray-800">
-        <div className="mx-auto max-w-6xl px-6 py-6 text-xs text-slate-400 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span>
-              Server Status: <span className={`font-medium ${serverOnline ? 'text-emerald-400' : 'text-rose-400'}`}>{serverOnline ? 'Online' : 'Offline'}</span>
-            </span>
-            <span>Players: {onlineCount.toLocaleString()} Online</span>
+            <button
+              onClick={handleStartGame}
+              className="w-full sm:w-auto bg-[#D4FF00] text-black text-4xl sm:text-5xl font-black px-12 py-6 hover:bg-white hover:scale-105 transition-all uppercase leading-none skew-x-[-10deg]"
+              style={{ fontFamily: "'Zilla Slab', serif" }}
+            >
+              Start Game
+            </button>
           </div>
-          <div>© 2024 Mad Chess Studio. All rights reserved.</div>
         </div>
-      </footer>
+
+      </main>
     </div>
   )
 }

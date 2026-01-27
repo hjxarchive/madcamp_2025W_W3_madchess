@@ -117,134 +117,152 @@ export default function MatchmakingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full">
-        <div className="bg-gray-800 rounded-lg p-8 shadow-2xl">
-          <h1 className="text-4xl font-bold mb-2 text-center">매칭</h1>
+    <div className="min-h-screen bg-[#050505] text-white font-sans">
+      {/* Header */}
+      <header className="border-b border-gray-900 bg-[#050505]/90 backdrop-blur sticky top-0 z-10">
+        <div className="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
+          <button
+            onClick={() => navigate('/')}
+            className="group flex items-center gap-2 text-gray-500 hover:text-white transition-colors"
+          >
+            <span className="text-xl group-hover:-translate-x-1 transition-transform">←</span>
+            <span className="uppercase tracking-widest text-xs font-bold">Back to Arena</span>
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 bg-white skew-x-12"></div>
+            <div className="font-serif text-lg">
+              <span className="text-[#D4FF00]">MAD</span>
+              <span className="text-white">CHESS</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-6 py-16">
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-5xl font-serif font-light mb-12 text-center">
+            <span className="text-white">MATCH</span>
+            <span className="text-[#D4FF00]">MAKING</span>
+          </h1>
 
           {/* 모드 선택 */}
           {mode === 'select' && (
-            <>
-              <p className="text-gray-400 text-center mb-8">
-                게임 모드를 선택해주세요
-              </p>
-              <div className="grid grid-cols-2 gap-6">
-                <button
-                  onClick={() => setMode('create')}
-                  className="p-8 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors border-2 border-blue-500"
-                >
-                  <div className="text-2xl mb-2">🏠</div>
-                  <div className="text-xl font-bold mb-2">방 만들기</div>
-                  <div className="text-sm text-gray-300">
-                    친구와 플레이하기
-                  </div>
-                </button>
-                <button
-                  onClick={() => setMode('join')}
-                  className="p-8 rounded-lg bg-green-600 hover:bg-green-700 transition-colors border-2 border-green-500"
-                >
-                  <div className="text-2xl mb-2">🚪</div>
-                  <div className="text-xl font-bold mb-2">방 참가하기</div>
-                  <div className="text-sm text-gray-300">
-                    방 코드로 입장
-                  </div>
-                </button>
-              </div>
-            </>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              <button
+                onClick={() => setMode('create')}
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-10 text-left transition-all duration-300"
+              >
+                <div className="text-5xl mb-6 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all">🏠</div>
+                <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Create Room</h3>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Host a private match</p>
+              </button>
+
+              <button
+                onClick={() => setMode('join')}
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-10 text-left transition-all duration-300"
+              >
+                <div className="text-5xl mb-6 opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all">🚪</div>
+                <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Join Room</h3>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Enter with a code</p>
+              </button>
+            </div>
           )}
 
           {/* 방 만들기 */}
           {mode === 'create' && !waiting && (
-            <>
-              <p className="text-gray-400 text-center mb-8">
-                선/후공을 선택해주세요
-              </p>
-              <div className="grid grid-cols-2 gap-6 mb-8">
+            <div className="border border-gray-800 p-10">
+              <h2 className="text-2xl font-serif mb-8 text-center">Select Your Side</h2>
+              <div className="grid grid-cols-2 gap-8 mb-10">
                 <button
                   onClick={() => setSelectedColor('white')}
                   className={`
-                    p-8 rounded-lg transition-all duration-300 border-2
+                    p-8 border-2 transition-all duration-200 flex flex-col items-center gap-4
                     ${selectedColor === 'white'
-                      ? 'border-blue-500 bg-blue-900 shadow-lg'
-                      : 'border-gray-600 bg-gray-700 hover:border-gray-500'
+                      ? 'border-[#D4FF00] bg-[#D4FF00]/5'
+                      : 'border-gray-800 hover:border-gray-600'
                     }
                   `}
                 >
-                  <div className="flex justify-center mb-4">
-                    <img src={KING_IMAGES.white} alt="White King" className="w-20 h-20" />
-                  </div>
-                  <div className="text-xl font-bold mb-2 text-center">선공 (백)</div>
-                  <div className="text-sm text-gray-300 text-center">
-                    먼저 움직입니다
+                  <img src={KING_IMAGES.white} alt="White King" className="w-20 h-20" />
+                  <div className="text-center">
+                    <div className="font-serif text-xl text-white">WHITE</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-widest mt-1">First Move</div>
                   </div>
                 </button>
                 <button
                   onClick={() => setSelectedColor('black')}
                   className={`
-                    p-8 rounded-lg transition-all duration-300 border-2
+                    p-8 border-2 transition-all duration-200 flex flex-col items-center gap-4
                     ${selectedColor === 'black'
-                      ? 'border-blue-500 bg-blue-900 shadow-lg'
-                      : 'border-gray-600 bg-gray-700 hover:border-gray-500'
+                      ? 'border-[#D4FF00] bg-[#D4FF00]/5'
+                      : 'border-gray-800 hover:border-gray-600'
                     }
                   `}
                 >
-                  <div className="flex justify-center mb-4">
-                    <img src={KING_IMAGES.black} alt="Black King" className="w-20 h-20" />
-                  </div>
-                  <div className="text-xl font-bold mb-2 text-center">후공 (흑)</div>
-                  <div className="text-sm text-gray-300 text-center">
-                    상대가 먼저 움직입니다
+                  <img src={KING_IMAGES.black} alt="Black King" className="w-20 h-20" />
+                  <div className="text-center">
+                    <div className="font-serif text-xl text-white">BLACK</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-widest mt-1">Second Move</div>
                   </div>
                 </button>
               </div>
-              <button
-                onClick={handleCreateRoom}
-                disabled={!selectedColor}
-                className={`
-                  w-full py-3 rounded-lg font-bold text-lg transition-colors mb-3
-                  ${selectedColor
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  }
-                `}
-              >
-                방 만들기
-              </button>
-            </>
+              <div className="flex gap-4">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 py-4 border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-white uppercase tracking-widest text-sm font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateRoom}
+                  disabled={!selectedColor}
+                  className={`
+                    flex-[2] py-4 font-bold uppercase tracking-widest text-sm transition-all
+                    ${selectedColor
+                      ? 'bg-[#D4FF00] text-black hover:bg-white'
+                      : 'bg-gray-900 text-gray-600 cursor-not-allowed'
+                    }
+                  `}
+                >
+                  Create Room
+                </button>
+              </div>
+            </div>
           )}
 
           {/* 대기 중 */}
           {mode === 'create' && waiting && (
-            <>
-              <div className="text-center mb-8">
-                <div className="text-6xl mb-4">⏳</div>
-                <h2 className="text-2xl font-bold mb-4">상대 대기 중...</h2>
-                <p className="text-gray-400 mb-6">
-                  친구에게 방 코드를 공유하세요
-                </p>
-                <div className="bg-gray-700 rounded-lg p-6 mb-4">
-                  <div className="text-sm text-gray-400 mb-2">방 코드</div>
-                  <div className="text-4xl font-bold tracking-wider mb-4">
-                    {roomCode}
-                  </div>
-                  <button
-                    onClick={handleCopyRoomCode}
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
-                  >
-                    📋 복사하기
-                  </button>
+            <div className="border border-gray-800 p-10 text-center">
+              <div className="inline-block mb-8">
+                <div className="text-6xl animate-pulse">⏳</div>
+              </div>
+              <h2 className="text-3xl font-serif text-white mb-2">Waiting for Opponent</h2>
+              <p className="text-gray-500 mb-10 uppercase tracking-widest text-sm">Share this room code</p>
+
+              <div className="bg-[#0A0A0A] border border-gray-800 p-8 mb-10 max-w-xs mx-auto relative group cursor-pointer" onClick={handleCopyRoomCode}>
+                <div className="text-xs text-gray-600 uppercase tracking-widest mb-2">Room Code</div>
+                <div className="text-5xl font-mono font-bold text-[#D4FF00] tracking-wider select-all">
+                  {roomCode}
+                </div>
+                <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <span className="uppercase tracking-widest text-sm font-bold text-white">Click to Copy</span>
                 </div>
               </div>
-            </>
+
+              <button
+                onClick={handleCancel}
+                className="py-3 px-10 border border-red-900 text-red-500 hover:bg-red-900/20 uppercase tracking-widest text-sm font-bold transition-colors"
+              >
+                Cancel Room
+              </button>
+            </div>
           )}
 
           {/* 방 참가하기 */}
           {mode === 'join' && (
-            <>
-              <p className="text-gray-400 text-center mb-8">
-                방 코드를 입력해주세요
-              </p>
-              <div className="mb-6">
+            <div className="border border-gray-800 p-10">
+              <h2 className="text-2xl font-serif mb-8 text-center">Join Existing Room</h2>
+              <div className="max-w-xs mx-auto">
                 <input
                   type="text"
                   value={inputRoomCode}
@@ -252,43 +270,42 @@ export default function MatchmakingPage() {
                     setInputRoomCode(e.target.value.toUpperCase())
                     setError('')
                   }}
-                  placeholder="6자리 코드 입력"
+                  placeholder="ENTER CODE"
                   maxLength={6}
-                  className="w-full px-4 py-3 bg-gray-700 border-2 border-gray-600 rounded-lg text-center text-2xl font-bold tracking-wider focus:border-blue-500 focus:outline-none"
+                  className="w-full px-4 py-5 bg-[#0A0A0A] border border-gray-800 text-center text-3xl font-mono font-bold tracking-widest text-white placeholder-gray-700 focus:border-[#D4FF00] focus:outline-none transition-colors mb-4"
                 />
                 {error && (
-                  <div className="mt-2 text-red-500 text-sm text-center">
+                  <div className="text-red-500 text-sm text-center mb-4 py-2 px-4 border border-red-900 bg-red-900/10">
                     {error}
                   </div>
                 )}
-              </div>
-              <button
-                onClick={handleJoinRoom}
-                disabled={inputRoomCode.length !== 6}
-                className={`
-                  w-full py-3 rounded-lg font-bold text-lg transition-colors mb-3
-                  ${inputRoomCode.length === 6
-                    ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  }
-                `}
-              >
-                참가하기
-              </button>
-            </>
-          )}
 
-          {/* 취소 버튼 */}
-          {mode !== 'select' && (
-            <button
-              onClick={handleCancel}
-              className="w-full py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold transition-colors"
-            >
-              {waiting ? '취소' : '뒤로 가기'}
-            </button>
+                <div className="mt-8 flex gap-4">
+                  <button
+                    onClick={handleCancel}
+                    className="flex-1 py-4 border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-white uppercase tracking-widest text-sm font-bold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleJoinRoom}
+                    disabled={inputRoomCode.length !== 6}
+                    className={`
+                      flex-[2] py-4 font-bold uppercase tracking-widest text-sm transition-all
+                      ${inputRoomCode.length === 6
+                        ? 'bg-[#D4FF00] text-black hover:bg-white'
+                        : 'bg-gray-900 text-gray-600 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    Join Room
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   )
 }

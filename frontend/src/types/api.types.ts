@@ -64,12 +64,12 @@ export interface DeckWithStats extends Deck {
 export interface CreateDeckRequest {
     userId: number
     name: string
-    pieces: DeckPiece[]
+    composition: { [key: string]: number }  // e.g., { "p": 8, "k": 1 }
 }
 
 export interface UpdateDeckRequest {
     name?: string
-    pieces?: DeckPiece[]
+    composition?: { [key: string]: number }
 }
 
 export interface ValidateDeckRequest {

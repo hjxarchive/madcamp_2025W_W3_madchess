@@ -160,7 +160,7 @@ export const useGameStore = create<GameStoreState>((set) => ({
 
       // 캐슬링 감지 (킹이 2칸 이동하는 경우)
       const isCastling = piece && piece.type === 'k' && Math.abs(toCol - fromCol) === 2
-      
+
       if (isCastling) {
         console.log(`♜ Castling detected: ${move.uci}`)
         // 킹 이동
@@ -171,12 +171,12 @@ export const useGameStore = create<GameStoreState>((set) => ({
         const isKingside = toCol > fromCol
         const rookFromCol = isKingside ? 7 : 0 // h-file or a-file
         const rookToCol = isKingside ? toCol - 1 : toCol + 1 // f-file (6) or d-file (3)
-        
+
         // 실제로는 룩이 다양한 위치에 있을 수 있으므로, 해당 줄에서 룩 찾기
         let rookCol = -1
         for (let col = 0; col < 8; col++) {
           const p = newBoard[fromRow][col]
-          if (p && p.type === 'r' && p.color === piece.color) {
+          if (p && piece && p.type === 'r' && p.color === piece.color) {
             // 킹사이드: f-h 파일의 룩 / 퀸사이드: a-d 파일의 룩
             if (isKingside && col >= 5) {
               rookCol = col

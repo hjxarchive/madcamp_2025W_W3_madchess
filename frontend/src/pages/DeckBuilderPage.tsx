@@ -1,310 +1,488 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAllPieces } from '../services/pieceApi'
-import { createDeck } from '../services/deckApi'
+import { createDeck, updateDeck, deleteDeck } from '../services/deckApi'
 import { getUserDecks } from '../services/userApi'
-import type { Piece, DeckPiece, DeckWithStats } from '../types/api.types'
+import { useAuthStore } from '../stores/authStore'
+import type { DeckWithStats } from '../types/api.types'
+
+// Types
+type PieceType = 'k' | 'q' | 'r' | 'b' | 'n' | 'p'
+type File = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h'
+type Rank = 1 | 2 | 3 | 4
+
+interface PlacedPiece {
+  type: PieceType
+  file: File
+  rank: Rank
+}
 
 const BUDGET_MAX = 30
+const FILES: File[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const RANKS: Rank[] = [1, 2, 3, 4]
+
+const PIECE_COSTS: Record<PieceType, number> = {
+  k: 0, q: 9, r: 5, b: 3, n: 3, p: 1
+}
+
+const PIECE_MAX_COUNT: Record<PieceType, number> = {
+  k: 1, q: 1, r: 2, b: 2, n: 2, p: 8
+}
+
+const PIECE_NAMES: Record<PieceType, string> = {
+  k: 'King', q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight', p: 'Pawn'
+}
+
+const PIECE_IMAGES: Record<PieceType, string> = {
+  k: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+  q: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+  r: 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+  b: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+  n: 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+  p: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
+}
+
+// Convert composition to board placements
+function compositionToPlacement(composition: { [key: string]: number }): PlacedPiece[] {
+  const pieces: PlacedPiece[] = []
+  const usedSquares = new Set<string>()
+
+  // King always at e1
+  pieces.push({ type: 'k', file: 'e', rank: 1 })
+  usedSquares.add('e1')
+
+  // Place other pieces in available squares
+  const availableSquares: { file: File; rank: Rank }[] = []
+  for (const rank of RANKS) {
+    for (const file of FILES) {
+      if (!(file === 'e' && rank === 1)) {
+        availableSquares.push({ file, rank })
+      }
+    }
+  }
+
+  let squareIdx = 0
+  for (const [pieceCode, count] of Object.entries(composition)) {
+    if (pieceCode === 'k') continue // King already placed
+    const pieceType = pieceCode as PieceType
+    for (let i = 0; i < count && squareIdx < availableSquares.length; i++) {
+      const square = availableSquares[squareIdx++]
+      pieces.push({ type: pieceType, file: square.file, rank: square.rank })
+    }
+  }
+
+  return pieces
+}
 
 export default function DeckBuilderPage() {
   const navigate = useNavigate()
-  const userId = 1 // Hardcoded for demo
+  const { user, isAuthenticated } = useAuthStore()
 
-  // Dummy pieces as fallback
-  const dummyPieces: Piece[] = [
-    { id: 1, name: '킹', type: 'King', value: 0, action: 'move', maxCount: 1, description: '왕', imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg' },
-    { id: 2, name: '퀸', type: 'Queen', value: 9, action: 'move', maxCount: 1, description: '여왕', imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg' },
-    { id: 3, name: '룩', type: 'Rook', value: 5, action: 'move', maxCount: 2, description: '전차', imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg' },
-    { id: 4, name: '비숍', type: 'Bishop', value: 3, action: 'move', maxCount: 2, description: '주교', imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg' },
-    { id: 5, name: '나이트', type: 'Knight', value: 3, action: 'move', maxCount: 2, description: '기사', imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg' },
-    { id: 6, name: '폰', type: 'Pawn', value: 1, action: 'move', maxCount: 8, description: '졸', imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg' },
-  ]
-
-  const dummySavedDecks: DeckWithStats[] = [
-    {
-      id: 101,
-      name: '공격형',
-      userId: 1,
-      pieces: [{ pieceId: 1, count: 1 }, { pieceId: 2, count: 1 }, { pieceId: 3, count: 2 }],
-      totalCost: 30,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      winCnt: 5,
-      loseCnt: 3,
-      winRate: 62.5,
-    },
-    {
-      id: 102,
-      name: '밸런스형',
-      userId: 1,
-      pieces: [{ pieceId: 1, count: 1 }, { pieceId: 4, count: 2 }, { pieceId: 5, count: 2 }],
-      totalCost: 26,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      winCnt: 7,
-      loseCnt: 2,
-      winRate: 77.8,
-    },
-    {
-      id: 103,
-      name: '방어형',
-      userId: 1,
-      pieces: [{ pieceId: 1, count: 1 }, { pieceId: 3, count: 1 }, { pieceId: 5, count: 6 }],
-      totalCost: 28,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      winCnt: 4,
-      loseCnt: 1,
-      winRate: 80.0,
-    },
-  ]
-
-  const [pieces, setPieces] = useState<Piece[]>(dummyPieces)
-  const [selectedPieces, setSelectedPieces] = useState<Record<number, number>>({ 1: 1 }) // King always 1
+  const [placedPieces, setPlacedPieces] = useState<PlacedPiece[]>([
+    { type: 'k', file: 'e', rank: 1 }
+  ])
+  const [selectedPieceType, setSelectedPieceType] = useState<PieceType | null>(null)
+  const [hoverSquare, setHoverSquare] = useState<{ file: File; rank: Rank } | null>(null)
   const [deckName, setDeckName] = useState('')
-  const [savedDecks, setSavedDecks] = useState<DeckWithStats[]>(dummySavedDecks)
+  const [savedDecks, setSavedDecks] = useState<DeckWithStats[]>([])
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
+  // Editing mode
+  const [editingDeckId, setEditingDeckId] = useState<number | null>(null)
+
+  // Load saved decks
   useEffect(() => {
-    ;(async () => {
-      try {
-        const res = await getAllPieces()
-        if (res?.success && res.data) setPieces(res.data)
-      } catch (_) {
-        // Use dummy
-      }
-      try {
-        const decksRes = await getUserDecks(userId)
-        if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
-      } catch (_) {
-        // Use dummy
-      }
-    })()
-  }, [])
+    if (user?.id) {
+      getUserDecks(user.id).then(res => {
+        if (res?.success && res.data) setSavedDecks(res.data)
+      }).catch(() => { })
+    }
+  }, [user])
 
-  const currentBudget = pieces.reduce((sum, p) => {
-    const count = selectedPieces[p.id] || 0
-    return sum + p.value * count
-  }, 0)
+  // Calculate budget
+  const usedBudget = placedPieces.reduce((sum, p) => sum + PIECE_COSTS[p.type], 0)
+  const budgetRemaining = BUDGET_MAX - usedBudget
 
-  const budgetRemaining = BUDGET_MAX - currentBudget
+  // Get available pieces
+  const getAvailablePieces = () => {
+    const pieceTypes: PieceType[] = ['q', 'r', 'b', 'n', 'p']
+    return pieceTypes.map(type => {
+      const placedCount = placedPieces.filter(p => p.type === type).length
+      const remaining = PIECE_MAX_COUNT[type] - placedCount
+      return { type, remaining, cost: PIECE_COSTS[type] }
+    }).filter(p => p.remaining > 0)
+  }
 
-  const handleIncrement = (pieceId: number, maxCount: number) => {
-    const current = selectedPieces[pieceId] || 0
-    if (current < maxCount) {
-      const piece = pieces.find((p) => p.id === pieceId)
-      if (piece && currentBudget + piece.value <= BUDGET_MAX) {
-        setSelectedPieces({ ...selectedPieces, [pieceId]: current + 1 })
+  // Handle piece selection
+  const handlePieceSelect = (type: PieceType) => {
+    if (selectedPieceType === type) {
+      setSelectedPieceType(null)
+    } else {
+      if (usedBudget + PIECE_COSTS[type] > BUDGET_MAX) {
+        setError(`Not enough budget for ${PIECE_NAMES[type]}`)
+        return
       }
+      setSelectedPieceType(type)
+      setError('')
     }
   }
 
-  const handleDecrement = (pieceId: number) => {
-    const current = selectedPieces[pieceId] || 0
-    if (pieceId === 1) return // Can't remove King
-    if (current > 0) {
-      setSelectedPieces({ ...selectedPieces, [pieceId]: current - 1 })
-    }
-  }
+  // Handle board square click
+  const handleSquareClick = (file: File, rank: Rank) => {
+    const existingPiece = placedPieces.find(p => p.file === file && p.rank === rank)
 
-  const handleSaveDeck = async () => {
-    if (!deckName.trim()) {
-      alert('덱 이름을 입력하세요.')
+    if (existingPiece) {
+      if (existingPiece.type === 'k') {
+        setError("King cannot be removed")
+        return
+      }
+      setPlacedPieces(prev => prev.filter(p => !(p.file === file && p.rank === rank)))
+      setSelectedPieceType(existingPiece.type)
+      setError('')
       return
     }
-    const deckPieces: DeckPiece[] = Object.entries(selectedPieces)
-      .filter(([_, count]) => count > 0)
-      .map(([id, count]) => ({ pieceId: Number(id), count }))
-    
-    if (deckPieces.length === 0) {
-      alert('최소 하나의 기물을 선택하세요.')
+
+    if (!selectedPieceType) return
+
+    if (file === 'e' && rank === 1) {
+      setError("King's position is fixed at e1")
+      return
+    }
+
+    if (usedBudget + PIECE_COSTS[selectedPieceType] > BUDGET_MAX) {
+      setError("Budget exceeded!")
+      return
+    }
+
+    setPlacedPieces(prev => [...prev, { type: selectedPieceType, file, rank }])
+    setSelectedPieceType(null)
+    setError('')
+  }
+
+  // Build composition from placed pieces
+  const buildComposition = (): { [key: string]: number } => {
+    const composition: { [key: string]: number } = {}
+    placedPieces.forEach(p => {
+      composition[p.type] = (composition[p.type] || 0) + 1
+    })
+    return composition
+  }
+
+  // Load deck for editing
+  const handleLoadDeck = (deck: DeckWithStats) => {
+    // Convert composition (from API response) to board placements
+    // The API returns composition as { "k": 1, "p": 8, ... }
+    const composition = deck.pieces
+      ? deck.pieces.reduce((acc, p) => {
+        // If pieces array format
+        const pieceType = (p as any).type || (p as any).action?.toLowerCase() || 'p'
+        acc[pieceType] = (acc[pieceType] || 0) + ((p as any).count || (p as any).quantity || 1)
+        return acc
+      }, {} as { [key: string]: number })
+      : (deck as any).composition || {}
+
+    const placement = compositionToPlacement(composition)
+    setPlacedPieces(placement)
+    setDeckName(deck.name)
+    setEditingDeckId(deck.id)
+    setError('')
+  }
+
+  // Save or update deck
+  const handleSaveDeck = async () => {
+    if (!isAuthenticated || !user) {
+      setError('Please login to save a deck')
+      return
+    }
+    if (!deckName.trim()) {
+      setError('Enter a deck name')
+      return
+    }
+    if (placedPieces.length < 2) {
+      setError('Place at least one piece besides the King')
       return
     }
 
     setSaving(true)
+    setError('')
     try {
-      const res = await createDeck({
-        userId,
-        name: deckName,
-        pieces: deckPieces,
-      })
-      if (res?.success && res.data) {
-        alert('덱이 저장되었습니다!')
-        setDeckName('')
-        // Refresh saved decks
-        const decksRes = await getUserDecks(userId)
-        if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
+      const composition = buildComposition()
+
+      if (editingDeckId) {
+        // Update existing deck
+        await updateDeck(editingDeckId, {
+          name: deckName,
+          composition,
+        })
+      } else {
+        // Create new deck
+        await createDeck({
+          userId: user.id,
+          name: deckName,
+          composition,
+        })
       }
-    } catch (err) {
-      alert('덱 저장 실패 (백엔드 연결 필요)')
+
+      // Reset and refresh
+      handleNewDeck()
+      const decksRes = await getUserDecks(user.id)
+      if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Failed to save deck')
     } finally {
       setSaving(false)
     }
   }
 
-  const budgetPercentage = Math.min((currentBudget / BUDGET_MAX) * 100, 100)
+  // Delete deck
+  const handleDeleteDeck = async () => {
+    if (!editingDeckId || !user) return
+
+    if (!confirm('Are you sure you want to delete this deck?')) return
+
+    try {
+      await deleteDeck(editingDeckId)
+      handleNewDeck()
+      const decksRes = await getUserDecks(user.id)
+      if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
+    } catch (err: any) {
+      setError('Failed to delete deck')
+    }
+  }
+
+  // Start new deck
+  const handleNewDeck = () => {
+    setPlacedPieces([{ type: 'k', file: 'e', rank: 1 }])
+    setDeckName('')
+    setEditingDeckId(null)
+    setSelectedPieceType(null)
+    setError('')
+  }
+
+  const availablePieces = getAvailablePieces()
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-[#050505] text-white font-sans">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-900/80 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 hover:text-blue-400 transition-colors">
-            <span>←</span>
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 grid place-items-center rounded-sm bg-blue-500 text-white font-black text-xs">📦</div>
-              <span className="font-semibold">Mad Chess 덱 빌더</span>
-            </div>
+      <header className="sticky top-0 z-10 border-b border-gray-900 bg-[#050505]/90 backdrop-blur">
+        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
+          <button onClick={() => navigate('/')} className="group flex items-center gap-2 text-gray-500 hover:text-white transition-colors">
+            <span className="text-xl group-hover:-translate-x-1 transition-transform">←</span>
+            <span className="uppercase tracking-widest text-xs font-bold">Back to Arena</span>
           </button>
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 bg-white skew-x-12"></div>
+            <div className="font-serif text-lg">
+              <span className="text-[#D4FF00]">DECK</span>
+              <span className="text-white">BUILDER</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-6">
-        {/* Budget Section */}
-        <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <div className="text-xs text-slate-400 uppercase tracking-wider">단위 예산 (Budget)</div>
-              <div className="text-2xl font-bold">
-                {currentBudget} / {BUDGET_MAX} pts
+      <main className="mx-auto max-w-7xl px-6 py-8">
+        {/* Editing indicator */}
+        {editingDeckId && (
+          <div className="mb-4 p-3 border border-[#D4FF00] bg-[#D4FF00]/10 flex items-center justify-between">
+            <div className="text-sm">
+              <span className="text-[#D4FF00] font-bold">Editing:</span> {deckName}
+            </div>
+            <button
+              onClick={handleNewDeck}
+              className="text-xs uppercase tracking-widest text-gray-400 hover:text-white transition-colors"
+            >
+              ✕ Cancel
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
+          {/* Left: Board */}
+          <div>
+            {/* Budget Bar */}
+            <div className="mb-6 p-4 border border-gray-800">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-gray-500 uppercase tracking-widest">Budget</div>
+                <div className={`font-mono text-lg ${budgetRemaining < 5 ? 'text-red-500' : 'text-[#D4FF00]'}`}>
+                  {budgetRemaining} pts remaining
+                </div>
+              </div>
+              <div className="relative h-2 bg-gray-900">
+                <div
+                  className={`absolute h-full transition-all ${usedBudget >= BUDGET_MAX ? 'bg-red-500' : 'bg-[#D4FF00]'}`}
+                  style={{ width: `${(usedBudget / BUDGET_MAX) * 100}%` }}
+                />
+              </div>
+              <div className="mt-2 text-right text-2xl font-serif">
+                <span className="text-white">{usedBudget}</span>
+                <span className="text-gray-600"> / {BUDGET_MAX}</span>
               </div>
             </div>
-            <div className="text-sm text-blue-400">
-              남은 포인트: {budgetRemaining}
+
+            {/* Chess Board (4 ranks) */}
+            <div className="inline-block border-2 border-gray-800">
+              {[...RANKS].reverse().map(rank => (
+                <div key={rank} className="flex">
+                  <div className="w-8 flex items-center justify-center text-gray-600 text-sm font-mono">
+                    {rank}
+                  </div>
+                  {FILES.map(file => {
+                    const isLight = (FILES.indexOf(file) + rank) % 2 === 1
+                    const piece = placedPieces.find(p => p.file === file && p.rank === rank)
+                    const isKingSquare = file === 'e' && rank === 1
+                    const isHovered = hoverSquare?.file === file && hoverSquare?.rank === rank
+                    const canPlace = !piece && selectedPieceType && !(file === 'e' && rank === 1)
+
+                    return (
+                      <div
+                        key={`${file}${rank}`}
+                        onClick={() => handleSquareClick(file, rank)}
+                        onMouseEnter={() => setHoverSquare({ file, rank })}
+                        onMouseLeave={() => setHoverSquare(null)}
+                        className={`
+                          w-16 h-16 flex items-center justify-center relative cursor-pointer
+                          transition-all duration-150
+                          ${isLight ? 'bg-[#E8E4D9]' : 'bg-[#B7C0D8]'}
+                          ${isKingSquare ? 'ring-2 ring-inset ring-[#D4FF00]' : ''}
+                          ${isHovered && canPlace ? 'ring-2 ring-blue-400' : ''}
+                          ${piece && piece.type !== 'k' ? 'hover:opacity-70' : ''}
+                        `}
+                      >
+                        {isHovered && canPlace && (
+                          <div className="absolute inset-0 flex items-center justify-center opacity-40">
+                            <img src={PIECE_IMAGES[selectedPieceType]} alt="" className="w-12 h-12" />
+                          </div>
+                        )}
+                        {piece && (
+                          <img
+                            src={PIECE_IMAGES[piece.type]}
+                            alt={PIECE_NAMES[piece.type]}
+                            className="w-12 h-12"
+                            draggable={false}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+              <div className="flex">
+                <div className="w-8" />
+                {FILES.map(file => (
+                  <div key={file} className="w-16 text-center text-gray-600 text-sm font-mono py-1">
+                    {file}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="relative h-3 bg-slate-700 rounded-full overflow-hidden">
-            <div
-              className="absolute h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${budgetPercentage}%` }}
-            ></div>
-          </div>
-        </section>
 
-        {/* Piece Selection */}
-        <section className="mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">기물 선택 (Piece Selection)</h2>
-            <div className="text-xs text-slate-400">최대 개수 배치 가능</div>
-          </div>
-          <div className="space-y-3">
-            {pieces.map((piece) => {
-              const count = selectedPieces[piece.id] || 0
-              const isKing = piece.type === 'King'
-              return (
-                <div
-                  key={piece.id}
-                  className="flex items-center justify-between rounded-xl border border-gray-800 bg-slate-800/40 px-5 py-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 grid place-items-center rounded-lg bg-slate-700 p-1">
-                      <img src={piece.imgUrl} alt={piece.name} className="w-full h-full" />
-                    </div>
-                    <div>
-                      <div className="font-semibold">{piece.name} ({piece.type})</div>
-                      <div className="text-xs text-slate-400">{piece.value}pt</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {isKing ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-emerald-400">필수</span>
-                        <span className="h-5 w-5 grid place-items-center rounded-full bg-emerald-600 text-white text-xs">✓</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleDecrement(piece.id)}
-                          className="h-8 w-8 grid place-items-center rounded-md bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          disabled={count === 0}
-                        >
-                          −
-                        </button>
-                        <span className="w-8 text-center font-semibold">{count}</span>
-                        <button
-                          onClick={() => handleIncrement(piece.id, piece.maxCount)}
-                          className="h-8 w-8 grid place-items-center rounded-md bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          disabled={count >= piece.maxCount || currentBudget + piece.value > BUDGET_MAX}
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-
-        {/* Deck Name Input & Actions */}
-        <section className="mt-6 rounded-xl border border-gray-800 bg-slate-800/40 p-6">
-          <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">덱 이름 (Deck Name)</div>
-          <input
-            type="text"
-            placeholder="나의 공격적인 덱"
-            value={deckName}
-            onChange={(e) => setDeckName(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-gray-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
-          />
-          <div className="flex gap-3 mt-4">
+            {/* Reset button */}
             <button
-              onClick={handleSaveDeck}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleNewDeck}
+              className="mt-4 px-6 py-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-600 uppercase tracking-widest text-xs font-bold transition-colors"
             >
-              <span>💾</span> 덱 저장
-            </button>
-            <button className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors">
-              <span>📤</span> 공유
+              ↺ Reset Board
             </button>
           </div>
-        </section>
 
-        {/* Saved Decks */}
-        <section className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">저장된 덱 (Saved Decks)</h2>
-            <button className="text-xs text-blue-400 hover:underline">모두 보기</button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {savedDecks.map((deck) => {
-              const tagColor = deck.name.includes('공격') ? 'bg-red-900/60 text-red-200' : deck.name.includes('밸런스') ? 'bg-teal-900/60 text-teal-200' : 'bg-cyan-900/60 text-cyan-200'
-              const tagLabel = deck.name.includes('공격') ? 'Aggro' : deck.name.includes('밸런스') ? 'Mid' : 'Def'
-              return (
-                <div key={deck.id} className="rounded-xl border border-gray-800 bg-slate-800/40 p-5 hover:bg-slate-800/60 transition-colors cursor-pointer">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold">{deck.name}</h3>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${tagColor}`}>{tagLabel}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-400 mb-3">
-                    <span>♔ x{deck.pieces.reduce((s, p) => s + p.count, 0)}</span>
-                    <span>♕ x{deck.pieces.find((p) => p.pieceId === 2)?.count || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-400 mb-2">
-                    <span>승 {deck.winCnt}</span>
-                    <span>패 {deck.loseCnt}</span>
-                  </div>
-                  <div className="relative h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                      className="absolute h-full bg-blue-500"
-                      style={{ width: `${(deck.totalCost / BUDGET_MAX) * 100}%` }}
-                    ></div>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">총 {deck.totalCost}/{BUDGET_MAX} pts</div>
+          {/* Right: Controls */}
+          <div className="space-y-6">
+            {/* Available Pieces */}
+            <div className="border border-gray-800 p-4">
+              <h2 className="text-lg font-serif mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-[#D4FF00]"></span>
+                Available Pieces
+              </h2>
+              <div className="text-xs text-gray-500 mb-4">Click a piece, then click the board to place</div>
+              <div className="grid grid-cols-2 gap-3">
+                {availablePieces.map(({ type, remaining, cost }) => {
+                  const isSelected = selectedPieceType === type
+                  const canAfford = usedBudget + cost <= BUDGET_MAX
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => handlePieceSelect(type)}
+                      disabled={!canAfford}
+                      className={`
+                        p-3 border transition-all flex flex-col items-center
+                        ${isSelected ? 'border-[#D4FF00] bg-[#D4FF00]/10' : 'border-gray-800 hover:border-gray-600'}
+                        ${!canAfford ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                      `}
+                    >
+                      <img src={PIECE_IMAGES[type]} alt={PIECE_NAMES[type]} className="w-10 h-10 mb-2" />
+                      <div className="text-sm font-serif">{PIECE_NAMES[type]}</div>
+                      <div className="text-xs text-gray-500">{cost}pt × {remaining}</div>
+                    </button>
+                  )
+                })}
+              </div>
+              {availablePieces.length === 0 && (
+                <div className="text-gray-500 text-sm text-center py-4">All pieces placed!</div>
+              )}
+            </div>
+
+            {/* Save Deck */}
+            <div className="border border-gray-800 p-4">
+              <h2 className="text-lg font-serif mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-[#D4FF00]"></span>
+                {editingDeckId ? 'Update Deck' : 'Save Deck'}
+              </h2>
+              <input
+                type="text"
+                value={deckName}
+                onChange={(e) => setDeckName(e.target.value)}
+                placeholder="Deck Name"
+                className="w-full px-4 py-3 bg-[#0A0A0A] border border-gray-800 text-white placeholder-gray-600 focus:border-[#D4FF00] focus:outline-none transition-colors mb-3"
+              />
+              {error && (
+                <div className="text-red-500 text-sm mb-3 py-2 px-3 border border-red-900 bg-red-900/10">
+                  {error}
                 </div>
-              )
-            })}
-          </div>
-        </section>
-      </main>
+              )}
+              <button
+                onClick={handleSaveDeck}
+                disabled={saving || !isAuthenticated}
+                className={`w-full py-3 font-bold uppercase tracking-widest text-sm transition-all ${saving || !isAuthenticated
+                    ? 'bg-gray-900 text-gray-600 cursor-not-allowed'
+                    : 'bg-[#D4FF00] text-black hover:bg-white'
+                  }`}
+              >
+                {saving ? 'Saving...' : editingDeckId ? 'Update Deck' : 'Save Deck'}
+              </button>
+              {editingDeckId && (
+                <button
+                  onClick={handleDeleteDeck}
+                  className="w-full mt-2 py-2 border border-red-900 text-red-500 hover:bg-red-900/20 uppercase tracking-widest text-xs font-bold transition-colors"
+                >
+                  Delete Deck
+                </button>
+              )}
+            </div>
 
-      <footer className="mt-10 border-t border-gray-800">
-        <div className="mx-auto max-w-6xl px-6 py-6 text-xs text-slate-400 text-center">
-          © 2024 Mad chess 스튜디오. 모든 권리 보유.
+            {/* Saved Decks */}
+            {savedDecks.length > 0 && (
+              <div className="border border-gray-800 p-4">
+                <h3 className="text-sm font-serif text-gray-400 mb-3">Your Decks</h3>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {savedDecks.map(deck => (
+                    <div
+                      key={deck.id}
+                      onClick={() => handleLoadDeck(deck)}
+                      className={`p-3 border transition-colors cursor-pointer ${editingDeckId === deck.id
+                          ? 'border-[#D4FF00] bg-[#D4FF00]/10'
+                          : 'border-gray-800 hover:border-[#D4FF00]'
+                        }`}
+                    >
+                      <div className="font-serif">{deck.name}</div>
+                      <div className="text-xs text-gray-500">{deck.totalCost} pts • {deck.winCnt}W / {deck.loseCnt}L</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </footer>
+      </main>
     </div>
   )
 }

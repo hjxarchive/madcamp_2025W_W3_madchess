@@ -48,147 +48,156 @@ export default function MyPage() {
     }
 
     const resultBadge = (r: UserGame['result']) => {
-        const map = {
-            WIN: 'bg-emerald-700/60 text-emerald-200',
-            LOSE: 'bg-rose-700/60 text-rose-200',
-            DRAW: 'bg-slate-700/60 text-slate-200',
-        } as const
-        const label = r === 'WIN' ? 'WIN' : r === 'LOSE' ? 'LOSE' : 'DRAW'
+        const color = r === 'WIN' ? 'text-[#D4FF00]' : 'text-gray-500'
         return (
-            <span className={`px-3 py-1 rounded-md text-xs font-bold tracking-wide ${map[r]}`}>{label}</span>
+            <span className={`text-xs font-bold tracking-wider uppercase ${color}`}>{r}</span>
         )
     }
 
     const timeAgo = (iso: string) => {
         const diff = Date.now() - new Date(iso).getTime()
         const mins = Math.floor(diff / (60 * 1000))
-        if (mins < 60) return `${mins} mins ago`
+        if (mins < 60) return `${mins}m`
         const hours = Math.floor(mins / 60)
-        if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
-        return new Date(iso).toLocaleDateString()
+        return `${hours}h`
     }
 
-    if (!user) return <div className="text-white p-10">Loading...</div>
+    if (!user) return <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center font-mono">LOADING PROFILE...</div>
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-6">
-            <div className="max-w-4xl mx-auto">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8">
+        <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12 font-sans">
+            <div className="max-w-5xl mx-auto">
+                {/* Header Actions */}
+                <div className="flex items-center justify-between mb-12">
                     <button
                         onClick={() => navigate('/')}
-                        className="text-slate-400 hover:text-white transition-colors"
+                        className="group flex items-center gap-2 text-gray-500 hover:text-white transition-colors"
                     >
-                        ← Back to Home
+                        <span className="text-xl group-hover:-translate-x-1 transition-transform">←</span>
+                        <span className="uppercase tracking-widest text-xs font-bold">Back to Arena</span>
                     </button>
-                    <div className="text-xl font-bold">My Profile</div>
-                    <div className="w-16"></div> {/* Spacer for center alignment */}
-                </div>
-
-                {/* Profile Card */}
-                <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 mb-8 flex flex-col md:flex-row items-center gap-8">
-                    <img
-                        src={user.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(user.name)}`}
-                        alt="Profile"
-                        className="w-32 h-32 rounded-full border-4 border-slate-700"
-                    />
-                    <div className="flex-1 text-center md:text-left">
-                        {isEditing ? (
-                            <div className="flex items-center gap-2 mb-2">
-                                <input
-                                    type="text"
-                                    value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
-                                    className="bg-slate-900 border border-slate-700 text-white text-xl font-bold rounded-lg px-3 py-1 focus:outline-none focus:border-blue-500"
-                                />
-                                <button onClick={handleSaveName} className="text-emerald-400 hover:text-emerald-300">
-                                    ✓
-                                </button>
-                                <button onClick={() => setIsEditing(false)} className="text-rose-400 hover:text-rose-300">
-                                    ✕
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center md:justify-start gap-2 mb-2 group">
-                                <h1 className="text-3xl font-bold">{user.name}</h1>
-                                <button
-                                    onClick={() => setIsEditing(true)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-white"
-                                >
-                                    ✎
-                                </button>
-                            </div>
-                        )}
-                        <p className="text-slate-400 mb-4">{user.email}</p>
-                        <div className="flex items-center justify-center md:justify-start gap-4">
-                            <div className="bg-slate-900 px-4 py-2 rounded-lg border border-slate-700">
-                                <span className="text-xs text-slate-400 block">Rating</span>
-                                <span className="text-xl font-bold text-yellow-400">1500</span>
-                            </div>
-                            <div className="bg-slate-900 px-4 py-2 rounded-lg border border-slate-700">
-                                <span className="text-xs text-slate-400 block">Matches</span>
-                                <span className="text-xl font-bold text-white">{matchHistory.length}</span>
-                            </div>
-                        </div>
-                    </div>
                     <button
                         onClick={handleLogout}
-                        className="px-6 py-3 bg-rose-600/20 text-rose-400 border border-rose-600/50 rounded-xl hover:bg-rose-600/30 transition-colors font-semibold"
+                        className="text-xs font-bold text-gray-600 hover:text-red-500 uppercase tracking-widest transition-colors"
                     >
                         Sign Out
                     </button>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-6">
-                        <h3 className="text-lg font-semibold mb-4 text-slate-200">Win Rate</h3>
-                        <div className="flex items-end gap-2">
-                            <span className="text-4xl font-bold text-emerald-400">
-                                {matchHistory.length > 0
-                                    ? Math.round((matchHistory.filter(m => m.result === 'WIN').length / matchHistory.length) * 100)
-                                    : 0}%
-                            </span>
-                            <span className="text-slate-500 mb-1">
-                                ({matchHistory.filter(m => m.result === 'WIN').length}W - {matchHistory.filter(m => m.result === 'LOSE').length}L)
-                            </span>
+                {/* Profile Section */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-16">
+                    {/* Left: Avatar & Rating */}
+                    <div className="md:col-span-4 flex flex-col items-center md:items-start">
+                        <div className="w-48 h-48 bg-gray-900 border border-gray-800 p-2 mb-6 relative group">
+                            <img
+                                src={user.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(user.name)}`}
+                                alt="Profile"
+                                className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+                            />
+                            <div className="absolute -bottom-2 -right-2 bg-[#D4FF00] text-black text-xs font-bold px-3 py-1 uppercase tracking-widest">
+                                Grandmaster
+                            </div>
+                        </div>
+
+                        <div className="w-full">
+                            <div className="text-gray-500 text-xs uppercase tracking-widest mb-1">Standard Rating</div>
+                            <div className="text-6xl font-serif font-light text-white leading-none flex items-start gap-2">
+                                {1500}
+                                <span className="text-lg text-[#D4FF00] mt-1">●</span>
+                            </div>
                         </div>
                     </div>
-                    <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-6">
-                        <h3 className="text-lg font-semibold mb-4 text-slate-200">Favorite Deck</h3>
-                        <div className="text-xl font-medium text-purple-300">Aggressive Knight Rush</div>
-                        <div className="text-xs text-slate-500 mt-1">Used in 12 matches</div>
+
+                    {/* Right: Info & Stats */}
+                    <div className="md:col-span-8 flex flex-col justify-between">
+                        <div className="mb-12">
+                            {isEditing ? (
+                                <div className="flex items-center gap-4 border-b border-[#D4FF00] pb-2 max-w-md">
+                                    <input
+                                        type="text"
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        className="bg-transparent text-4xl font-serif text-white focus:outline-none w-full"
+                                        autoFocus
+                                    />
+                                    <button onClick={handleSaveName} className="text-[#D4FF00] hover:text-white uppercase text-xs font-bold tracking-widest">Save</button>
+                                    <button onClick={() => setIsEditing(false)} className="text-gray-500 hover:text-white uppercase text-xs font-bold tracking-widest">Cancel</button>
+                                </div>
+                            ) : (
+                                <div className="group flex items-end gap-6 border-b border-gray-800 pb-8 hover:border-[#D4FF00] transition-colors">
+                                    <div>
+                                        <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Player Name</div>
+                                        <h1 className="text-5xl md:text-6xl font-serif text-white leading-none">{user.name}</h1>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className="mb-2 opacity-0 group-hover:opacity-100 text-[#D4FF00] uppercase text-xs font-bold tracking-widest transition-all"
+                                    >
+                                        Edit Profile
+                                    </button>
+                                </div>
+                            )}
+                            <div className="mt-4 text-gray-500 font-mono text-sm">{user.email}</div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-6">
+                            <div className="border-l border-gray-800 pl-6">
+                                <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Total Matches</div>
+                                <div className="text-3xl font-light">{matchHistory.length}</div>
+                            </div>
+                            <div className="border-l border-gray-800 pl-6">
+                                <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Win Rate</div>
+                                <div className="text-3xl font-light text-[#D4FF00]">
+                                    {matchHistory.length > 0
+                                        ? Math.round((matchHistory.filter(m => m.result === 'WIN').length / matchHistory.length) * 100)
+                                        : 0}%
+                                </div>
+                            </div>
+                            <div className="border-l border-gray-800 pl-6">
+                                <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Favorite Deck</div>
+                                <div className="text-lg leading-tight truncate">Aggro Knight Rush</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Match History */}
-                <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-700 bg-slate-800/50">
-                        <h3 className="font-semibold text-slate-200">Match History</h3>
-                    </div>
+                {/* Match History Table */}
+                <div>
+                    <h2 className="text-2xl font-serif text-white mb-8 flex items-center gap-4">
+                        <span className="w-2 h-2 bg-[#D4FF00]"></span>
+                        Match History
+                    </h2>
+
                     {matchHistory.length > 0 ? (
-                        <div className="divide-y divide-slate-700/50">
+                        <div className="border-t border-gray-800">
                             {matchHistory.map((game) => (
-                                <div key={game.gameId} className="px-6 py-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-2 h-2 rounded-full ${true ? 'bg-white' : 'bg-black border border-slate-500'}`} />
+                                <div key={game.gameId} className="group grid grid-cols-12 py-6 border-b border-gray-800 hover:bg-white/5 transition-colors items-center">
+                                    <div className="col-span-4 flex items-center gap-4">
+                                        <div className={`w-3 h-3 ${true ? 'bg-white' : 'bg-gray-800 border border-gray-600'}`}></div>
                                         <div>
-                                            <div className="font-medium text-slate-200">vs {game.opponent}</div>
-                                            <div className="text-xs text-slate-500">{timeAgo(game.playedAt)}</div>
+                                            <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Opponent</div>
+                                            <div className="font-bold text-lg">{game.opponent}</div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className={`text-sm font-medium ${game.ratingChange > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    <div className="col-span-3">
+                                        <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Result</div>
+                                        {resultBadge(game.result)}
+                                    </div>
+                                    <div className="col-span-3">
+                                        <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Rating</div>
+                                        <div className={`font-mono ${game.ratingChange > 0 ? 'text-[#D4FF00]' : 'text-gray-500'}`}>
                                             {game.ratingChange > 0 ? '+' : ''}{game.ratingChange}
                                         </div>
-                                        {resultBadge(game.result)}
+                                    </div>
+                                    <div className="col-span-2 text-right text-gray-500 font-mono text-xs">
+                                        {timeAgo(game.playedAt)} AGO
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="p-8 text-center text-slate-500">
-                            No matches played yet. Go play some chess!
+                        <div className="py-24 border border-dashed border-gray-800 text-center text-gray-600">
+                            NO MATCH DATA AVAILABLE
                         </div>
                     )}
                 </div>
