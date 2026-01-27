@@ -3,12 +3,14 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getGameReplay, getGameById } from '../services/gameApi'
 import ChessBoard from '../components/ChessBoard'
+import { useAuthStore } from '../stores/authStore'
 import type { Game } from '../types/api.types'
 import type { Move } from '../types/game'
 
 export default function ReplayPage() {
   const { gameId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
 
   const [history, setHistory] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -125,6 +127,14 @@ export default function ReplayPage() {
     } as Move
   }
 
+  // Determine if user played as black
+  // gameInfo.player2 is Black
+  // We handle potential type mismatch (string vs number) for IDs
+  const userColor = gameInfo && user &&
+    (String((gameInfo.player2 as any).userId || gameInfo.player2.userId) === String(user.id))
+    ? 'black'
+    : 'white'
+
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col">
       {/* Header */}
@@ -158,11 +168,12 @@ export default function ReplayPage() {
           <ChessBoard
             board={currentState.board}
             currentTurn={currentState.turn}
-            myColor="white"
+            myColor={userColor}
             isMyTurn={false}
             lastMove={lastMove}
             onMove={() => { }}
             isCheck={false} // TODO: Add check status to replay data
+            useImages={true}
           />
         </div>
 
