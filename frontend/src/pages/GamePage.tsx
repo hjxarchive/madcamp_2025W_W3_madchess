@@ -1081,21 +1081,23 @@ export default function GamePage() {
                 </div>
               )}
               {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
-              {showCurrentMessage && (
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-green-600/90 text-white px-3 py-1 text-xs font-bold uppercase tracking-widest rounded animate-pulse">
-                  Current
-                </div>
-              )}
+              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${
+                showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+              }`}>
+                Current
+              </div>
             </div>
 
             {/* 하단 버튼 */}
-            {gameState?.currentTurn === myColor && !gameOverData && (
-              <div className={`border p-4 ${isViewingHistory ? 'border-yellow-600 bg-yellow-600/5' : 'border-[#D4FF00] bg-[#D4FF00]/5'}`}>
+            {!gameOverData && (
+              <div className={`border p-4 ${isViewingHistory ? 'border-yellow-600 bg-yellow-600/5' : gameState?.currentTurn === myColor ? 'border-[#D4FF00] bg-[#D4FF00]/5' : 'border-gray-800 bg-gray-900/30'}`}>
                 <div className="text-sm font-serif mb-3 text-center">
                   {isViewingHistory ? (
                     <span className="text-yellow-500">VIEWING HISTORY - <button onClick={goToLatestMove} className="underline hover:text-white">Return to game</button></span>
-                  ) : (
+                  ) : gameState?.currentTurn === myColor ? (
                     <span className="text-[#D4FF00]">YOUR TURN</span>
+                  ) : (
+                    <span className="text-gray-500">OPPONENT'S TURN</span>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">

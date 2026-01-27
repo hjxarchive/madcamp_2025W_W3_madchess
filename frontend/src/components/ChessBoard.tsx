@@ -359,16 +359,6 @@ export default function ChessBoard({
         ))}
         <div className="w-8"></div>
       </div>
-
-      {/* 턴 표시 */}
-      <div className="mt-4 text-center">
-        <div className={`
-          inline-block px-6 py-2 rounded-lg font-semibold text-lg
-          ${isMyTurn ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'}
-        `}>
-          {isMyTurn ? '당신의 차례입니다' : '상대방의 차례입니다'}
-        </div>
-      </div>
     </div>
   )
 }
