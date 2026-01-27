@@ -16,7 +16,8 @@ export default function Hero3D() {
 
             selectors.forEach(selector => {
                 const elements = document.querySelectorAll(selector)
-                elements.forEach(el => {
+                elements.forEach(node => {
+                    const el = node as HTMLElement
                     if (el && el.parentElement && el.textContent?.toLowerCase().includes('spline')) {
                         el.style.display = 'none'
                         el.remove()
