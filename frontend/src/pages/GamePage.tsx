@@ -79,6 +79,9 @@ export default function GamePage() {
   const [premove, setPremove] = useState<Move | null>(null)
   const premoveRef = useRef<Move | null>(null)
 
+  const gameOverDataRef = useRef<{ winner: string; reason: string } | null>(null)
+  useEffect(() => { gameOverDataRef.current = gameOverData }, [gameOverData])
+
   // 타이머 상태 (ms 단위)
   const [whiteTime, setWhiteTime] = useState(600 * 1000)
   const [blackTime, setBlackTime] = useState(600 * 1000)
@@ -105,6 +108,8 @@ export default function GamePage() {
   }>>([])  // 각 수에 대한 보드 상태 저장
   const [viewingMoveIndex, setViewingMoveIndex] = useState<number>(-1)  // -1 = 최신 상태, 0+ = 해당 수의 보드 상태
   const [isViewingHistory, setIsViewingHistory] = useState(false)  // 히스토리 모드 여부
+  const isViewingHistoryRef = useRef(false)
+  useEffect(() => { isViewingHistoryRef.current = isViewingHistory }, [isViewingHistory])
   const [showCurrentMessage, setShowCurrentMessage] = useState(false)  // "Current" 메시지 표시 여부
 
   // Ref for myColor to access in socket callbacks without closure issues
@@ -346,9 +351,14 @@ export default function GamePage() {
       if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
       if (data.blackTime !== undefined) setBlackTime(data.blackTime)
 
-      // Apply server-confirmed move
-      // If I moved, skip increment because optimistic update already did it
-      applyOpponentMove(data.move, iMoved)
+      // Apply server-confirmed game state directly for perfect sync
+      if (data.gameState) {
+        console.log('🔄 Syncing game state from server:', data.gameState)
+        setGameState(data.gameState)
+      } else {
+        // Fallback
+        applyOpponentMove(data.move, iMoved)
+      }
 
       // 히스토리 보기 모드에서 벗어나기 (상대가 수를 두면 최신 상태로)
       setIsViewingHistory(false)
@@ -380,13 +390,15 @@ export default function GamePage() {
       // 내 턴이 되었을 때 프리무브가 있다면 자동 실행
       if (!iMoved) {
         setTimeout(() => {
-          // 최신 상태를 한 번 더 체크 (서버 동기화 후)
+          // 최신 보드 상태와 턴 정보를 기반으로 프리무브 실행
+          const latestState = useGameStore.getState()
           const latestPremove = premoveRef.current
+
           if (latestPremove) {
-            console.log('🚀 Executing premove from latest store state:', latestPremove)
+            console.log('🚀 Executing premove after server sync:', latestPremove)
             handleMove(latestPremove)
           }
-        }, 150) // 약간의 지연을 더 주어 상태 업데이트가 확실히 반영되게 함
+        }, 250) // 서버 상태가 완전히 반영될 시간을 충분히 확보 (Zustand + React)
       }
     }
 
@@ -731,11 +743,12 @@ export default function GamePage() {
 
   const handleMove = (move: Move) => {
     // 최신 게임 상태 가져오기 (클로저 stale state 방지)
-    const currentGameState = useGameStore.getState().gameState
+    const storeState = useGameStore.getState()
+    const currentGameState = storeState.gameState
     const currentTurn = currentGameState?.currentTurn
 
     // 내 턴이 아니면 프리무브로 설정
-    if (currentTurn !== myColor) {
+    if (currentTurn !== myColorRef.current) {
       console.log('🔴 Setting premove:', move)
       setPremove(move)
       premoveRef.current = move
@@ -746,20 +759,20 @@ export default function GamePage() {
     setPremove(null)
     premoveRef.current = null
 
-    // 히스토리 보기 모드에서는 수를 둘 수 없음
-    if (isViewingHistory) {
+    // 히스토리 보기 모드에서는 수를 둘 수 없음 (Ref 사용)
+    if (isViewingHistoryRef.current) {
       console.log('Cannot move while viewing history')
       return
     }
 
-    // Prevent moves if game is over
-    if (gameOverData || gameState?.status !== 'playing') {
+    // Prevent moves if game is over (Ref 사용)
+    if (gameOverDataRef.current || currentGameState?.status !== 'playing') {
       console.log('Game is over, move prevented')
       return
     }
 
     // 프로모션 체크: 폰이 끝 랭크로 이동하는지 확인
-    if (gameState) {
+    if (currentGameState) {
       // UCI 파싱: "e2e4" 또는 "e7e8" (프로모션 후보)
       const from = move.uci.substring(0, 2)
       const to = move.uci.substring(2, 4)
