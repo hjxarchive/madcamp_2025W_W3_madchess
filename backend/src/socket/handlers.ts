@@ -273,8 +273,9 @@ export function setupSocketHandlers(io: Server) {
           black: blackPlayer,
           pgn: gameManager.getMatchPGN(data.matchId)
         })
-        console.log(`✅ User ${data.userId} rejoined match ${data.matchId}`)
+        console.log(`✅ User ${data.userId} successfully rejoined match ${data.matchId}`)
       } else {
+        console.warn(`❌ Rejoin FAILED for user ${data.userId} in match ${data.matchId}: ${result.error}`)
         socket.emit('rejoin-error', { message: result.error || 'Failed to rejoin' })
       }
     })

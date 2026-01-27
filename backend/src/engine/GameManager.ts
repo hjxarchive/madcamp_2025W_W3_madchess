@@ -930,10 +930,10 @@ export class GameManager {
     // Find room containing this socket
     for (const [code, room] of this.rooms.entries()) {
       if (room.hostSocketId === socketId || room.guestSocketId === socketId) {
-        // Delete the match if it exists
-        if (this.matches.has(room.matchId)) {
-          this.matches.delete(room.matchId)
-        }
+        // [MODIFIED] DON'T delete the match here. Let it persist for rejoining or game-over condition.
+        // if (this.matches.has(room.matchId)) {
+        //   this.matches.delete(room.matchId)
+        // }
 
         // Delete the room
         this.rooms.delete(code)
@@ -951,12 +951,16 @@ export class GameManager {
     // Handle room disconnect
     this.leaveRoom(socketId)
 
-    // Find and end any matches with this player
+    // [MODIFIED] DON'T delete matches on disconnect. 
+    // This allows reconnection within the same session.
+    // Matches should only be cleaned up when finished or via a global TTL.
+    /*
     for (const [matchId, match] of this.matches.entries()) {
       if (match.player1SocketId === socketId || match.player2SocketId === socketId) {
         this.matches.delete(matchId)
       }
     }
+    */
   }
 
   private initializeGame(roomId: string, white: any, black: any): any {
