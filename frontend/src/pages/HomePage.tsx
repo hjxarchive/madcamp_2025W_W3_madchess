@@ -134,7 +134,7 @@ export default function HomePage() {
                       <div className="flex items-center gap-4 mb-4">
                         <div className="flex-1">
                           <div className="text-sm text-gray-400">VS</div>
-                          <div className="text-lg font-bold text-white truncate">{game.opponent}</div>
+                          <div className="text-lg font-bold text-white truncate">{typeof game.opponent === 'object' ? (game.opponent as any).username : game.opponent}</div>
                         </div>
                         <div className={`text-xl font-mono ${game.ratingChange > 0 ? 'text-[#D4FF00]' : 'text-gray-500'}`}>
                           {game.ratingChange > 0 ? '+' : ''}{game.ratingChange}
