@@ -452,23 +452,25 @@ export default function PlacementPage() {
   }, {} as Record<PieceType, number>)
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-[#050505] text-white font-sans">
       {/* 헤더 */}
-      <header className="sticky top-0 z-10 border-b border-gray-800 bg-gray-900/80 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 grid place-items-center rounded-sm bg-orange-500 text-white font-black text-xs">📦</div>
-            <span className="font-semibold">Mad Chess</span>
+      <header className="sticky top-0 z-10 border-b border-gray-900 bg-[#050505]/90 backdrop-blur">
+        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 bg-white skew-x-12"></div>
+            <div className="font-serif text-lg">
+              <span className="text-[#D4FF00]">MAD</span>
+              <span className="text-white">CHESS</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-xs text-slate-400">배치 단계</div>
-            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-slate-800">
-              <span className="text-xs">남은 시간:</span>
-              <span className={`font-semibold font-mono ${timeLeft <= 30 ? 'text-red-400 animate-pulse' : 'text-orange-400'}`}>
+            <div className="text-xs text-gray-500 uppercase tracking-widest">Placement Phase</div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-[#0A0A0A] border border-gray-800">
+              <span className="text-xs text-gray-500 uppercase">Time:</span>
+              <span className={`font-mono text-lg ${timeLeft <= 30 ? 'text-red-500 animate-pulse' : 'text-[#D4FF00]'}`}>
                 {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
               </span>
             </div>
-            <button className="h-8 w-8 grid place-items-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors">⚙</button>
           </div>
         </div>
       </header>
@@ -568,19 +570,19 @@ export default function PlacementPage() {
             <button
               onClick={() => setPlacedPieces(placedPieces.filter(p => p.type === 'k'))}
               disabled={waitingForOpponent}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 uppercase tracking-widest text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <span>↺</span> 초기화
+              <span>↺</span> RESET
             </button>
           </div>
 
           {/* 우측 컨트롤 영역 */}
           <div className="flex flex-col gap-6">
             {/* 덱 선택 */}
-            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">저장된 덱 불러오기</div>
+            <section className="border border-gray-900 bg-[#0A0A0A] p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Load Saved Deck</div>
               <select
-                className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-gray-700 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full px-4 py-2 bg-[#050505] border border-gray-800 text-white focus:outline-none focus:border-[#D4FF00] transition-colors"
                 value={selectedDeckId || ''}
                 onChange={(e) => {
                   const deckId = parseInt(e.target.value)
@@ -589,7 +591,7 @@ export default function PlacementPage() {
                   }
                 }}
               >
-                <option value="">-- 덱 선택 --</option>
+                <option value="">-- Select Deck --</option>
                 {savedDecks.map(deck => (
                   <option key={deck.id} value={deck.id}>
                     {deck.name} ({deck.totalCost}pts)
@@ -597,16 +599,13 @@ export default function PlacementPage() {
                 ))}
               </select>
               {savedDecks.length === 0 && (
-                <div className="text-xs text-slate-500 mt-2">저장된 덱이 없습니다. 덱 빌더에서 덱을 만들어 보세요!</div>
+                <div className="text-xs text-gray-600 mt-2">No saved decks. Create one in Deck Builder!</div>
               )}
             </section>
 
             {/* 보유 기물 */}
-            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-orange-500 text-lg">📦</span>
-                <h2 className="text-lg font-semibold">보유 기물</h2>
-              </div>
+            <section className="border border-gray-900 bg-[#0A0A0A] p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-4">Available Pieces</div>
               <div className="grid grid-cols-3 gap-3">
                 {availablePieces.map((piece) => {
                   const isKing = piece.type === 'k'
@@ -617,25 +616,25 @@ export default function PlacementPage() {
                       <div
                         onClick={() => handlePieceSelect(piece.type)}
                         className={`
-                          rounded-xl border bg-slate-700/60 p-3 text-center
+                          border bg-[#050505] p-3 text-center
                           transition-all duration-200
-                          ${isKing ? 'opacity-50 cursor-not-allowed border-gray-700' : 'cursor-grab hover:bg-slate-700 border-gray-700 hover:border-gray-600'}
-                          ${isSelected ? 'ring-2 ring-blue-400 border-blue-400 bg-slate-600' : ''}
+                          ${isKing ? 'opacity-50 cursor-not-allowed border-gray-800' : 'cursor-pointer hover:border-gray-600 border-gray-800'}
+                          ${isSelected ? 'border-[#D4FF00] bg-[#D4FF00]/10' : ''}
                         `}
                       >
                         <div className="flex justify-center mb-2">
                           <img
                             src={PIECE_IMAGES[myColor][piece.type]}
                             alt={getPieceName(piece.type)}
-                            className="w-12 h-12"
+                            className="w-10 h-10"
                             draggable={false}
                           />
                         </div>
-                        <div className="text-sm font-semibold mb-1">{getPieceName(piece.type)}</div>
-                        <div className="text-xs text-slate-300 mb-1">{piece.count}개 남음</div>
-                        <div className="text-xs text-slate-400">{PIECE_COSTS[piece.type]} pts</div>
+                        <div className="text-xs font-medium mb-1 uppercase tracking-wider">{piece.type.toUpperCase()}</div>
+                        <div className="text-xs text-gray-500">{piece.count} left</div>
+                        <div className="text-xs text-[#D4FF00] mt-1">{PIECE_COSTS[piece.type]} pts</div>
                         {isKing && (
-                          <div className="absolute top-2 right-2 h-4 w-4 grid place-items-center rounded-full bg-emerald-600 text-white text-xs">✓</div>
+                          <div className="absolute top-2 right-2 h-4 w-4 grid place-items-center bg-[#D4FF00] text-black text-xs font-bold">✓</div>
                         )}
                       </div>
                     </div>
@@ -645,36 +644,34 @@ export default function PlacementPage() {
             </section>
 
             {/* 배치된 기물 요약 */}
-            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-3">배치된 기물 요약</div>
-              <div className="flex flex-wrap gap-3">
+            <section className="border border-gray-900 bg-[#0A0A0A] p-4">
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-3">Placed Pieces</div>
+              <div className="flex flex-wrap gap-2">
                 {Object.entries(placedSummary).map(([type, count]) => (
-                  <div key={type} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-700">
+                  <div key={type} className="flex items-center gap-2 px-3 py-1.5 bg-[#050505] border border-gray-800">
                     <img
                       src={PIECE_IMAGES[myColor][type as PieceType]}
                       alt={type}
                       className="w-5 h-5"
                     />
-                    <span className="text-sm font-semibold">{getPieceName(type as PieceType)} x {count}</span>
+                    <span className="text-xs font-mono">{type.toUpperCase()} x {count}</span>
                   </div>
                 ))}
                 {placedPieces.length === 0 && (
-                  <div className="text-sm text-slate-500">배치된 기물이 없습니다</div>
+                  <div className="text-xs text-gray-600 italic">No pieces placed yet</div>
                 )}
               </div>
             </section>
 
             {/* 사용 예산 */}
-            <section className="rounded-xl border border-gray-800 bg-slate-800/40 p-4">
+            <section className="border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center justify-between mb-2">
-                <div>
-                  <div className="text-xs text-slate-400 uppercase tracking-wider">사용 예산</div>
-                  <div className="text-2xl font-bold text-orange-400">{usedBudget} <span className="text-base text-slate-400">/ 30 pts</span></div>
-                </div>
+                <div className="text-xs text-gray-500 uppercase tracking-widest">Budget</div>
+                <div className="text-lg font-mono text-[#D4FF00]">{usedBudget}<span className="text-gray-500">/30</span></div>
               </div>
-              <div className="relative h-2.5 bg-slate-700 rounded-full overflow-hidden">
+              <div className="relative h-2 bg-gray-900 overflow-hidden">
                 <div
-                  className="absolute h-full bg-orange-500 transition-all duration-300"
+                  className="absolute h-full bg-[#D4FF00] transition-all duration-300"
                   style={{ width: `${Math.min(usedBudget / 30 * 100, 100)}%` }}
                 ></div>
               </div>
@@ -685,20 +682,20 @@ export default function PlacementPage() {
               onClick={handleConfirmPlacement}
               disabled={!placedPieces.some(p => p.type === 'k') || waitingForOpponent}
               className={`
-                flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-bold text-lg
+                flex items-center justify-center gap-2 px-6 py-4 font-bold text-sm uppercase tracking-widest
                 transition-all duration-200
                 ${waitingForOpponent
-                  ? 'bg-yellow-600 text-white cursor-wait'
+                  ? 'bg-gray-800 text-gray-400 cursor-wait border border-gray-700'
                   : placedPieces.some(p => p.type === 'k')
-                    ? 'bg-orange-500 hover:bg-orange-400 text-gray-900 cursor-pointer shadow-lg hover:shadow-orange-500/50'
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    ? 'bg-[#D4FF00] hover:bg-white text-black cursor-pointer'
+                    : 'bg-gray-900 text-gray-600 cursor-not-allowed border border-gray-800'
                 }
               `}
             >
               {waitingForOpponent ? (
-                <>⏳ 상대방 배치 대기 중...</>
+                <>Waiting for opponent...</>
               ) : (
-                <>배치 확정 🚀</>
+                <>CONFIRM PLACEMENT</>
               )}
             </button>
           </div>
