@@ -142,7 +142,7 @@ class SocketService {
   // Event listeners
 
   // 게임 매칭 완료
-  onGameFound(callback: (data: { matchId: string; opponent: any }) => void) {
+  onGameFound(callback: (data: { matchId: string; opponent: any; yourColor?: 'white' | 'black' }) => void) {
     if (this.socket) {
       this.socket.on('game-found', callback)
     }

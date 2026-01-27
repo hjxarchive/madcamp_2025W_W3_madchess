@@ -53,6 +53,9 @@ export default function MatchmakingPage() {
     socketService.onGameFound((data) => {
       console.log('Game found:', data)
       sessionStorage.setItem('matchId', data.matchId)
+      if (data.yourColor) {
+        sessionStorage.setItem('selectedColor', data.yourColor)
+      }
       // opponent info is in data.opponent
       navigate(`/placement/${data.matchId}`)
     })
@@ -246,8 +249,8 @@ export default function MatchmakingPage() {
                     key={cat}
                     onClick={() => setTimeCategory(cat)}
                     className={`px-8 py-3 text-sm font-bold uppercase tracking-widest transition-colors border-b-2 ${timeCategory === cat
-                        ? 'text-[#D4FF00] border-[#D4FF00]'
-                        : 'text-gray-500 border-transparent hover:text-white'
+                      ? 'text-[#D4FF00] border-[#D4FF00]'
+                      : 'text-gray-500 border-transparent hover:text-white'
                       }`}
                   >
                     {cat}
@@ -262,8 +265,8 @@ export default function MatchmakingPage() {
                     key={option.value}
                     onClick={() => setSelectedTime(option.value)}
                     className={`p-6 border transition-all ${selectedTime === option.value
-                        ? 'border-[#D4FF00] bg-[#D4FF00]/10 text-white'
-                        : 'border-gray-800 hover:border-gray-600 text-gray-400'
+                      ? 'border-[#D4FF00] bg-[#D4FF00]/10 text-white'
+                      : 'border-gray-800 hover:border-gray-600 text-gray-400'
                       }`}
                   >
                     <div className="text-xl font-bold font-mono">{option.label}</div>

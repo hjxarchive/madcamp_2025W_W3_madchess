@@ -94,10 +94,12 @@ export function setupSocketHandlers(io: Server) {
         io.to(match.player1SocketId).emit('game-found', {
           matchId: match.id,
           opponent: match.player2,
+          yourColor: match.player1Color
         })
         io.to(match.player2SocketId).emit('game-found', {
           matchId: match.id,
           opponent: match.player1,
+          yourColor: match.player2Color
         })
       }
     })
