@@ -598,6 +598,26 @@ export default function GamePage() {
     console.log(`📚 Saved board state for move ${currentMoveCount}`)
   }, [gameState?.pgn, gameState?.moveCount])
 
+  // ===== CRITICAL: Auto-sync myColor based on server gameState =====
+  // This ensures myColor is always correct even if sessionStorage is cleared or stale
+  useEffect(() => {
+    if (gameState && user?.id) {
+      const myId = String(user.id)
+      let correctColor: PieceColor | null = null
+
+      if (String(gameState.white.userId) === myId) {
+        correctColor = 'white'
+      } else if (String(gameState.black.userId) === myId) {
+        correctColor = 'black'
+      }
+
+      if (correctColor && correctColor !== myColor) {
+        console.log(`🎨 Auto-syncing myColor: ${myColor} → ${correctColor} (based on server gameState)`)
+        setMyColor(correctColor)
+      }
+    }
+  }, [gameState?.white?.userId, gameState?.black?.userId, user?.id])
+
   // 보드나 턴이 바뀔 때마다 합법수 선제 요청 (이동 지연 방지)
   useEffect(() => {
     if (gameState?.roomId && gameState?.status === 'playing' && gameState?.roomId !== 'test-room') {
