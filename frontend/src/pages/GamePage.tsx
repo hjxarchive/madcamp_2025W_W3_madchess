@@ -128,7 +128,7 @@ export default function GamePage() {
 
   // sessionStorage에서 배치 정보 로드
   useEffect(() => {
-    const savedColor = sessionStorage.getItem('myColor') as PieceColor | null
+    const savedColor = (sessionStorage.getItem('myColor') || sessionStorage.getItem('selectedColor')) as PieceColor | null
     if (savedColor) {
       setMyColor(savedColor)
     }
@@ -446,10 +446,13 @@ export default function GamePage() {
         setMyColor(data.yourColor)
       }
 
+      const currentState = useGameStore.getState().gameState
       if (data.gameState) {
         setGameState({
-          capturedPieces: { white: [], black: [] },
           ...data.gameState,
+          white: data.white || currentState?.white,
+          black: data.black || currentState?.black,
+          capturedPieces: data.gameState.capturedPieces || currentState?.capturedPieces || { white: [], black: [] },
           roomId: data.matchId
         })
       }
