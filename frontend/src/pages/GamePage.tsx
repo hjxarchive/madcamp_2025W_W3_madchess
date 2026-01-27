@@ -318,6 +318,12 @@ export default function GamePage() {
     const uciToAlgebraic = (uci: string, piece: PieceType, capturedPiece?: PieceType): string => {
       console.log(`🔄 Converting UCI to algebraic: uci=${uci}, piece=${piece}, captured=${capturedPiece}`)
 
+      // Defensive check for missing piece info
+      if (!piece) {
+        console.warn('⚠️ Missing piece info for algebraic conversion, falling back to UCI')
+        return uci
+      }
+
       const from = uci.substring(0, 2)
       const to = uci.substring(2, 4)
       const promotion = uci.length > 4 ? uci.substring(4) : undefined
@@ -401,6 +407,7 @@ export default function GamePage() {
 
         // Algebraic notation으로 변환
         const algebraicMove = uciToAlgebraic(data.move.uci, data.move.piece, data.move.captured)
+        console.log(`✨ Algebraic Move: ${algebraicMove}`)
 
         let newPgn = currentState.pgn
 

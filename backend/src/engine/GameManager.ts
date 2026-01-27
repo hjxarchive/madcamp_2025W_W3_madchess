@@ -386,6 +386,12 @@ export class GameManager {
     const engineBoard = match.chessEngine.getBoard()
     const frontendBoard = [...engineBoard].reverse()
 
+    // Debug logging for initial board
+    console.log(`🎬 Game Start - Match ${matchId}`)
+    console.log(`⚪ White: ${match.whitePlacement?.length} pieces, Black: ${match.blackPlacement?.length} pieces`)
+    console.log(`🎯 Rank 1 Piece at f1:`, engineBoard[0][5]?.color, engineBoard[0][5]?.type)
+    console.log(`🎯 Rank 2 Piece at f2:`, engineBoard[1][5]?.color, engineBoard[1][5]?.type)
+
     // Reset turn to white at game start & Sync Board
     match.gameState = {
       ...match.gameState,
@@ -561,11 +567,15 @@ export class GameManager {
       return { success: false, error: 'Match not found' }
     }
 
+    // Get piece info before move for broadcasting
+    const moverPiece = match.chessEngine.getPieceAtUci(move.from)
+    const capturedPiece = match.chessEngine.getPieceAtUci(move.to)
+
     // Use custom chess engine to validate move
     const result = match.chessEngine.makeMove(move.from, move.to, move.promotion)
 
     if (!result.success) {
-      console.log(`❌ Move validation failed: ${move.from} -> ${move.to}`)
+      console.log(`❌ Move validation failed in match ${matchId}: ${move.from} -> ${move.to} (Piece: ${moverPiece?.type}, Color: ${moverPiece?.color}, Turn: ${match.chessEngine.getTurn()})`)
       return {
         success: false,
         error: 'Invalid move - 불법 이동입니다'
@@ -626,7 +636,11 @@ export class GameManager {
 
       this.broadcastCallback(matchId, 'move-made', {
         matchId,
-        move: { uci: moveStr }, // Wrap move back to UCI for frontend
+        move: {
+          uci: moveStr,
+          piece: moverPiece?.type,
+          captured: capturedPiece?.type
+        },
         socketId: socketId,
         moverColor,
         gameState: match.gameState,

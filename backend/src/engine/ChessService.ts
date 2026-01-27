@@ -257,6 +257,14 @@ export class ChessService {
     }
 
     /**
+     * Get piece at UCI coordinate (e.g. "e2")
+     */
+    getPieceAtUci(uci: string): Piece | null {
+        const pos = this.uciToPosition(uci)
+        return this.getPiece(pos)
+    }
+
+    /**
      * Check if path is clear (for sliding pieces)
      */
     private isPathClear(from: Position, to: Position): boolean {
