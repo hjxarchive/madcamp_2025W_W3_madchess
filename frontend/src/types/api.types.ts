@@ -40,19 +40,19 @@ export interface RecentGame {
 }
 
 // Deck Types
-export interface DeckPiece {
-    pieceId: number
-    count: number
+export interface PlacedPiece {
+    type: string  // 'k', 'q', 'r', 'b', 'n', 'p'
+    position: string  // 'e1', 'a2', etc.
 }
 
 export interface Deck {
     id: number
     name: string
     userId: number
-    pieces: DeckPiece[]
+    placement: PlacedPiece[]
     totalCost: number
     createdAt: string
-    updatedAt: string
+    updatedAt?: string
 }
 
 export interface DeckWithStats extends Deck {
@@ -64,16 +64,16 @@ export interface DeckWithStats extends Deck {
 export interface CreateDeckRequest {
     userId: number
     name: string
-    composition: { [key: string]: number }  // e.g., { "p": 8, "k": 1 }
+    placement: PlacedPiece[]
 }
 
 export interface UpdateDeckRequest {
     name?: string
-    composition?: { [key: string]: number }
+    placement?: PlacedPiece[]
 }
 
 export interface ValidateDeckRequest {
-    pieces: DeckPiece[]
+    placement: PlacedPiece[]
 }
 
 export interface ValidateDeckResponse {

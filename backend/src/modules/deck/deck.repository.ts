@@ -1,5 +1,5 @@
 import prisma from '../../utils/prisma';
-import { CreateDeckDto, UpdateDeckDto } from './DTOS/deck.dto';
+import { CreateDeckDto, UpdateDeckDto, PlacedPieceDto } from './DTOS/deck.dto';
 
 // 덱 생성 (트랜잭션)
 export const createDeck = async (data: CreateDeckDto, pieceMap: Map<string, number>) => {
@@ -9,19 +9,19 @@ export const createDeck = async (data: CreateDeckDto, pieceMap: Map<string, numb
       data: {
         user_id: data.userId,
         name: data.name || 'Untitled Deck',
-        total_p_val: 0, // 트리거가 계산해주겠지만 초기값
+        total_p_val: 0,
       },
     });
 
-    // 2. 구성품(Composition) 저장
-    for (const [code, qty] of Object.entries(data.composition)) {
-      const pieceId = pieceMap.get(code); // action code("p") -> id(1) 변환
+    // 2. 배치된 기물들 저장 (각 기물의 위치 포함)
+    for (const piece of data.placement) {
+      const pieceId = pieceMap.get(piece.type.toLowerCase());
       if (pieceId) {
         await tx.deck_composition.create({
           data: {
             deck_id: deck.id,
             piece_id: pieceId,
-            quantity: qty,
+            position: piece.position,
           },
         });
       }
@@ -45,8 +45,6 @@ export const findDecksByUser = async (userId: number, sort?: string, limit?: num
   if (sort === 'recent') {
     orderBy.created_at = 'desc';
   } else if (sort === 'winRate') {
-    // winRate 계산 필요 (win_cnt / (win_cnt + lose_cnt))
-    // 일단 win_cnt로 정렬
     orderBy.win_cnt = 'desc';
   }
 
@@ -92,22 +90,30 @@ export const findDeckById = async (deckId: number) => {
 
 export const updateDeck = async (deckId: number, data: UpdateDeckDto, pieceMap?: Map<string, number>) => {
   return await prisma.$transaction(async (tx: any) => {
-    // composition 업데이트가 있는 경우
-    if (data.composition && pieceMap) {
+    // name 업데이트
+    if (data.name) {
+      await tx.deck.update({
+        where: { id: deckId },
+        data: { name: data.name }
+      });
+    }
+
+    // placement 업데이트가 있는 경우
+    if (data.placement && pieceMap) {
       // 기존 composition 삭제
       await tx.deck_composition.deleteMany({
         where: { deck_id: deckId }
       });
 
-      // 새로운 composition 생성
-      for (const [code, qty] of Object.entries(data.composition)) {
-        const pieceId = pieceMap.get(code);
+      // 새로운 placement 생성
+      for (const piece of data.placement) {
+        const pieceId = pieceMap.get(piece.type.toLowerCase());
         if (pieceId) {
           await tx.deck_composition.create({
             data: {
               deck_id: deckId,
               piece_id: pieceId,
-              quantity: qty,
+              position: piece.position,
             },
           });
         }

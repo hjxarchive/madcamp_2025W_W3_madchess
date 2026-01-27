@@ -159,29 +159,33 @@ export default function DeckBuilderPage() {
     setError('')
   }
 
-  // Build composition from placed pieces
-  const buildComposition = (): { [key: string]: number } => {
-    const composition: { [key: string]: number } = {}
-    placedPieces.forEach(p => {
-      composition[p.type] = (composition[p.type] || 0) + 1
-    })
-    return composition
+  // Build placement array from placed pieces (for API)
+  const buildPlacement = (): { type: string; position: string }[] => {
+    return placedPieces.map(p => ({
+      type: p.type,
+      position: `${p.file}${p.rank}`
+    }))
   }
 
   // Load deck for editing
   const handleLoadDeck = (deck: DeckWithStats) => {
-    // Convert composition (from API response) to board placements
-    // The API returns composition as { "k": 1, "p": 8, ... }
-    const composition = deck.pieces
-      ? deck.pieces.reduce((acc, p) => {
-        // If pieces array format
-        const pieceType = (p as any).type || (p as any).action?.toLowerCase() || 'p'
-        acc[pieceType] = (acc[pieceType] || 0) + ((p as any).count || (p as any).quantity || 1)
-        return acc
-      }, {} as { [key: string]: number })
-      : (deck as any).composition || {}
+    // Convert API placement array to board placements
+    const placement: PlacedPiece[] = (deck.placement || []).map((p: any) => {
+      const pos = p.position || 'a1'
+      const file = pos[0] as File
+      const rank = parseInt(pos[1]) as Rank
+      return {
+        type: p.type as PieceType,
+        file,
+        rank
+      }
+    })
 
-    const placement = compositionToPlacement(composition)
+    // Ensure King is included (fallback)
+    if (!placement.some(p => p.type === 'k')) {
+      placement.push({ type: 'k', file: 'e', rank: 1 })
+    }
+
     setPlacedPieces(placement)
     setDeckName(deck.name)
     setEditingDeckId(deck.id)
@@ -206,20 +210,20 @@ export default function DeckBuilderPage() {
     setSaving(true)
     setError('')
     try {
-      const composition = buildComposition()
+      const placement = buildPlacement()
 
       if (editingDeckId) {
         // Update existing deck
         await updateDeck(editingDeckId, {
           name: deckName,
-          composition,
+          placement,
         })
       } else {
         // Create new deck
         await createDeck({
           userId: user.id,
           name: deckName,
-          composition,
+          placement,
         })
       }
 
@@ -443,8 +447,8 @@ export default function DeckBuilderPage() {
                 onClick={handleSaveDeck}
                 disabled={saving || !isAuthenticated}
                 className={`w-full py-3 font-bold uppercase tracking-widest text-sm transition-all ${saving || !isAuthenticated
-                    ? 'bg-gray-900 text-gray-600 cursor-not-allowed'
-                    : 'bg-[#D4FF00] text-black hover:bg-white'
+                  ? 'bg-gray-900 text-gray-600 cursor-not-allowed'
+                  : 'bg-[#D4FF00] text-black hover:bg-white'
                   }`}
               >
                 {saving ? 'Saving...' : editingDeckId ? 'Update Deck' : 'Save Deck'}
@@ -469,8 +473,8 @@ export default function DeckBuilderPage() {
                       key={deck.id}
                       onClick={() => handleLoadDeck(deck)}
                       className={`p-3 border transition-colors cursor-pointer ${editingDeckId === deck.id
-                          ? 'border-[#D4FF00] bg-[#D4FF00]/10'
-                          : 'border-gray-800 hover:border-[#D4FF00]'
+                        ? 'border-[#D4FF00] bg-[#D4FF00]/10'
+                        : 'border-gray-800 hover:border-[#D4FF00]'
                         }`}
                     >
                       <div className="font-serif">{deck.name}</div>
