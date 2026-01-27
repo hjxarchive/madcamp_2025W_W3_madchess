@@ -206,14 +206,25 @@ export function setupSocketHandlers(io: Server) {
     // Resign - 기권
     socket.on('resign', (data: { matchId: string }) => {
       console.log(`🏳️ Player ${socket.id} resigned in match ${data.matchId}`)
+      console.log(`📦 Received data:`, JSON.stringify(data))
+      
       const match = gameManager.getMatch(data.matchId)
       if (match) {
         // Determine winner (opponent of resigned player)
-        const winner = match.player1SocketId === socket.id ? 'black' : 'white'
+        // 기권한 플레이어의 색상을 확인한 후 반대 색상이 승자
+        const resignedPlayerColor = match.player1SocketId === socket.id 
+          ? match.player1Color 
+          : match.player2Color
+        const winner = resignedPlayerColor === 'white' ? 'black' : 'white'
+        
+        console.log(`🏆 Resigned player: ${socket.id} (${resignedPlayerColor}), Winner: ${winner}`)
+        
         io.to(data.matchId).emit('game-over', {
           winner,
           reason: 'resignation',
         })
+      } else {
+        console.log(`❌ Match not found: ${data.matchId}`)
       }
     })
 

@@ -833,11 +833,9 @@ export default function GamePage() {
   const handleResign = () => {
     if (confirm('정말 기권하시겠습니까?')) {
       if (gameState) {
-        // 기권 처리: 상대가 승리
-        const winner = myColor === 'white' ? 'black' : 'white'
+        // 기권 처리: 서버에서 game-over 이벤트를 통해 승자 결정
         socketService.resign(gameState.roomId)
-        setGameOverData({ winner, reason: 'resignation' })
-        console.log('🏳️ Player resigned')
+        console.log('🏳️ Player resigned, waiting for server confirmation')
       }
     }
   }
