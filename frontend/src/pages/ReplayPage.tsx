@@ -17,6 +17,7 @@ export default function ReplayPage() {
   const [gameInfo, setGameInfo] = useState<Game | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isFlipped, setIsFlipped] = useState(false)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Load data
@@ -49,12 +50,21 @@ export default function ReplayPage() {
     loadData()
   }, [gameId])
 
+  // Auto-flip for black player
+  useEffect(() => {
+    if (gameInfo && user) {
+      const isBlack = String((gameInfo.player2 as any).userId || gameInfo.player2.userId) === String(user.id)
+      if (isBlack) setIsFlipped(true)
+    }
+  }, [gameInfo, user])
+
   // Key controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') handlePrev()
       if (e.key === 'ArrowRight') handleNext()
       if (e.key === ' ') togglePlay()
+      if (e.key === 'f') setIsFlipped(prev => !prev)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -127,14 +137,6 @@ export default function ReplayPage() {
     } as Move
   }
 
-  // Determine if user played as black
-  // gameInfo.player2 is Black
-  // We handle potential type mismatch (string vs number) for IDs
-  const userColor = gameInfo && user &&
-    (String((gameInfo.player2 as any).userId || gameInfo.player2.userId) === String(user.id))
-    ? 'black'
-    : 'white'
-
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col">
       {/* Header */}
@@ -147,19 +149,29 @@ export default function ReplayPage() {
             <span className="text-[#D4FF00]">REPLAY</span> MODE
           </div>
         </div>
-        {gameInfo && (
-          <div className="flex items-center gap-8 text-sm">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${gameInfo.result === 'white_win' ? 'bg-[#D4FF00]' : 'bg-gray-700'}`}></div>
-              <span>{typeof gameInfo.player1.username === 'string' ? gameInfo.player1.username : (gameInfo.player1 as any).username} (White)</span>
+
+        <div className="flex items-center gap-8">
+          <button
+            onClick={() => setIsFlipped(!isFlipped)}
+            className="text-xs border border-gray-600 rounded px-3 py-1 hover:bg-gray-800 transition-colors"
+          >
+            FLIP BOARD (F)
+          </button>
+
+          {gameInfo && (
+            <div className="flex items-center gap-8 text-sm">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${gameInfo.result === 'white_win' ? 'bg-[#D4FF00]' : 'bg-gray-700'}`}></div>
+                <span>{typeof gameInfo.player1.username === 'string' ? gameInfo.player1.username : (gameInfo.player1 as any).username} (White)</span>
+              </div>
+              <div className="text-gray-600">VS</div>
+              <div className="flex items-center gap-2">
+                <span>{typeof gameInfo.player2.username === 'string' ? gameInfo.player2.username : (gameInfo.player2 as any).username} (Black)</span>
+                <div className={`w-3 h-3 rounded-full ${gameInfo.result === 'black_win' ? 'bg-[#D4FF00]' : 'bg-gray-700'}`}></div>
+              </div>
             </div>
-            <div className="text-gray-600">VS</div>
-            <div className="flex items-center gap-2">
-              <span>{typeof gameInfo.player2.username === 'string' ? gameInfo.player2.username : (gameInfo.player2 as any).username} (Black)</span>
-              <div className={`w-3 h-3 rounded-full ${gameInfo.result === 'black_win' ? 'bg-[#D4FF00]' : 'bg-gray-700'}`}></div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       {/* Main Content */}
@@ -168,7 +180,7 @@ export default function ReplayPage() {
           <ChessBoard
             board={currentState.board}
             currentTurn={currentState.turn}
-            myColor={userColor}
+            myColor={isFlipped ? 'black' : 'white'}
             isMyTurn={false}
             lastMove={lastMove}
             onMove={() => { }}
