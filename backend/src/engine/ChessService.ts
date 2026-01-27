@@ -862,4 +862,5 @@ export class ChessService {
     getPGN(): string {
         return this.moves.join(' ')
     }
+
 }

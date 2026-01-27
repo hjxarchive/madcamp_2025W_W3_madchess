@@ -191,8 +191,16 @@ export class GameManager {
       match.chessEngine.initializeFromPlacement(match.whitePlacement, match.blackPlacement)
       console.log('✅ Chess engine initialized with custom placements (white/black mapped)')
 
-      // Reset turn to white at game start
-      match.gameState = { ...match.gameState, currentTurn: 'white' }
+      // Get board and reverse it for frontend compatibility (Rank 8 at index 0)
+      const engineBoard = match.chessEngine.getBoard()
+      const frontendBoard = [...engineBoard].reverse()
+
+      // Reset turn to white at game start & Sync Board
+      match.gameState = {
+        ...match.gameState,
+        currentTurn: 'white',
+        board: frontendBoard
+      }
 
       // Start Timer
       match.lastMoveTime = Date.now()
@@ -345,6 +353,16 @@ export class GameManager {
     if (result.isCheckmate) {
       const moverColor = match.player1SocketId === socketId ? match.player1Color : match.player2Color
       winner = moverColor
+    }
+
+    // Sync GameState from Engine
+    const engineBoard = match.chessEngine.getBoard()
+    match.gameState = {
+      ...match.gameState,
+      board: [...engineBoard].reverse(),
+      currentTurn: match.chessEngine.getTurn(),
+      pgn: match.chessEngine.getPGN(),
+      isCheck: result.isCheck
     }
 
     console.log(`✅ Move validated: ${move.uci}`)
