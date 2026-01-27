@@ -5,6 +5,9 @@ interface QueuePlayer {
   userId: string
   deckId: string
   timeControl: string
+  username?: string
+  picture?: string
+  rating?: number
 }
 
 interface PlacementData {
@@ -16,8 +19,8 @@ interface Match {
   id: string
   player1SocketId: string
   player2SocketId: string
-  player1: { userId: string; deckId: string }
-  player2: { userId: string; deckId: string }
+  player1: { userId: string; deckId: string; username?: string; picture?: string; rating?: number }
+  player2: { userId: string; deckId: string; username?: string; picture?: string; rating?: number }
   player1Color: 'white' | 'black'
   player2Color: 'white' | 'black'
   player1Placement?: Array<{ type: string; file: string; rank: number }>
@@ -44,8 +47,8 @@ interface Room {
   matchId: string
   hostSocketId: string
   guestSocketId?: string
-  host: { userId: string; deckId: string; color: 'white' | 'black' }
-  guest?: { userId: string; deckId: string; color: 'white' | 'black' }
+  host: { userId: string; deckId: string; color: 'white' | 'black'; username?: string; picture?: string; rating?: number }
+  guest?: { userId: string; deckId: string; color: 'white' | 'black'; username?: string; picture?: string; rating?: number }
   status: 'waiting' | 'ready' | 'in_progress'
   createdAt: number
 }
@@ -55,8 +58,8 @@ export class GameManager {
   private matches: Map<string, Match> = new Map()
   private rooms: Map<string, Room> = new Map() // Room code -> Room
 
-  addToQueue(socketId: string, userId: string, deckId: string, timeControl: string = '3+0') {
-    this.queue.push({ socketId, userId, deckId, timeControl })
+  addToQueue(socketId: string, userId: string, deckId: string, timeControl: string = '3+0', username?: string, picture?: string, rating?: number) {
+    this.queue.push({ socketId, userId, deckId, timeControl, username, picture, rating })
   }
 
   getCastlingOptions(matchId: string, color: 'white' | 'black') {
@@ -108,8 +111,8 @@ export class GameManager {
           id: matchId,
           player1SocketId: player1.socketId,
           player2SocketId: player2.socketId,
-          player1: { userId: player1.userId, deckId: player1.deckId },
-          player2: { userId: player2.userId, deckId: player2.deckId },
+          player1: { userId: player1.userId, deckId: player1.deckId, username: player1.username, picture: player1.picture, rating: player1.rating },
+          player2: { userId: player2.userId, deckId: player2.deckId, username: player2.username, picture: player2.picture, rating: player2.rating },
           player1Color: 'white',
           player2Color: 'black',
           chessEngine,
@@ -421,7 +424,7 @@ export class GameManager {
     return code
   }
 
-  createRoom(hostSocketId: string, userId: string, deckId: string, color: 'white' | 'black'): Room {
+  createRoom(hostSocketId: string, userId: string, deckId: string, color: 'white' | 'black', username?: string, picture?: string, rating?: number): Room {
     const code = this.generateRoomCode()
     const matchId = `match-${Date.now()}`
 
@@ -429,7 +432,7 @@ export class GameManager {
       code,
       matchId,
       hostSocketId,
-      host: { userId, deckId, color },
+      host: { userId, deckId, color, username, picture, rating },
       status: 'waiting',
       createdAt: Date.now(),
     }
@@ -440,7 +443,7 @@ export class GameManager {
     return room
   }
 
-  joinRoom(roomCode: string, guestSocketId: string, userId: string, deckId: string): {
+  joinRoom(roomCode: string, guestSocketId: string, userId: string, deckId: string, username?: string, picture?: string, rating?: number): {
     success: boolean
     room?: Room
     error?: string
@@ -463,7 +466,7 @@ export class GameManager {
     const guestColor: 'white' | 'black' = room.host.color === 'white' ? 'black' : 'white'
 
     room.guestSocketId = guestSocketId
-    room.guest = { userId, deckId, color: guestColor }
+    room.guest = { userId, deckId, color: guestColor, username, picture, rating }
     room.status = 'ready'
 
     // Create a match for this room
@@ -472,8 +475,8 @@ export class GameManager {
       id: room.matchId,
       player1SocketId: room.hostSocketId,
       player2SocketId: guestSocketId,
-      player1: { userId: room.host.userId, deckId: room.host.deckId },
-      player2: { userId, deckId },
+      player1: { userId: room.host.userId, deckId: room.host.deckId, username: room.host.username, picture: room.host.picture, rating: room.host.rating },
+      player2: { userId, deckId, username, picture, rating },
       player1Color: room.host.color,
       player2Color: guestColor,
       gameState: this.initializeGame(),

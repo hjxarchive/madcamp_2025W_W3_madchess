@@ -11,10 +11,10 @@ export function setupSocketHandlers(io: Server) {
     // ===== 방 시스템 이벤트 =====
 
     // 방 생성
-    socket.on('create-room', (data: { userId: string; deckId: string; color: 'white' | 'black' }) => {
+    socket.on('create-room', (data: { userId: string; deckId: string; color: 'white' | 'black'; username?: string; picture?: string; rating?: number }) => {
       console.log(`🏠 User ${data.userId} creating room...`)
 
-      const room = gameManager.createRoom(socket.id, data.userId, data.deckId, data.color)
+      const room = gameManager.createRoom(socket.id, data.userId, data.deckId, data.color, data.username, data.picture, data.rating)
 
       // 방 생성 성공 응답
       socket.emit('room-created', {
@@ -26,10 +26,10 @@ export function setupSocketHandlers(io: Server) {
     })
 
     // 방 참가
-    socket.on('join-room', (data: { roomCode: string; userId: string; deckId: string }) => {
+    socket.on('join-room', (data: { roomCode: string; userId: string; deckId: string; username?: string; picture?: string; rating?: number }) => {
       console.log(`🚪 User ${data.userId} joining room ${data.roomCode}...`)
 
-      const result = gameManager.joinRoom(data.roomCode, socket.id, data.userId, data.deckId)
+      const result = gameManager.joinRoom(data.roomCode, socket.id, data.userId, data.deckId, data.username, data.picture, data.rating)
 
       if (result.success && result.room) {
         // Socket을 matchId room에 join (실시간 동기화용)
@@ -84,9 +84,9 @@ export function setupSocketHandlers(io: Server) {
     // ===== 기존 큐 시스템 이벤트 (유지) =====
 
     // Join game queue
-    socket.on('join-queue', (data: { userId: string; deckId: string; timeControl?: string }) => {
-      console.log(`User ${data.userId} joined queue (${data.timeControl})`)
-      gameManager.addToQueue(socket.id, data.userId, data.deckId, data.timeControl)
+    socket.on('join-queue', (data: { userId: string; deckId: string; timeControl?: string; username?: string; picture?: string; rating?: number }) => {
+      console.log(`User ${data.userId} (${data.username}) joined queue (${data.timeControl})`)
+      gameManager.addToQueue(socket.id, data.userId, data.deckId, data.timeControl, data.username, data.picture, data.rating)
 
       // Try to match players
       const match = gameManager.tryMatchPlayers()
@@ -312,6 +312,56 @@ export function setupSocketHandlers(io: Server) {
         gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner as 'white' | 'black', 'resignation', pgn)
       } else {
         console.log(`❌ Match not found: ${data.matchId}`)
+      }
+    })
+
+    // Timeout - 시간 초과 패배
+    socket.on('timeout', (data: { matchId: string; loserColor?: 'white' | 'black' }) => {
+      console.log(`⏰ Timeout reported by ${socket.id} in match ${data.matchId}`)
+
+      const match = gameManager.getMatch(data.matchId)
+      if (match) {
+        // loserColor가 지정되면 그 색상이 패배, 아니면 보낸 플레이어가 패배
+        let timedOutColor: 'white' | 'black'
+        if (data.loserColor) {
+          timedOutColor = data.loserColor
+        } else {
+          timedOutColor = match.player1SocketId === socket.id
+            ? match.player1Color
+            : match.player2Color
+        }
+
+        // 서버 시간 검증: 해당 색상의 남은 시간이 실제로 0 이하인지 확인
+        const remainingTime = timedOutColor === 'white' ? match.whiteTime : match.blackTime
+        if (match.lastMoveTime) {
+          const elapsed = Date.now() - match.lastMoveTime
+          const currentTurnColor = match.gameState.currentTurn
+          // 현재 턴인 플레이어의 시간만 차감됨
+          if (currentTurnColor === timedOutColor) {
+            const actualRemaining = remainingTime - elapsed
+            if (actualRemaining > 1000) {
+              // 1초 이상 남아있으면 타임아웃 거부 (네트워크 지연 감안)
+              console.log(`❌ Timeout rejected: ${timedOutColor} has ${actualRemaining}ms remaining`)
+              return
+            }
+          }
+        }
+
+        const winner = timedOutColor === 'white' ? 'black' : 'white'
+        console.log(`🏆 Timeout: ${timedOutColor} lost, ${winner} wins`)
+
+        io.to(data.matchId).emit('game-over', {
+          winner,
+          reason: 'timeout',
+        })
+
+        // DB에 게임 결과 저장
+        const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
+        const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
+        const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
+        const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
+        const pgn = gameManager.getMatchPGN(data.matchId)
+        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner as 'white' | 'black', 'timeout', pgn)
       }
     })
 

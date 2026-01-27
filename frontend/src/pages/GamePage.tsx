@@ -165,24 +165,49 @@ export default function GamePage() {
         })
       }
 
-      // gameStore 업데이트
+      // 내 정보 (auth store에서)
+      const myUserId = user?.id ? String(user.id) : 'me'
+      const myUsername = user?.name || 'You'
+      const myRating = user?.rating || 1500
+      const myPicture = user?.picture
 
+      // 상대 정보 (sessionStorage에서)
+      const opponentInfoStr = sessionStorage.getItem('opponentInfo')
+      let opponentUsername = 'Opponent'
+      let opponentRating = 1500
+      let opponentUserId = 'opponent'
+      let opponentDeckId = 'deck-2'
+      let opponentPicture: string | undefined
+
+      if (opponentInfoStr) {
+        try {
+          const opponentInfo = JSON.parse(opponentInfoStr)
+          opponentUsername = opponentInfo.username || opponentInfo.name || 'Opponent'
+          opponentRating = opponentInfo.rating || 1500
+          opponentUserId = opponentInfo.userId || 'opponent'
+          opponentDeckId = opponentInfo.deckId || 'deck-2'
+          opponentPicture = opponentInfo.picture
+        } catch (e) {
+          console.error('Failed to parse opponent info:', e)
+        }
+        sessionStorage.removeItem('opponentInfo')
+      }
+
+      const currentColor = savedColor || myColor
+
+      const whitePlayer = currentColor === 'white'
+        ? { userId: myUserId, username: myUsername, rating: myRating, deckId: 'deck-1', color: 'white' as const, picture: myPicture }
+        : { userId: opponentUserId, username: opponentUsername, rating: opponentRating, deckId: opponentDeckId, color: 'white' as const, picture: opponentPicture }
+
+      const blackPlayer = currentColor === 'black'
+        ? { userId: myUserId, username: myUsername, rating: myRating, deckId: 'deck-1', color: 'black' as const, picture: myPicture }
+        : { userId: opponentUserId, username: opponentUsername, rating: opponentRating, deckId: opponentDeckId, color: 'black' as const, picture: opponentPicture }
+
+      // gameStore 업데이트
       setGameState({
         roomId: gameId || 'test-room',
-        white: {
-          userId: 'white-player',
-          username: 'White Player',
-          rating: 1500,
-          deckId: 'deck-1',
-          color: 'white',
-        },
-        black: {
-          userId: 'black-player',
-          username: 'Black Player',
-          rating: 1500,
-          deckId: 'deck-2',
-          color: 'black',
-        },
+        white: whitePlayer,
+        black: blackPlayer,
         board: newBoard,
         currentTurn: 'white',
         moveCount: 0,
@@ -937,6 +962,24 @@ export default function GamePage() {
     }
   }, [])
 
+  // 시간 초과 처리
+  const handleMyTimeout = () => {
+    if (gameOverData) return // 이미 게임 종료 상태면 무시
+    console.log(`My time out! (${myColor}) Reporting to server...`)
+    if (gameState) {
+      socketService.reportTimeout(gameState.roomId, myColor)
+    }
+  }
+
+  const handleOpponentTimeout = () => {
+    if (gameOverData) return
+    const oppColor = myColor === 'white' ? 'black' : 'white'
+    console.log(`Opponent time out! (${oppColor}) Reporting to server...`)
+    if (gameState) {
+      socketService.reportTimeout(gameState.roomId, oppColor)
+    }
+  }
+
   // 시간 포맷팅 (mm:ss)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -1014,7 +1057,8 @@ export default function GamePage() {
               <span className="text-2xl">
                 {gameOverData.winner === 'draw' ? '🤝' :
                   gameOverData.reason === 'checkmate' ? '👑' :
-                    gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
+                    gameOverData.reason === 'timeout' ? '⏰' :
+                      gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
               </span>
             </div>
             <h2 className="text-3xl font-serif mb-3 font-bold">
@@ -1024,10 +1068,11 @@ export default function GamePage() {
             <p className="text-base text-gray-400 mb-6">
               by {gameOverData.reason === 'resignation' ? 'resignation' :
                 gameOverData.reason === 'checkmate' ? 'checkmate' :
-                  gameOverData.reason === 'stalemate' ? 'stalemate' :
-                    gameOverData.reason === 'placement' ? 'placement advantage' :
-                      gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
-                        gameOverData.reason}
+                  gameOverData.reason === 'timeout' ? 'timeout' :
+                    gameOverData.reason === 'stalemate' ? 'stalemate' :
+                      gameOverData.reason === 'placement' ? 'placement advantage' :
+                        gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
+                          gameOverData.reason}
             </p>
             <button
               onClick={() => navigate('/')}
@@ -1224,6 +1269,7 @@ export default function GamePage() {
                 <Timer
                   initialTime={myColor === 'white' ? blackTime : whiteTime}
                   isActive={!gameOverData && gameState?.currentTurn === (myColor === 'white' ? 'black' : 'white')}
+                  onTimeout={handleOpponentTimeout}
                 />
               </div>
             </div>
@@ -1390,7 +1436,7 @@ export default function GamePage() {
                   <Timer
                     initialTime={myColor === 'white' ? whiteTime : blackTime}
                     isActive={!gameOverData && gameState?.currentTurn === myColor}
-                    onTimeout={() => console.log('My time out!')}
+                    onTimeout={handleMyTimeout}
                   />
                 </div>
               </div>

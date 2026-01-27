@@ -33,11 +33,10 @@ class SocketService {
   }
 
   // 게임 큐에 참가
-  // 게임 큐에 참가
-  joinQueue(userId: string, deckId: string, timeControl?: string) {
+  joinQueue(userId: string, deckId: string, timeControl?: string, username?: string, picture?: string, rating?: number) {
     if (this.socket) {
-      this.socket.emit('join-queue', { userId, deckId, timeControl })
-      console.log('Joined queue:', { userId, deckId, timeControl })
+      this.socket.emit('join-queue', { userId, deckId, timeControl, username, picture, rating })
+      console.log('Joined queue:', { userId, deckId, timeControl, username })
     }
   }
 
@@ -50,18 +49,18 @@ class SocketService {
   }
 
   // 방 생성
-  createRoom(userId: string, deckId: string, color: 'white' | 'black') {
+  createRoom(userId: string, deckId: string, color: 'white' | 'black', username?: string, picture?: string, rating?: number) {
     if (this.socket) {
-      this.socket.emit('create-room', { userId, deckId, color })
-      console.log('Creating room:', { userId, deckId, color })
+      this.socket.emit('create-room', { userId, deckId, color, username, picture, rating })
+      console.log('Creating room:', { userId, deckId, color, username })
     }
   }
 
   // 방 참가
-  joinRoom(roomCode: string, userId: string, deckId: string) {
+  joinRoom(roomCode: string, userId: string, deckId: string, username?: string, picture?: string, rating?: number) {
     if (this.socket) {
-      this.socket.emit('join-room', { roomCode, userId, deckId })
-      console.log('Joining room:', { roomCode, userId, deckId })
+      this.socket.emit('join-room', { roomCode, userId, deckId, username, picture, rating })
+      console.log('Joining room:', { roomCode, userId, deckId, username })
     }
   }
 
@@ -128,6 +127,14 @@ class SocketService {
     if (this.socket) {
       this.socket.emit('offer-draw', { matchId })
       console.log('🤝 Draw offered:', { matchId })
+    }
+  }
+
+  // 시간 초과 알림
+  reportTimeout(matchId: string, loserColor?: 'white' | 'black') {
+    if (this.socket) {
+      this.socket.emit('timeout', { matchId, loserColor })
+      console.log('Timeout reported:', { matchId, loserColor })
     }
   }
 

@@ -56,7 +56,10 @@ export default function MatchmakingPage() {
       if (data.yourColor) {
         sessionStorage.setItem('selectedColor', data.yourColor)
       }
-      // opponent info is in data.opponent
+      // Store opponent info for GamePage
+      if (data.opponent) {
+        sessionStorage.setItem('opponentInfo', JSON.stringify(data.opponent))
+      }
       navigate(`/placement/${data.matchId}`)
     })
 
@@ -74,6 +77,10 @@ export default function MatchmakingPage() {
       // 상대가 참가했으면 배치 페이지로 이동
       sessionStorage.setItem('selectedColor', selectedColor!)
       sessionStorage.setItem('matchId', data.matchId)
+      // Store opponent (guest) info
+      if (data.guest) {
+        sessionStorage.setItem('opponentInfo', JSON.stringify(data.guest))
+      }
       navigate(`/placement/${data.matchId}`)
     })
 
@@ -84,6 +91,10 @@ export default function MatchmakingPage() {
       const myColor = data.room.guest.color
       sessionStorage.setItem('selectedColor', myColor)
       sessionStorage.setItem('matchId', data.matchId)
+      // Store opponent (host) info
+      if (data.room.host) {
+        sessionStorage.setItem('opponentInfo', JSON.stringify(data.room.host))
+      }
       navigate(`/placement/${data.matchId}`)
     })
 
@@ -118,7 +129,7 @@ export default function MatchmakingPage() {
     const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
     const deckId = 'default-deck'
 
-    socketService.createRoom(userId, deckId, selectedColor)
+    socketService.createRoom(userId, deckId, selectedColor, user?.name, user?.picture, user?.rating)
   }
 
   const handleJoinRoom = () => {
@@ -130,14 +141,14 @@ export default function MatchmakingPage() {
     const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
     const deckId = 'default-deck'
 
-    socketService.joinRoom(inputRoomCode.trim().toUpperCase(), userId, deckId)
+    socketService.joinRoom(inputRoomCode.trim().toUpperCase(), userId, deckId, user?.name, user?.picture, user?.rating)
   }
 
   const handleQuickMatch = () => {
     setIsQueueing(true)
     const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
     const deckId = 'default-deck'
-    socketService.joinQueue(userId, deckId, selectedTime)
+    socketService.joinQueue(userId, deckId, selectedTime, user?.name, user?.picture, user?.rating)
   }
 
   const handleCancelQueue = () => {
