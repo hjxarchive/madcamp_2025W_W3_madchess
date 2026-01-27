@@ -76,25 +76,25 @@ export const createDeck = async (req: Request, res: Response) => {
     res.status(201).json({ success: true, data: result });
   } catch (err: any) {
     if (err.message === 'KING_REQUIRED') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: { code: 'KING_REQUIRED', message: '킹은 필수입니다.' }
       });
     }
     if (err.message === 'BUDGET_EXCEEDED') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: { code: 'BUDGET_EXCEEDED', message: '예산(30)을 초과했습니다.' }
       });
     }
     if (err.message === 'PIECE_COUNT_EXCEEDED') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: { code: 'PIECE_COUNT_EXCEEDED', message: '기물 개수를 초과했습니다.' }
       });
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -164,12 +164,12 @@ export const getUserDecks = async (req: Request, res: Response) => {
     const userId = parseInt(req.params.userId);
     const sort = req.query.sort as string;
     const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-    
+
     const data = await deckService.getUserDecks(userId, sort, limit);
     res.json({ success: true, data });
   } catch (err: any) {
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -238,13 +238,13 @@ export const getDeckById = async (req: Request, res: Response) => {
     res.json({ success: true, data });
   } catch (err: any) {
     if (err.message === 'DECK_NOT_FOUND') {
-      return res.status(404).json({ 
-        success: false, 
+      return res.status(404).json({
+        success: false,
         error: { code: 'DECK_NOT_FOUND', message: '덱을 찾을 수 없습니다.' }
       });
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -291,25 +291,25 @@ export const updateDeck = async (req: Request, res: Response) => {
     res.json({ success: true, data: result });
   } catch (err: any) {
     if (err.message === 'DECK_NOT_FOUND') {
-      return res.status(404).json({ 
-        success: false, 
+      return res.status(404).json({
+        success: false,
         error: { code: 'DECK_NOT_FOUND', message: '덱을 찾을 수 없습니다.' }
       });
     }
     if (err.message === 'KING_REQUIRED') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: { code: 'KING_REQUIRED', message: '킹은 필수입니다.' }
       });
     }
     if (err.message === 'BUDGET_EXCEEDED') {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: { code: 'BUDGET_EXCEEDED', message: '예산(30)을 초과했습니다.' }
       });
     }
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -354,19 +354,25 @@ export const deleteDeck = async (req: Request, res: Response) => {
   try {
     const deckId = parseInt(req.params.deckId);
     await deckService.removeDeck(deckId);
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: { message: '덱이 삭제되었습니다' }
     });
   } catch (err: any) {
     if (err.message === 'DECK_NOT_FOUND') {
-      return res.status(404).json({ 
-        success: false, 
+      return res.status(404).json({
+        success: false,
         error: { code: 'DECK_NOT_FOUND', message: '덱을 찾을 수 없습니다.' }
       });
     }
-    res.status(500).json({ 
-      success: false, 
+    if (err.message === 'DECK_IN_USE') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'DECK_IN_USE', message: '게임 기록이 있는 덱은 삭제할 수 없습니다.' }
+      });
+    }
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }
@@ -427,8 +433,8 @@ export const validateDeck = async (req: Request, res: Response) => {
     const result = await deckService.validateDeck(req.body.composition);
     res.json({ success: true, data: result });
   } catch (err: any) {
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: { code: 'DATABASE_ERROR', message: 'Server Error' }
     });
   }

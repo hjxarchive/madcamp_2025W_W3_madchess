@@ -250,7 +250,12 @@ export default function DeckBuilderPage() {
       const decksRes = await getUserDecks(user.id)
       if (decksRes?.success && decksRes.data) setSavedDecks(decksRes.data)
     } catch (err: any) {
-      setError('Failed to delete deck')
+      const serverError = err.response?.data?.error
+      if (serverError) {
+        setError(serverError.message)
+      } else {
+        setError('Failed to delete deck')
+      }
     }
   }
 

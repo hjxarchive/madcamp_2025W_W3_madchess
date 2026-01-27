@@ -281,7 +281,10 @@ export const updateDeck = async (deckId: number, dto: UpdateDeckDto): Promise<De
 export const removeDeck = async (deckId: number) => {
   try {
     return await deckRepo.deleteDeck(deckId);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2003') {
+      throw new Error('DECK_IN_USE');
+    }
     throw new Error('DECK_NOT_FOUND');
   }
 };
