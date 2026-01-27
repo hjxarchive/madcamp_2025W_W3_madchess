@@ -777,21 +777,8 @@ export class GameManager {
       rating: rating || 1200
     }
 
-    // Standard Chess Placement for AI
-    const aiPlacement = []
-    const pieces = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
-
-    // Determine AI ranks based on its color
-    const majorRank = player2Color === 'white' ? 1 : 8
-    const pawnRank = player2Color === 'white' ? 2 : 7
-
-    for (let i = 0; i < 8; i++) {
-      const file = String.fromCharCode(97 + i) // a,b,c...
-      // Major pieces
-      aiPlacement.push({ type: pieces[i], file, rank: majorRank })
-      // Pawns
-      aiPlacement.push({ type: 'p', file, rank: pawnRank })
-    }
+    // Generate Fair AI Placement (Max 30 points)
+    const aiPlacement = this.generateFairAiPlacement(player2Color)
 
     const match: Match = {
       id: matchId,
@@ -833,6 +820,67 @@ export class GameManager {
 
     this.matches.set(matchId, match)
     return match
+  }
+
+  /**
+   * Generates a random piece placement for AI respecting the 30-point cost limit.
+   */
+  private generateFairAiPlacement(color: 'white' | 'black'): Array<{ type: string; file: string; rank: number }> {
+    const COST_LIMIT = 30
+    const MAX_PIECES = 16
+    const costs: { [key: string]: number } = { 'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9 }
+    const fileMap = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+
+    // Available slots: Rank 1 & 2 for White, Rank 8 & 7 for Black
+    const slots: Array<{ file: string; rank: number }> = []
+    const majorRank = color === 'white' ? 1 : 8
+    const pawnRank = color === 'white' ? 2 : 7
+
+    for (let i = 0; i < 8; i++) {
+      slots.push({ file: fileMap[i], rank: majorRank })
+      slots.push({ file: fileMap[i], rank: pawnRank })
+    }
+
+    // Shuffle slots
+    for (let i = slots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slots[i], slots[j]] = [slots[j], slots[i]];
+    }
+
+    const queens = []
+    // Always start with a King
+    const kingSlot = slots.pop()!
+    const placement = [{ type: 'k', file: kingSlot.file, rank: kingSlot.rank }]
+    let currentCost = 0
+
+    // Possible pieces to buy
+    const shop = ['p', 'n', 'b', 'r', 'q']
+
+    // Strategy: Ensure at least some minor pieces first, then fill with random
+    // Guarantee 2 pawns, 1 knight, 1 bishop (Cost: 1+1+3+3 = 8)
+    const guaranteed = ['p', 'p', 'n', 'b']
+    for (const p of guaranteed) {
+      if (slots.length > 0) {
+        const slot = slots.pop()!
+        placement.push({ type: p, file: slot.file, rank: slot.rank })
+        currentCost += costs[p]
+      }
+    }
+
+    // Fill remaining points with random selections
+    while (currentCost < COST_LIMIT && slots.length > 0) {
+      // Filter affordable pieces
+      const affordable = shop.filter(p => currentCost + costs[p] <= COST_LIMIT)
+      if (affordable.length === 0) break
+
+      const pick = affordable[Math.floor(Math.random() * affordable.length)]
+      const slot = slots.pop()!
+
+      placement.push({ type: pick, file: slot.file, rank: slot.rank })
+      currentCost += costs[pick]
+    }
+
+    return placement
   }
 
   createRoom(hostSocketId: string, userId: string, deckId: string, color: 'white' | 'black', username?: string, picture?: string, rating?: number): Room {
