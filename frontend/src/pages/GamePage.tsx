@@ -47,7 +47,7 @@ function CapturedBar({
           pieces.map((piece, idx) => (
             <div
               key={`${piece}-${idx}`}
-              className="w-8 h-8 bg-gray-800/50 rounded grid place-items-center"
+              className="w-8 h-8 bg-gray-400 rounded grid place-items-center"
             >
               <img
                 src={PIECE_IMAGES[pieceColor][piece]}
@@ -92,6 +92,16 @@ export default function GamePage() {
   // Draw offer state
   const [showDrawOffer, setShowDrawOffer] = useState(false)
   const [drawOfferPending, setDrawOfferPending] = useState(false)
+
+  // Game history state - stores board state (FEN-like) for each move
+  const [moveHistory, setMoveHistory] = useState<Array<{
+    board: (Piece | null)[][];
+    pgn: string;
+    moveIndex: number;
+  }>>([])  // 각 수에 대한 보드 상태 저장
+  const [viewingMoveIndex, setViewingMoveIndex] = useState<number>(-1)  // -1 = 최신 상태, 0+ = 해당 수의 보드 상태
+  const [isViewingHistory, setIsViewingHistory] = useState(false)  // 히스토리 모드 여부
+  const [showCurrentMessage, setShowCurrentMessage] = useState(false)  // "Current" 메시지 표시 여부
 
   // Ref for myColor to access in socket callbacks without closure issues
   const myColorRef = useRef<PieceColor>(myColor)
@@ -185,6 +195,15 @@ export default function GamePage() {
 
       console.log('Loaded board:', newBoard)
       console.log('My color:', savedColor || myColor)
+
+      // 초기 보드 상태를 히스토리에 저장 (moveIndex 0 = 게임 시작 상태)
+      const initialBoardCopy = newBoard.map(row => row.map(cell => cell ? { ...cell } : null))
+      setMoveHistory([{
+        board: initialBoardCopy,
+        pgn: '',
+        moveIndex: 0
+      }])
+      console.log('📚 Saved initial board state to history')
 
       // 사용한 데이터는 제거 (한 번만 사용)
       sessionStorage.removeItem('placedPieces')
@@ -297,6 +316,10 @@ export default function GamePage() {
       // Apply server-confirmed move
       applyOpponentMove(data.move)
 
+      // 히스토리 보기 모드에서 벗어나기 (상대가 수를 두면 최신 상태로)
+      setIsViewingHistory(false)
+      setViewingMoveIndex(-1)
+
       // 다음 턴 합법수 재요청을 위해 플래그 리셋
       setHasLegalMovesResponse(false)
       setServerLegalMoves([])
@@ -346,9 +369,18 @@ export default function GamePage() {
     }
 
     // 합법수 응답
-    const handleLegalMoves = (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }> }) => {
+    const handleLegalMoves = (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }>; gameState?: { isCheck: boolean; isCheckmate: boolean; isStalemate: boolean } }) => {
       setServerLegalMoves(data.legalMoves || [])
       setHasLegalMovesResponse(true)
+      
+      // 체크 상태 업데이트
+      if (data.gameState && gameState) {
+        console.log(`♟️ Game state received - Check: ${data.gameState.isCheck}, Checkmate: ${data.gameState.isCheckmate}, Stalemate: ${data.gameState.isStalemate}`)
+        setGameState({
+          ...gameState,
+          isCheck: data.gameState.isCheck
+        })
+      }
     }
 
     const handleLegalMovesError = (data: { message: string }) => {
@@ -391,6 +423,47 @@ export default function GamePage() {
       socketService.offLegalMovesError()
     }
   }, []) // 빈 배열: 한 번만 등록
+
+  // PGN이 업데이트될 때마다 보드 상태를 히스토리에 저장
+  useEffect(() => {
+    if (!gameState?.board || !gameState?.pgn) return
+    
+    const currentMoveCount = gameState.moveCount
+    
+    // 이미 저장된 수인지 확인
+    const existingEntry = moveHistory.find(h => h.moveIndex === currentMoveCount)
+    if (existingEntry) return
+    
+    // 새로운 보드 상태 저장 (deep copy)
+    const boardCopy = gameState.board.map(row => row.map(cell => cell ? { ...cell } : null))
+    
+    setMoveHistory(prev => [
+      ...prev,
+      {
+        board: boardCopy,
+        pgn: gameState.pgn,
+        moveIndex: currentMoveCount
+      }
+    ])
+    
+    console.log(`📚 Saved board state for move ${currentMoveCount}`)
+  }, [gameState?.pgn, gameState?.moveCount])
+
+  // 게임 시작 시 초기 체크 상태 확인 (배치 완료 후)
+  useEffect(() => {
+    if (gameState && gameState.moveCount === 0 && gameState.roomId) {
+      // 게임이 막 시작되었을 때 (moveCount === 0)
+      // 백의 턴이므로 백이 체크 상태인지 확인
+      console.log('🎮 Game started, checking initial check state')
+      
+      // 약간의 지연 후 체크 상태 확인 (배치가 완료된 후)
+      setTimeout(() => {
+        if (gameState.currentTurn === myColor) {
+          socketService.requestLegalMoves(gameState.roomId)
+        }
+      }, 500)
+    }
+  }, [gameState?.roomId, gameState?.moveCount])
 
   // 내 턴이 시작될 때 합법수 요청
   useEffect(() => {
@@ -524,7 +597,70 @@ export default function GamePage() {
   const opponent = myColor === 'white' ? gameState.black : gameState.white
   const me = myColor === 'white' ? gameState.white : gameState.black
 
+  // 히스토리 네비게이션 함수들
+  const goToPreviousMove = () => {
+    if (moveHistory.length === 0) return
+    
+    if (!isViewingHistory) {
+      // 처음 히스토리 모드 진입: 마지막 수에서 하나 이전으로
+      const lastIndex = moveHistory.length - 2
+      if (lastIndex >= 0) {
+        setIsViewingHistory(true)
+        setViewingMoveIndex(lastIndex)
+      }
+    } else {
+      // 이미 히스토리 모드: 이전 수로
+      if (viewingMoveIndex > 0) {
+        setViewingMoveIndex(viewingMoveIndex - 1)
+      }
+    }
+  }
+
+  const goToNextMove = () => {
+    if (!isViewingHistory) return
+    
+    const nextIndex = viewingMoveIndex + 1
+    if (nextIndex >= moveHistory.length - 1) {
+      // 최신 상태로 돌아감
+      setIsViewingHistory(false)
+      setViewingMoveIndex(-1)
+      
+      // "Current" 메시지 표시
+      setShowCurrentMessage(true)
+      setTimeout(() => setShowCurrentMessage(false), 1000)
+    } else {
+      setViewingMoveIndex(nextIndex)
+    }
+  }
+
+  const goToLatestMove = () => {
+    setIsViewingHistory(false)
+    setViewingMoveIndex(-1)
+    
+    // "Current" 메시지 표시
+    setShowCurrentMessage(true)
+    setTimeout(() => setShowCurrentMessage(false), 1000)
+  }
+
+  const goToFirstMove = () => {
+    if (moveHistory.length > 0) {
+      setIsViewingHistory(true)
+      setViewingMoveIndex(0)
+    }
+  }
+
+  // 현재 표시할 보드 결정
+  const displayBoard = isViewingHistory && viewingMoveIndex >= 0 && viewingMoveIndex < moveHistory.length
+    ? moveHistory[viewingMoveIndex].board
+    : gameState?.board || []
+
   const handleMove = (move: Move) => {
+    // 히스토리 보기 모드에서는 수를 둘 수 없음
+    if (isViewingHistory) {
+      console.log('Cannot move while viewing history')
+      return
+    }
+
     // Prevent moves if game is over
     if (gameOverData || gameState?.status !== 'playing') {
       console.log('Game is over, move prevented')
@@ -722,11 +858,9 @@ export default function GamePage() {
   const handleResign = () => {
     if (confirm('정말 기권하시겠습니까?')) {
       if (gameState) {
-        // 기권 처리: 상대가 승리
-        const winner = myColor === 'white' ? 'black' : 'white'
+        // 기권 처리: 서버에서 game-over 이벤트를 통해 승자 결정
         socketService.resign(gameState.roomId)
-        setGameOverData({ winner, reason: 'resignation' })
-        console.log('🏳️ Player resigned')
+        console.log('🏳️ Player resigned, waiting for server confirmation')
       }
     }
   }
@@ -842,15 +976,23 @@ export default function GamePage() {
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
           <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-md w-full mx-4 text-center">
             <div className="w-12 h-12 mx-auto mb-4 bg-[#D4FF00] flex items-center justify-center">
-              <span className="text-2xl">{gameOverData.reason === 'checkmate' ? '👑' : '🤝'}</span>
+              <span className="text-2xl">
+                {gameOverData.winner === 'draw' ? '🤝' : 
+                 gameOverData.reason === 'checkmate' ? '👑' : 
+                 gameOverData.reason === 'placement' ? '⚡' : '🏳️'}
+              </span>
             </div>
-            <h2 className="text-2xl font-serif mb-2">
-              {gameOverData.reason === 'checkmate' ? 'CHECKMATE' : 'GAME OVER'}
+            <h2 className="text-3xl font-serif mb-3 font-bold">
+              {gameOverData.winner === 'draw' ? 'DRAW!' : 
+               gameOverData.winner === 'white' ? 'WHITE won!' : 'BLACK won!'}
             </h2>
-            <p className="text-lg text-gray-400 mb-6">
-              {gameOverData.winner === 'draw'
-                ? `Game ended in ${gameOverData.reason}`
-                : gameOverData.winner === myColor ? 'Victory!' : 'Defeat'}
+            <p className="text-base text-gray-400 mb-6">
+              by {gameOverData.reason === 'resignation' ? 'resignation' :
+                  gameOverData.reason === 'checkmate' ? 'checkmate' :
+                  gameOverData.reason === 'stalemate' ? 'stalemate' :
+                  gameOverData.reason === 'placement' ? 'placement advantage' :
+                  gameOverData.reason === 'mutual agreement' ? 'mutual agreement' :
+                  gameOverData.reason}
             </p>
             <button
               onClick={() => navigate('/')}
@@ -950,26 +1092,44 @@ export default function GamePage() {
         <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6">
           {/* 왼쪽: 체스판 */}
           <div className="flex flex-col gap-4">
-            <div className="inline-block">
+            <div className="inline-block relative">
               <ChessBoard
-                board={gameState?.board || []}
+                board={displayBoard}
                 currentTurn={gameState?.currentTurn || 'white'}
                 myColor={myColor}
                 isMyTurn={gameState?.currentTurn === myColor}
-                lastMove={gameState?.lastMove}
-                isCheck={isCheck || gameState?.isCheck || false}
+                lastMove={isViewingHistory ? undefined : gameState?.lastMove}
+                isCheck={isViewingHistory ? false : (isCheck || gameState?.isCheck || false)}
                 onMove={handleMove}
                 useImages={useImages}
                 fetchLegalMoves={fetchLegalMovesFromServer}
-                castlingOptions={castlingOptions}
+                castlingOptions={isViewingHistory ? [] : castlingOptions}
               />
+              {/* 히스토리 보기 모드 표시 */}
+              {isViewingHistory && (
+                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-yellow-600/90 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded">
+                  Move {viewingMoveIndex + 1} / {moveHistory.length}
+                </div>
+              )}
+              {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
+              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${
+                showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+              }`}>
+                Current
+              </div>
             </div>
 
             {/* 하단 버튼 */}
-            {gameState?.currentTurn === myColor && !gameOverData && (
-              <div className="border border-[#D4FF00] bg-[#D4FF00]/5 p-4">
-                <div className="text-sm font-serif text-[#D4FF00] mb-3 text-center">
-                  YOUR TURN
+            {!gameOverData && (
+              <div className={`border p-4 ${isViewingHistory ? 'border-yellow-600 bg-yellow-600/5' : gameState?.currentTurn === myColor ? 'border-[#D4FF00] bg-[#D4FF00]/5' : 'border-gray-800 bg-gray-900/30'}`}>
+                <div className="text-sm font-serif mb-3 text-center">
+                  {isViewingHistory ? (
+                    <span className="text-yellow-500">VIEWING HISTORY - <button onClick={goToLatestMove} className="underline hover:text-white">Return to game</button></span>
+                  ) : gameState?.currentTurn === myColor ? (
+                    <span className="text-[#D4FF00]">YOUR TURN</span>
+                  ) : (
+                    <span className="text-gray-500">OPPONENT'S TURN</span>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -1034,25 +1194,125 @@ export default function GamePage() {
             {/* 대국 기록 */}
             <div className="flex-1 border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs uppercase tracking-widest text-gray-500">Move History</h2>
+                <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h2>
               </div>
+              
               <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-sm">
-                {parseMoves(gameState?.pgn || '').map((m, idx) => (
-                  <div
-                    key={idx}
-                    className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${idx === parseMoves(gameState?.pgn || '').length - 1 ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]' : 'hover:bg-gray-900'
+                {parseMoves(gameState?.pgn || '').map((m, idx) => {
+                  const whiteMoveIndex = idx * 2 + 1  // 백의 수는 홀수 인덱스 (1, 3, 5...)
+                  const blackMoveIndex = idx * 2 + 2  // 흑의 수는 짝수 인덱스 (2, 4, 6...)
+                  const totalMoves = parseMoves(gameState?.pgn || '').length
+                  const isLastMove = idx === totalMoves - 1
+                  
+                  // 현재 보고 있는 수 하이라이트
+                  const viewingWhite = isViewingHistory && moveHistory[viewingMoveIndex]?.moveIndex === whiteMoveIndex
+                  const viewingBlack = isViewingHistory && moveHistory[viewingMoveIndex]?.moveIndex === blackMoveIndex
+                  
+                  // 최신 수 하이라이트 (히스토리 모드가 아닐 때)
+                  const isLatestWhite = !isViewingHistory && isLastMove && !m.black
+                  const isLatestBlack = !isViewingHistory && isLastMove && m.black
+                  
+                  return (
+                    <div
+                      key={idx}
+                      className={`grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1.5 ${
+                        (isLatestWhite || isLatestBlack) && !isViewingHistory
+                          ? 'bg-[#D4FF00]/10 border-l-2 border-[#D4FF00]'
+                          : 'hover:bg-gray-900'
                       }`}
-                  >
-                    <span className="text-gray-600">{m.move}.</span>
-                    <span className="text-white">{m.white}</span>
-                    <span className="text-gray-400">{m.black || ''}</span>
-                  </div>
-                ))}
+                    >
+                      <span className="text-gray-600">{m.move}.</span>
+                      <span
+                        onClick={() => {
+                          const historyIndex = moveHistory.findIndex(h => h.moveIndex === whiteMoveIndex)
+                          if (historyIndex >= 0) {
+                            setIsViewingHistory(true)
+                            setViewingMoveIndex(historyIndex)
+                          }
+                        }}
+                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${
+                          viewingWhite
+                            ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
+                            : isLatestWhite
+                              ? 'text-[#D4FF00]'
+                              : 'text-white'
+                        }`}
+                      >
+                        {m.white}
+                      </span>
+                      <span
+                        onClick={() => {
+                          if (!m.black) return
+                          const historyIndex = moveHistory.findIndex(h => h.moveIndex === blackMoveIndex)
+                          if (historyIndex >= 0) {
+                            setIsViewingHistory(true)
+                            setViewingMoveIndex(historyIndex)
+                          }
+                        }}
+                        className={`cursor-pointer hover:text-[#D4FF00] transition-colors ${
+                          viewingBlack
+                            ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/20 px-1 -mx-1 rounded'
+                            : isLatestBlack
+                              ? 'text-[#D4FF00]'
+                              : 'text-gray-400'
+                        } ${m.black ? '' : 'cursor-default'}`}
+                      >
+                        {m.black || ''}
+                      </span>
+                    </div>
+                  )
+                })}
                 {!gameState?.pgn && (
                   <div className="text-center text-gray-600 py-8 text-xs uppercase tracking-widest">
                     No moves yet
                   </div>
                 )}
+              </div>
+              
+              {/* 히스토리 네비게이션 버튼 */}
+              <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-gray-900">
+                <button
+                  onClick={goToFirstMove}
+                  disabled={moveHistory.length === 0}
+                  className="p-1.5 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="처음으로"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M9.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <button
+                  onClick={goToPreviousMove}
+                  disabled={moveHistory.length === 0 || (isViewingHistory && viewingMoveIndex <= 0)}
+                  className="p-1.5 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="이전 수"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <button
+                  onClick={goToNextMove}
+                  disabled={!isViewingHistory}
+                  className="p-1.5 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="다음 수"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <button
+                  onClick={goToLatestMove}
+                  disabled={!isViewingHistory}
+                  className="p-1.5 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="최신으로"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 15.707a1 1 0 010-1.414L8.586 10 4.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
               </div>
             </div>
 

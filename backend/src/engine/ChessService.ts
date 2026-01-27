@@ -27,6 +27,11 @@ export class ChessService {
         blackQueenSide: false,
     }
 
+    /** Get current turn */
+    getTurn(): 'white' | 'black' {
+        return this.turn
+    }
+
     /** Snapshot engine state for reversible simulations */
     private createSnapshot() {
         return {
@@ -626,6 +631,19 @@ export class ChessService {
         console.log(`  ✅ Move completed. Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}, Draw: ${isDraw} ${drawReason ? `(${drawReason})` : ''}`)
 
         return { success: true, isCheck, isCheckmate, isStalemate, isDraw, drawReason }
+    }
+
+    /**
+     * Check current game state for check/checkmate without making a move
+     */
+    getCurrentGameState(): { isCheck: boolean; isCheckmate: boolean; isStalemate: boolean } {
+        const isCheck = this.isKingInCheck(this.turn)
+        const isCheckmate = isCheck && this.isCheckmate(this.turn)
+        const isStalemate = !isCheck && this.isStalemate(this.turn)
+        
+        console.log(`🔍 Current state check - Turn: ${this.turn}, Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}`)
+        
+        return { isCheck, isCheckmate, isStalemate }
     }
 
     /**

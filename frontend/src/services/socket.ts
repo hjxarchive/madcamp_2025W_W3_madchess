@@ -231,7 +231,7 @@ class SocketService {
   }
 
   // 합법수 응답
-  onLegalMoves(callback: (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }> }) => void) {
+  onLegalMoves(callback: (data: { legalMoves: Array<{ from: string; to: string; promotion?: string }>; gameState?: { isCheck: boolean; isCheckmate: boolean; isStalemate: boolean } }) => void) {
     if (this.socket) {
       this.socket.on('legal-moves', callback)
     }
