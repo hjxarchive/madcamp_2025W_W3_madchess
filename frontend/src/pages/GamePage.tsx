@@ -63,7 +63,7 @@ function CapturedBar({
   )
 }
 
-function EvalBar({ evaluation }: { evaluation: { type: 'cp' | 'mate', value: number } | null }) {
+export function EvalBar({ evaluation }: { evaluation: { type: 'cp' | 'mate', value: number } | null }) {
   if (!evaluation) return <div className="w-6 h-full bg-gray-800/50 rounded border border-gray-700"></div>
 
   let percent = 50

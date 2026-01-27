@@ -75,6 +75,10 @@ export class GameManager {
     return this.stockfishService.evaluate(fen)
   }
 
+  async analyzeFen(fen: string): Promise<{ type: 'cp' | 'mate', value: number, bestMove?: string }> {
+    return this.stockfishService.evaluate(fen)
+  }
+
   // ===== Spectator Methods =====
 
   /**

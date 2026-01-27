@@ -5,6 +5,8 @@ import ChessBoard from '../components/ChessBoard'
 import { useAuthStore } from '../stores/authStore'
 import type { Game } from '../types/api.types'
 import type { Move, Piece } from '../types/game'
+import { EvalBar } from './GamePage'
+import { socketService } from '../services/socket'
 
 export default function ReplayPage() {
   const { gameId } = useParams()
@@ -17,6 +19,7 @@ export default function ReplayPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isFlipped, setIsFlipped] = useState(false)
+  const [evalScore, setEvalScore] = useState<{ type: 'cp' | 'mate', value: number } | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Load data
@@ -99,7 +102,7 @@ export default function ReplayPage() {
           setIsPlaying(false)
           return prev
         })
-      }, 1000)
+      }, 2000) // 2 seconds per move
     } else if (timerRef.current) {
       clearInterval(timerRef.current)
     }
@@ -107,6 +110,33 @@ export default function ReplayPage() {
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [isPlaying, history.length])
+
+  // Analysis socket listener
+  useEffect(() => {
+    const socket = socketService.getSocket()
+    if (!socket) return
+
+    const handleAnalysis = (data: { type: 'cp' | 'mate', value: number }) => {
+      setEvalScore(data)
+    }
+
+    socket.on('analysis-result', handleAnalysis)
+    return () => {
+      socket.off('analysis-result', handleAnalysis)
+    }
+  }, [])
+
+  // Check for FEN and request analysis when index changes
+  useEffect(() => {
+    if (history[currentIndex]?.fen) {
+      const socket = socketService.getSocket()
+      if (socket) {
+        socket.emit('analyze-fen', { fen: history[currentIndex].fen })
+      }
+    } else {
+      setEvalScore(null)
+    }
+  }, [currentIndex, history])
 
   const handlePrev = () => {
     setCurrentIndex(prev => Math.max(0, prev - 1))
@@ -222,17 +252,24 @@ export default function ReplayPage() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-8 p-6">
-        <div className="relative">
-          <ChessBoard
-            board={displayBoard}
-            currentTurn={currentState.turn}
-            myColor={isFlipped ? 'black' : 'white'}
-            isMyTurn={false}
-            lastMove={displayLastMove}
-            onMove={() => { }}
-            isCheck={false} // TODO: Add check status to replay data
-            useImages={true}
-          />
+
+        {/* Helper Div for layout consistency with GamePage */}
+        <div className="flex gap-4">
+          <div className="h-[600px] pt-8 pb-8 shrink-0">
+            <EvalBar evaluation={evalScore} />
+          </div>
+          <div className="relative">
+            <ChessBoard
+              board={displayBoard}
+              currentTurn={currentState.turn}
+              myColor={isFlipped ? 'black' : 'white'}
+              isMyTurn={false}
+              lastMove={displayLastMove}
+              onMove={() => { }}
+              isCheck={false} // TODO: Add check status to replay data
+              useImages={true}
+            />
+          </div>
         </div>
 
         {/* Controls Panel */}

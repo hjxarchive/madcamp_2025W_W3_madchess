@@ -396,6 +396,18 @@ export function setupSocketHandlers(io: Server) {
       gameManager.removeFromQueue(socket.id)
     })
 
+    // Request FEN analysis (Stateless - used for Replay)
+    socket.on('analyze-fen', async (data: { fen: string }) => {
+      try {
+        if (!data.fen) return
+        const result = await gameManager.analyzeFen(data.fen)
+        socket.emit('analysis-result', result)
+      } catch (error: any) {
+        console.error('❌ FEN Analysis failed:', error)
+        socket.emit('analysis-error', { message: error.message || 'Analysis failed' })
+      }
+    })
+
     // ===== Spectator Events =====
 
     // Get list of live games
