@@ -543,25 +543,17 @@ export default function GamePage() {
     console.log(`📚 Saved board state for move ${currentMoveCount}`)
   }, [gameState?.pgn, gameState?.moveCount])
 
-  // 게임 시작 시 초기 체크 상태 확인 (배치 완료 후)
+  // 보드나 턴이 바뀔 때마다 합법수 선제 요청 (이동 지연 방지)
   useEffect(() => {
-    if (gameState && gameState.moveCount === 0 && gameState.roomId && gameState.roomId !== 'test-room') {
-      // 게임이 막 시작되었을 때 (moveCount === 0)
-      // 백의 턴이므로 백이 체크 상태인지 확인
-      console.log('🎮 Game started, checking initial check state')
-
-      // 약간의 지연 후 체크 상태 확인 (배치가 완료된 후)
-      setTimeout(() => {
-        if (gameState.currentTurn === myColor) {
-          socketService.requestLegalMoves(gameState.roomId)
-        }
-      }, 500)
+    if (gameState?.roomId && gameState?.status === 'playing' && gameState?.roomId !== 'test-room') {
+      console.log('📡 Proactively requesting legal moves for sync...')
+      socketService.requestLegalMoves(gameState.roomId)
     }
-  }, [gameState?.roomId, gameState?.moveCount])
+  }, [gameState?.board, gameState?.currentTurn, myColor])
 
-  // 내 턴이 시작될 때 합법수 요청
+  // 내 턴이 시작될 때 합법수 및 캐슬링 옵션 요청
   useEffect(() => {
-    if (gameState && gameState.currentTurn === myColor && !gameOverData && gameState.roomId !== 'test-room') {
+    if (gameState && gameState.currentTurn === myColor && !gameOverDataRef.current && gameState.roomId !== 'test-room') {
       console.log('🎯 My turn started, requesting legal moves and castling options')
       setHasLegalMovesResponse(false)
       setServerLegalMoves([])
@@ -570,7 +562,7 @@ export default function GamePage() {
       // 캐슬링 옵션 요청
       socketService.requestCastlingOptions(gameState.roomId, myColor)
     }
-  }, [gameState?.currentTurn, gameState?.roomId, myColor, gameOverData])
+  }, [gameState?.currentTurn, gameState?.roomId, myColor])
 
   // 내 턴이 시작될 때 스테일메이트/체크메이트 백업 판정
   // (서버 game-over 이벤트가 누락된 경우에만 작동)
@@ -746,10 +738,13 @@ export default function GamePage() {
     const storeState = useGameStore.getState()
     const currentGameState = storeState.gameState
     const currentTurn = currentGameState?.currentTurn
+    const currentMyColor = myColorRef.current
+
+    console.log(`🕹 handleMove called. Turn: ${currentTurn}, Me: ${currentMyColor}, Move: ${move.uci}`)
 
     // 내 턴이 아니면 프리무브로 설정
-    if (currentTurn !== myColorRef.current) {
-      console.log('🔴 Setting premove:', move)
+    if (currentTurn !== currentMyColor) {
+      console.log('🔴 Setting premove (Not my turn):', move)
       setPremove(move)
       premoveRef.current = move
       return
@@ -837,14 +832,30 @@ export default function GamePage() {
   // 서버 제공 합법수 기반으로 특정 말의 legal moves 반환
   const fetchLegalMovesFromServer = async ({ row, col }: { row: number; col: number; piece?: Piece }) => {
     if (!gameState) return []
-    // ensure we have latest legal moves; request if empty
-    if (serverLegalMoves.length === 0) {
-      socketService.requestLegalMoves(gameState.roomId)
-    }
 
     const square = rowColToSquare(row, col)
     const fromUci = squareToUci(square)
-    const moves = serverLegalMoves.filter(m => m.from === fromUci).map(m => ({ row: squareToRowCol({ file: m.to[0] as any, rank: parseInt(m.to[1]) as any }).row, col: squareToRowCol({ file: m.to[0] as any, rank: parseInt(m.to[1]) as any }).col }))
+
+    // serverLegalMoves가 비어있다면 즉시 요청
+    if (serverLegalMoves.length === 0) {
+      console.log('⚠️ Legal moves list empty, requesting...')
+      socketService.requestLegalMoves(gameState.roomId)
+      // 소켓 통신은 비동기이므로 이번 호출에서는 빈 배열을 반환할 수밖에 없음
+      // 하지만 proactive useEffect가 대부분의 상황을 커버할 것임
+    }
+
+    const moves = serverLegalMoves
+      .filter(m => m.from === fromUci)
+      .map(m => {
+        const to = m.to
+        const toPos = squareToRowCol({
+          file: to[0] as any,
+          rank: parseInt(to[1]) as any
+        })
+        return { row: toPos.row, col: toPos.col }
+      })
+
+    console.log(`📍 Found ${moves.length} legal moves for ${fromUci}`)
     return moves
   }
 
