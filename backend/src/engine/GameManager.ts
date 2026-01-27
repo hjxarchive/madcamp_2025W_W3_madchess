@@ -147,10 +147,12 @@ export class GameManager {
 
     let playerColor: 'white' | 'black' | undefined
 
-    if (match.player1.userId === userId) {
+    const stringifiedUserId = String(userId)
+
+    if (String(match.player1.userId) === stringifiedUserId) {
       match.player1SocketId = newSocketId
       playerColor = match.player1Color
-    } else if (match.player2.userId === userId) {
+    } else if (String(match.player2.userId) === stringifiedUserId) {
       match.player2SocketId = newSocketId
       playerColor = match.player2Color
     } else {

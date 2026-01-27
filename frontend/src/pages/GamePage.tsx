@@ -310,17 +310,17 @@ export default function GamePage() {
 
       const mySocketId = socketService.getSocket()?.id
       const currentGameState = useGameStore.getState().gameState
-      const myId = user?.id?.toString()
+      const myId = user?.id ? String(user.id) : null
 
       // 내 색상 판별 (스토어 정보가 가장 정확함)
       let currentMyColor = myColorRef.current
-      if (currentGameState) {
-        if (currentGameState.white.userId === myId) currentMyColor = 'white'
-        else if (currentGameState.black.userId === myId) currentMyColor = 'black'
+      if (currentGameState && myId) {
+        if (String(currentGameState.white.userId) === myId) currentMyColor = 'white'
+        else if (String(currentGameState.black.userId) === myId) currentMyColor = 'black'
       }
 
       // 내가 움직였는지 판별 (소켓 ID 또는 색상 일치 여부)
-      const iMoved = data.socketId === mySocketId || data.moverColor === currentMyColor
+      const iMoved = data.socketId === mySocketId || (data.moverColor && data.moverColor === currentMyColor)
 
       console.log(`📥 handleMoveMade: iMoved=${iMoved}, mover=${data.moverColor}, me=${currentMyColor}, socketId=${data.socketId}`)
 
@@ -772,15 +772,18 @@ export default function GamePage() {
     console.log(`🕹 handleMove called. Turn: ${currentTurn}, Me: ${currentMyColor}, Move: ${move.uci}`)
 
     // 내 색상 결정을 더 확실히 하기 (Store 정보 활용)
-    const myId = user?.id?.toString()
+    const myId = user?.id ? String(user.id) : null
     let verifiedMyColor = currentMyColor
-    if (currentGameState) {
-      if (currentGameState.white.userId === myId) verifiedMyColor = 'white'
-      else if (currentGameState.black.userId === myId) verifiedMyColor = 'black'
+
+    if (currentGameState && myId) {
+      if (String(currentGameState.white.userId) === myId) verifiedMyColor = 'white'
+      else if (String(currentGameState.black.userId) === myId) verifiedMyColor = 'black'
     }
 
     if (verifiedMyColor !== currentMyColor) {
       console.warn(`🎨 Color mismatch! Ref: ${currentMyColor}, Verified: ${verifiedMyColor}`)
+      // Defensive: Update myColor if it was incorrectly set
+      setMyColor(verifiedMyColor)
     }
 
     // 내 턴이 아니면 프리무브로 설정

@@ -12,9 +12,10 @@ export function setupSocketHandlers(io: Server) {
 
     // 방 생성
     socket.on('create-room', (data: { userId: string; deckId: string; color: 'white' | 'black'; username?: string; picture?: string; rating?: number }) => {
-      console.log(`🏠 User ${data.userId} creating room...`)
+      const stringifiedUserId = String(data.userId)
+      console.log(`🏠 User ${stringifiedUserId} creating room...`)
 
-      const room = gameManager.createRoom(socket.id, data.userId, data.deckId, data.color, data.username, data.picture, data.rating)
+      const room = gameManager.createRoom(socket.id, stringifiedUserId, data.deckId, data.color, data.username, data.picture, data.rating)
 
       // 방 생성 성공 응답
       socket.emit('room-created', {
@@ -27,9 +28,10 @@ export function setupSocketHandlers(io: Server) {
 
     // 방 참가
     socket.on('join-room', (data: { roomCode: string; userId: string; deckId: string; username?: string; picture?: string; rating?: number }) => {
-      console.log(`🚪 User ${data.userId} joining room ${data.roomCode}...`)
+      const stringifiedUserId = String(data.userId)
+      console.log(`🚪 User ${stringifiedUserId} joining room ${data.roomCode}...`)
 
-      const result = gameManager.joinRoom(data.roomCode, socket.id, data.userId, data.deckId, data.username, data.picture, data.rating)
+      const result = gameManager.joinRoom(data.roomCode, socket.id, stringifiedUserId, data.deckId, data.username, data.picture, data.rating)
 
       if (result.success && result.room) {
         // Socket을 matchId room에 join (실시간 동기화용)
@@ -85,8 +87,9 @@ export function setupSocketHandlers(io: Server) {
 
     // Join game queue
     socket.on('join-queue', (data: { userId: string; deckId: string; timeControl?: string; username?: string; picture?: string; rating?: number }) => {
-      console.log(`User ${data.userId} (${data.username}) joined queue (${data.timeControl})`)
-      gameManager.addToQueue(socket.id, data.userId, data.deckId, data.timeControl, data.username, data.picture, data.rating)
+      const stringifiedUserId = String(data.userId)
+      console.log(`User ${stringifiedUserId} (${data.username}) joined queue (${data.timeControl})`)
+      gameManager.addToQueue(socket.id, stringifiedUserId, data.deckId, data.timeControl, data.username, data.picture, data.rating)
 
       // Try to match players
       const match = gameManager.tryMatchPlayers()
@@ -258,8 +261,9 @@ export function setupSocketHandlers(io: Server) {
 
     // Rejoin game
     socket.on('rejoin-game', (data: { matchId: string; userId: string }) => {
-      console.log(`🔄 User ${data.userId} rejoining match ${data.matchId}`)
-      const result = gameManager.reconnectPlayer(data.matchId, data.userId, socket.id)
+      const stringifiedUserId = String(data.userId)
+      console.log(`🔄 User ${stringifiedUserId} rejoining match ${data.matchId}`)
+      const result = gameManager.reconnectPlayer(data.matchId, stringifiedUserId, socket.id)
 
       if (result.success && result.match) {
         socket.join(data.matchId)
