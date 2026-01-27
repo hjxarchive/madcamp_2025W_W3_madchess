@@ -380,12 +380,13 @@ export default function GamePage() {
       // 내 턴이 되었을 때 프리무브가 있다면 자동 실행
       if (!iMoved) {
         setTimeout(() => {
-          if (premoveRef.current) {
-            console.log('🚀 Executing premove:', premoveRef.current)
-            const moveExec = premoveRef.current
-            handleMove(moveExec)
+          // 최신 상태를 한 번 더 체크 (서버 동기화 후)
+          const latestPremove = premoveRef.current
+          if (latestPremove) {
+            console.log('🚀 Executing premove from latest store state:', latestPremove)
+            handleMove(latestPremove)
           }
-        }, 100)
+        }, 150) // 약간의 지연을 더 주어 상태 업데이트가 확실히 반영되게 함
       }
     }
 
@@ -729,8 +730,12 @@ export default function GamePage() {
     : gameState?.board || []
 
   const handleMove = (move: Move) => {
+    // 최신 게임 상태 가져오기 (클로저 stale state 방지)
+    const currentGameState = useGameStore.getState().gameState
+    const currentTurn = currentGameState?.currentTurn
+
     // 내 턴이 아니면 프리무브로 설정
-    if (gameState?.currentTurn !== myColor) {
+    if (currentTurn !== myColor) {
       console.log('🔴 Setting premove:', move)
       setPremove(move)
       premoveRef.current = move

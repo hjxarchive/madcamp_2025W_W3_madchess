@@ -130,7 +130,7 @@ export default function ChessBoard({
       }
 
       // Calculate legal moves
-      if (isMyTurn && fetchLegalMoves) {
+      if (fetchLegalMoves) {
         fetchLegalMoves({ row: actual.row, col: actual.col, piece })
           .then(moves => setLegalMoves(moves))
           .catch(e => {
