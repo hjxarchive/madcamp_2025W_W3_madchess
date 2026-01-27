@@ -309,8 +309,21 @@ export default function GamePage() {
       console.log('📥 Received move-made from server:', data)
 
       const mySocketId = socketService.getSocket()?.id
-      const iMoved = data.socketId === mySocketId
-      const currentMyColor = myColorRef.current
+      const currentGameState = useGameStore.getState().gameState
+      const myId = user?.id?.toString()
+
+      // 내 색상 판별 (스토어 정보가 가장 정확함)
+      let currentMyColor = myColorRef.current
+      if (currentGameState) {
+        if (currentGameState.white.userId === myId) currentMyColor = 'white'
+        else if (currentGameState.black.userId === myId) currentMyColor = 'black'
+      }
+
+      // 내가 움직였는지 판별 (소켓 ID 또는 색상 일치 여부)
+      const iMoved = data.socketId === mySocketId || data.moverColor === currentMyColor
+
+      console.log(`📥 handleMoveMade: iMoved=${iMoved}, mover=${data.moverColor}, me=${currentMyColor}, socketId=${data.socketId}`)
+
       const opponentColor = currentMyColor === 'white' ? 'black' : 'white'
 
       // Update check status
@@ -758,9 +771,21 @@ export default function GamePage() {
 
     console.log(`🕹 handleMove called. Turn: ${currentTurn}, Me: ${currentMyColor}, Move: ${move.uci}`)
 
+    // 내 색상 결정을 더 확실히 하기 (Store 정보 활용)
+    const myId = user?.id?.toString()
+    let verifiedMyColor = currentMyColor
+    if (currentGameState) {
+      if (currentGameState.white.userId === myId) verifiedMyColor = 'white'
+      else if (currentGameState.black.userId === myId) verifiedMyColor = 'black'
+    }
+
+    if (verifiedMyColor !== currentMyColor) {
+      console.warn(`🎨 Color mismatch! Ref: ${currentMyColor}, Verified: ${verifiedMyColor}`)
+    }
+
     // 내 턴이 아니면 프리무브로 설정
-    if (currentTurn !== currentMyColor) {
-      console.log('🔴 Setting premove (Not my turn):', move)
+    if (currentTurn !== verifiedMyColor) {
+      console.log(`🔴 Setting premove (Turn=${currentTurn}, Me=${verifiedMyColor}):`, move)
       setPremove(move)
       premoveRef.current = move
       return
@@ -784,12 +809,11 @@ export default function GamePage() {
 
     // 프로모션 체크: 폰이 끝 랭크로 이동하는지 확인
     if (currentGameState) {
-      // UCI 파싱: "e2e4" 또는 "e7e8" (프로모션 후보)
       const from = move.uci.substring(0, 2)
       const to = move.uci.substring(2, 4)
       const fromSquare = squareToRowCol({ file: from[0] as any, rank: parseInt(from[1]) as any })
       const toSquare = squareToRowCol({ file: to[0] as any, rank: parseInt(to[1]) as any })
-      const piece = gameState.board[fromSquare.row][fromSquare.col]
+      const piece = currentGameState.board[fromSquare.row][fromSquare.col]
 
       // 폰이 끝 랭크(1랭크 또는 8랭크)에 도달하는 경우
       if (piece && piece.type === 'p') {

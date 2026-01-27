@@ -249,6 +249,7 @@ export class GameManager {
     isDraw?: boolean
     drawReason?: string
     winner?: string
+    moverColor?: string
     whiteTime?: number
     blackTime?: number
   } {
@@ -403,6 +404,7 @@ export class GameManager {
       isDraw: result.isDraw,
       drawReason: result.drawReason,
       winner,
+      moverColor,
       whiteTime: match.whiteTime,
       blackTime: match.blackTime
     }

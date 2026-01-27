@@ -141,6 +141,7 @@ export function setupSocketHandlers(io: Server) {
           move: data.move,
           gameState: result.gameState,
           socketId: socket.id,
+          moverColor: result.moverColor,
           isCheck: result.isCheck,
           isCheckmate: result.isCheckmate,
           whiteTime: result.whiteTime,
