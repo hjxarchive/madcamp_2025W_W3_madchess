@@ -58,6 +58,135 @@ export class GameManager {
   private queue: QueuePlayer[] = []
   private matches: Map<string, Match> = new Map()
   private rooms: Map<string, Room> = new Map() // Room code -> Room
+  private spectators: Map<string, Set<string>> = new Map() // matchId -> Set of socketIds
+
+  // ===== Spectator Methods =====
+
+  /**
+   * Get list of live games for spectators
+   */
+  getLiveGames(): Array<{
+    matchId: string;
+    white: { username: string; rating: number };
+    black: { username: string; rating: number };
+    timeControl: string;
+    spectatorCount: number;
+    currentTurn: 'white' | 'black';
+    board: any;
+  }> {
+    const liveGames: Array<{
+      matchId: string;
+      white: { username: string; rating: number };
+      black: { username: string; rating: number };
+      timeControl: string;
+      spectatorCount: number;
+      currentTurn: 'white' | 'black';
+      board: any;
+    }> = []
+
+    for (const [matchId, match] of this.matches.entries()) {
+      // Only include games that are in 'playing' status
+      if (match.gameState?.status === 'playing') {
+        const whitePlayer = match.player1Color === 'white' ? match.player1 : match.player2
+        const blackPlayer = match.player1Color === 'black' ? match.player1 : match.player2
+
+        liveGames.push({
+          matchId,
+          white: {
+            username: whitePlayer.username || 'Player',
+            rating: whitePlayer.rating || 1500,
+          },
+          black: {
+            username: blackPlayer.username || 'Player',
+            rating: blackPlayer.rating || 1500,
+          },
+          timeControl: match.timeControl.label,
+          spectatorCount: this.spectators.get(matchId)?.size || 0,
+          currentTurn: match.gameState.currentTurn,
+          board: match.gameState.board,
+        })
+      }
+    }
+
+    return liveGames
+  }
+
+  /**
+   * Get full game state for a spectator joining mid-game
+   */
+  getGameStateForSpectator(matchId: string): {
+    gameState: any;
+    whiteTime: number;
+    blackTime: number;
+    white: { username: string; rating: number };
+    black: { username: string; rating: number };
+    timeControl: string;
+    pgn: string;
+  } | null {
+    const match = this.matches.get(matchId)
+    if (!match) return null
+
+    const whitePlayer = match.player1Color === 'white' ? match.player1 : match.player2
+    const blackPlayer = match.player1Color === 'black' ? match.player1 : match.player2
+
+    return {
+      gameState: match.gameState,
+      whiteTime: match.whiteTime,
+      blackTime: match.blackTime,
+      white: {
+        username: whitePlayer.username || 'Player',
+        rating: whitePlayer.rating || 1500,
+      },
+      black: {
+        username: blackPlayer.username || 'Player',
+        rating: blackPlayer.rating || 1500,
+      },
+      timeControl: match.timeControl.label,
+      pgn: match.standardPgn || '',
+    }
+  }
+
+  /**
+   * Add a spectator to a match
+   */
+  addSpectator(matchId: string, socketId: string): boolean {
+    if (!this.matches.has(matchId)) return false
+
+    if (!this.spectators.has(matchId)) {
+      this.spectators.set(matchId, new Set())
+    }
+    this.spectators.get(matchId)!.add(socketId)
+    console.log(`👁️ Spectator ${socketId} joined ${matchId}. Total: ${this.spectators.get(matchId)!.size}`)
+    return true
+  }
+
+  /**
+   * Remove a spectator from a match
+   */
+  removeSpectator(matchId: string, socketId: string): void {
+    const spectatorSet = this.spectators.get(matchId)
+    if (spectatorSet) {
+      spectatorSet.delete(socketId)
+      console.log(`👁️ Spectator ${socketId} left ${matchId}. Remaining: ${spectatorSet.size}`)
+      if (spectatorSet.size === 0) {
+        this.spectators.delete(matchId)
+      }
+    }
+  }
+
+  /**
+   * Remove spectator from all matches (on disconnect)
+   */
+  removeSpectatorFromAll(socketId: string): void {
+    for (const [matchId, spectatorSet] of this.spectators.entries()) {
+      if (spectatorSet.has(socketId)) {
+        spectatorSet.delete(socketId)
+        if (spectatorSet.size === 0) {
+          this.spectators.delete(matchId)
+        }
+      }
+    }
+  }
 
   addToQueue(socketId: string, userId: string, deckId: string, timeControl: string = '3+0', username?: string, picture?: string, rating?: number) {
     this.queue.push({ socketId, userId, deckId, timeControl, username, picture, rating })

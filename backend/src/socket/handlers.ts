@@ -414,10 +414,43 @@ export function setupSocketHandlers(io: Server) {
       gameManager.removeFromQueue(socket.id)
     })
 
+    // ===== Spectator Events =====
+
+    // Get list of live games
+    socket.on('get-live-games', () => {
+      const liveGames = gameManager.getLiveGames()
+      socket.emit('live-games', { games: liveGames })
+      console.log(`📺 Sent ${liveGames.length} live games to ${socket.id}`)
+    })
+
+    // Join a game as spectator
+    socket.on('spectate-game', (data: { matchId: string }) => {
+      console.log(`👁️ ${socket.id} requesting to spectate ${data.matchId}`)
+      const state = gameManager.getGameStateForSpectator(data.matchId)
+
+      if (state) {
+        socket.join(data.matchId) // Join the room to receive move-made, game-over events
+        gameManager.addSpectator(data.matchId, socket.id)
+        socket.emit('spectate-joined', state)
+        console.log(`✅ ${socket.id} is now spectating ${data.matchId}`)
+      } else {
+        socket.emit('spectate-error', { message: 'Game not found or not in progress' })
+        console.log(`❌ Spectate failed for ${data.matchId}`)
+      }
+    })
+
+    // Leave spectating
+    socket.on('leave-spectate', (data: { matchId: string }) => {
+      socket.leave(data.matchId)
+      gameManager.removeSpectator(data.matchId, socket.id)
+      console.log(`👁️ ${socket.id} left spectating ${data.matchId}`)
+    })
+
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`)
       gameManager.handleDisconnect(socket.id)
+      gameManager.removeSpectatorFromAll(socket.id) // Clean up spectator from all matches
     })
   })
 }

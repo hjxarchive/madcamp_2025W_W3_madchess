@@ -392,6 +392,90 @@ class SocketService {
       this.socket.off('legal-moves-error')
     }
   }
+
+  // ===== Spectator Methods =====
+
+  // Request list of live games
+  requestLiveGames() {
+    if (this.socket) {
+      this.socket.emit('get-live-games')
+      console.log('📺 Requesting live games...')
+    }
+  }
+
+  // Join a game as spectator
+  spectateGame(matchId: string) {
+    if (this.socket) {
+      this.socket.emit('spectate-game', { matchId })
+      console.log(`👁️ Requesting to spectate ${matchId}`)
+    }
+  }
+
+  // Leave spectating
+  leaveSpectate(matchId: string) {
+    if (this.socket) {
+      this.socket.emit('leave-spectate', { matchId })
+      console.log(`👁️ Leaving spectate ${matchId}`)
+    }
+  }
+
+  // Listener for live games list
+  onLiveGames(callback: (data: {
+    games: Array<{
+      matchId: string;
+      white: { username: string; rating: number };
+      black: { username: string; rating: number };
+      timeControl: string;
+      spectatorCount: number;
+      currentTurn: 'white' | 'black';
+      board: any;
+    }>
+  }) => void) {
+    if (this.socket) {
+      this.socket.on('live-games', callback)
+    }
+  }
+
+  // Listener for joining spectate
+  onSpectateJoined(callback: (data: {
+    gameState: any;
+    whiteTime: number;
+    blackTime: number;
+    white: { username: string; rating: number };
+    black: { username: string; rating: number };
+    timeControl: string;
+    pgn: string;
+  }) => void) {
+    if (this.socket) {
+      this.socket.on('spectate-joined', callback)
+    }
+  }
+
+  // Listener for spectate error
+  onSpectateError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('spectate-error', callback)
+    }
+  }
+
+  // Off methods for spectator
+  offLiveGames() {
+    if (this.socket) {
+      this.socket.off('live-games')
+    }
+  }
+
+  offSpectateJoined() {
+    if (this.socket) {
+      this.socket.off('spectate-joined')
+    }
+  }
+
+  offSpectateError() {
+    if (this.socket) {
+      this.socket.off('spectate-error')
+    }
+  }
 }
 
 export const socketService = new SocketService()
