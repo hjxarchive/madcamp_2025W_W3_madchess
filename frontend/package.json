@@ -9,16 +9,11 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "@react-three/drei": "^9.102.6",
-    "@react-three/fiber": "^8.16.8",
-    "@splinetool/react-spline": "^4.1.0",
-    "@splinetool/runtime": "^1.12.39",
     "axios": "^1.13.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.1",
     "socket.io-client": "^4.6.1",
-    "three": "^0.182.0",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
