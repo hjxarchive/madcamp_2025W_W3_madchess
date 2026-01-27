@@ -429,11 +429,24 @@ export function setupSocketHandlers(io: Server) {
     })
 
     // Request game analysis
+    // Request game analysis
     socket.on('request-analysis', async (data: { matchId: string }) => {
-      // console.log(`🧠 Analysis requested for match ${data.matchId}`)
       try {
+        const match = gameManager.getMatch(data.matchId)
+        if (!match) throw new Error('Match not found')
+
+        // Security Check: Active players cannot analyze during game
+        const isPlayer = match.player1SocketId === socket.id || match.player2SocketId === socket.id
+        const isGameActive = match.gameState.status === 'playing'
+
+        if (isPlayer && isGameActive) {
+          console.warn(`⚠️ Player ${socket.id} tried to request analysis during active game! Blocked.`)
+          socket.emit('analysis-error', { message: 'Analysis is not available while playing' })
+          return
+        }
+
         const result = await gameManager.analyzeGame(data.matchId)
-        console.log(`🧠 Analysis result:`, result)
+        console.log(`🧠 Analysis result sent to ${socket.id}`)
         socket.emit('analysis-result', result)
       } catch (error: any) {
         console.error('❌ Analysis failed:', error)

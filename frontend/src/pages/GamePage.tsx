@@ -142,14 +142,26 @@ export default function GamePage() {
   // Analysis State
   const [evalScore, setEvalScore] = useState<{ type: 'cp' | 'mate', value: number } | null>(null)
 
+  // Determine if analysis is allowed (Spectator or Game Over)
+  const canAnalyze = React.useMemo(() => {
+    if (!gameState) return false
+    if (!user?.id) return true // Guest/Spectator usually? Or if not logged in? Assuming spectator if not matched.
+    // Actually, if userId matches white/black, it's a player.
+    const myId = String(user.id)
+    const isPlayer = String(gameState.white?.userId) === myId || String(gameState.black?.userId) === myId
+    const isPlaying = gameState.status === 'playing'
+    // Allow if NOT player OR NOT playing (Review)
+    return !isPlayer || !isPlaying
+  }, [gameState?.status, gameState?.white?.userId, gameState?.black?.userId, user?.id])
+
   useEffect(() => {
     socketService.onAnalysisResult(setEvalScore)
     return () => socketService.offAnalysisResult()
   }, [])
 
   useEffect(() => {
-    if (gameState?.roomId) socketService.requestAnalysis(gameState.roomId)
-  }, [gameState?.roomId, gameState?.moveCount])
+    if (gameState?.roomId && canAnalyze) socketService.requestAnalysis(gameState.roomId)
+  }, [gameState?.roomId, gameState?.moveCount, canAnalyze])
 
   // Game history state - stores board state (FEN-like) for each move
   const [moveHistory, setMoveHistory] = useState<Array<{
@@ -1392,9 +1404,11 @@ export default function GamePage() {
             </div>
 
             <div className="flex gap-4 h-[600px]">
-              <div className="h-full shrink-0 pt-8 pb-8">
-                <EvalBar evaluation={evalScore} />
-              </div>
+              {canAnalyze && (
+                <div className="h-full shrink-0 pt-8 pb-8">
+                  <EvalBar evaluation={evalScore} />
+                </div>
+              )}
               <div className="inline-block relative h-full">
                 <ChessBoard
                   board={displayBoard}
@@ -1453,16 +1467,18 @@ export default function GamePage() {
                     Resign
                   </button>
                 </div>
-                <button
-                  onClick={() => gameState?.roomId && socketService.requestAnalysis(gameState?.roomId)}
-                  className="mt-3 w-full px-4 py-2 border border-blue-900 text-blue-400 hover:text-white hover:bg-blue-900/20 uppercase tracking-widest text-xs font-bold transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
-                    <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
-                  </svg>
-                  Analyze Position
-                </button>
+                {canAnalyze && (
+                  <button
+                    onClick={() => gameState?.roomId && socketService.requestAnalysis(gameState?.roomId)}
+                    className="mt-3 w-full px-4 py-2 border border-blue-900 text-blue-400 hover:text-white hover:bg-blue-900/20 uppercase tracking-widest text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                      <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                    </svg>
+                    Analyze Position
+                  </button>
+                )}
               </div>
             )}
           </div>
