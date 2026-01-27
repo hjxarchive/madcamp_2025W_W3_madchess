@@ -176,7 +176,7 @@ export default function MyPage() {
                                         <div className={`w-3 h-3 ${true ? 'bg-white' : 'bg-gray-800 border border-gray-600'}`}></div>
                                         <div>
                                             <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Opponent</div>
-                                            <div className="font-bold text-lg">{game.opponent}</div>
+                                            <div className="font-bold text-lg">{typeof game.opponent === 'object' ? (game.opponent as any).username : game.opponent}</div>
                                         </div>
                                     </div>
                                     <div className="col-span-3">
