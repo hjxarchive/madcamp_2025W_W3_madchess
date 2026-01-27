@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUserGames } from '../services/userApi'
 import { useAuthStore } from '../stores/authStore'
 import type { UserGame } from '../types/api.types'
+import Hero3D from '../components/Hero3D'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -153,15 +154,29 @@ export default function HomePage() {
                 </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col justify-center items-center text-center">
-                <h1 className="text-6xl md:text-8xl font-serif font-light leading-none mb-6">
-                  <span className="block text-white">WORLD</span>
-                  <span className="block text-[#D4FF00]">CLASS</span>
-                  <span className="block text-white">STRATEGY</span>
-                </h1>
-                <p className="text-gray-400 max-w-md text-lg font-light tracking-wide">
-                  Join the ultimate deck-building chess arena. Compete globally.
-                </p>
+              <div className="h-full flex flex-col lg:flex-row items-center justify-center gap-8 px-8">
+                {/* 3D Queen */}
+                <div className="flex-1 w-full max-w-lg">
+                  <Suspense fallback={
+                    <div className="h-[400px] flex items-center justify-center text-gray-500">
+                      Loading 3D...
+                    </div>
+                  }>
+                    <Hero3D />
+                  </Suspense>
+                </div>
+
+                {/* Text Content */}
+                <div className="flex-1 text-center lg:text-left">
+                  <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-light leading-none mb-6">
+                    <span className="block text-white">WORLD</span>
+                    <span className="block text-[#D4FF00]">CLASS</span>
+                    <span className="block text-white">STRATEGY</span>
+                  </h1>
+                  <p className="text-gray-400 max-w-md text-lg font-light tracking-wide mx-auto lg:mx-0">
+                    Join the ultimate deck-building chess arena. Compete globally.
+                  </p>
+                </div>
               </div>
             )}
           </div>
