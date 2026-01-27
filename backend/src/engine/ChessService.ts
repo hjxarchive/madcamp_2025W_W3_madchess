@@ -26,10 +26,15 @@ export class ChessService {
         blackKingSide: false,
         blackQueenSide: false,
     }
+    private moves: string[] = []
 
     /** Get current turn */
     getTurn(): 'white' | 'black' {
         return this.turn
+    }
+
+    getBoard(): (Piece | null)[][] {
+        return this.board
     }
 
     /** Snapshot engine state for reversible simulations */
@@ -117,7 +122,7 @@ export class ChessService {
             // Check if path is clear
             const minFile = Math.min(kingFile, rookFile, kingTargetFile, rookTargetFile)
             const maxFile = Math.max(kingFile, rookFile, kingTargetFile, rookTargetFile)
-            
+
             let pathClear = true
             for (let file = minFile; file <= maxFile; file++) {
                 if (file === kingFile || file === rookFile) continue
@@ -628,6 +633,8 @@ export class ChessService {
             drawReason = 'insufficient material'
         }
 
+        const moveString = promotion ? `${from}${to}${promotion}` : `${from}${to}`
+        this.moves.push(moveString)
         console.log(`  ✅ Move completed. Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}, Draw: ${isDraw} ${drawReason ? `(${drawReason})` : ''}`)
 
         return { success: true, isCheck, isCheckmate, isStalemate, isDraw, drawReason }
@@ -640,9 +647,9 @@ export class ChessService {
         const isCheck = this.isKingInCheck(this.turn)
         const isCheckmate = isCheck && this.isCheckmate(this.turn)
         const isStalemate = !isCheck && this.isStalemate(this.turn)
-        
+
         console.log(`🔍 Current state check - Turn: ${this.turn}, Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}`)
-        
+
         return { isCheck, isCheckmate, isStalemate }
     }
 
@@ -826,8 +833,9 @@ export class ChessService {
      * Initialize board from custom placement
      */
     initializeFromPlacement(whitePlacement: any[], blackPlacement: any[]): void {
-        // Clear board
+        // Clear board and moves
         this.board = Array(8).fill(null).map(() => Array(8).fill(null))
+        this.moves = []
 
         // Place white pieces
         whitePlacement.forEach((p: any) => {
@@ -844,5 +852,12 @@ export class ChessService {
         })
 
         this.turn = 'white'
+    }
+
+    /**
+     * Get moves in UCI format space-separated (simple PGN)
+     */
+    getPGN(): string {
+        return this.moves.join(' ')
     }
 }

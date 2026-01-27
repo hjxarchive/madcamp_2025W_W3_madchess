@@ -157,7 +157,8 @@ export function setupSocketHandlers(io: Server) {
             const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
             const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
             const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, result.winner as 'white' | 'black', 'checkmate')
+            const pgn = gameManager.getMatchPGN(data.matchId)
+            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, result.winner as 'white' | 'black', 'checkmate', pgn)
           }
         }
         // Handle stalemate
@@ -174,7 +175,8 @@ export function setupSocketHandlers(io: Server) {
             const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
             const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
             const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'stalemate')
+            const pgn = gameManager.getMatchPGN(data.matchId)
+            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'stalemate', pgn)
           }
         }
         // Handle draw
@@ -191,7 +193,8 @@ export function setupSocketHandlers(io: Server) {
             const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
             const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
             const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', result.drawReason || 'draw')
+            const pgn = gameManager.getMatchPGN(data.matchId)
+            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', result.drawReason || 'draw', pgn)
           }
         }
       } else {
@@ -238,7 +241,8 @@ export function setupSocketHandlers(io: Server) {
         const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
         const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
         const winner = data.winner as 'white' | 'black' | 'draw'
-        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner, data.reason)
+        const pgn = gameManager.getMatchPGN(data.matchId)
+        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner, data.reason, pgn)
       }
     })
 
@@ -268,7 +272,8 @@ export function setupSocketHandlers(io: Server) {
         const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
         const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
         const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner as 'white' | 'black', 'resignation')
+        const pgn = gameManager.getMatchPGN(data.matchId)
+        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner as 'white' | 'black', 'resignation', pgn)
       } else {
         console.log(`❌ Match not found: ${data.matchId}`)
       }
@@ -306,7 +311,8 @@ export function setupSocketHandlers(io: Server) {
           const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
           const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
           const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-          gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'mutual agreement')
+          const pgn = gameManager.getMatchPGN(data.matchId)
+          gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'mutual agreement', pgn)
         }
       }
       // If rejected, no action needed - game continues

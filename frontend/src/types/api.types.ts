@@ -122,6 +122,8 @@ export interface Game {
     pgn: string
     isCheck: boolean
     createdAt: string
+    result?: string
+    reason?: string
 }
 
 export interface ResignGameRequest {

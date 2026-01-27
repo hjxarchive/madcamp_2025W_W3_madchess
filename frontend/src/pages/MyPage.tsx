@@ -174,7 +174,7 @@ export default function MyPage() {
                                 <div
                                     key={game.gameId}
                                     className="group grid grid-cols-12 py-6 border-b border-gray-800 hover:bg-white/5 transition-colors items-center cursor-pointer"
-                                    onClick={() => alert('복기 기능 준비 중입니다. 곧 추가될 예정입니다!')}
+                                    onClick={() => navigate(`/replay/${game.gameId}`)}
                                 >
                                     <div className="col-span-4 flex items-center gap-4">
                                         <div className={`w-3 h-3 ${game.result === 'WIN' ? 'bg-[#D4FF00]' : game.result === 'LOSE' ? 'bg-red-500' : 'bg-white'}`}></div>

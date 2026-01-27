@@ -138,6 +138,19 @@ export class GameManager {
     return this.matches.get(matchId)
   }
 
+  getMatchPGN(matchId: string): string | undefined {
+    const match = this.matches.get(matchId)
+    if (!match) return undefined
+
+    // For simplicity, we'll store PGN as:
+    // JSON(whitePlacement)|JSON(blackPlacement)|move1 move2 move3...
+    const whitePlacementStr = JSON.stringify(match.player1Placement)
+    const blackPlacementStr = JSON.stringify(match.player2Placement)
+    const movesStr = match.chessEngine.getPGN()
+
+    return `${whitePlacementStr}|${blackPlacementStr}|${movesStr}`
+  }
+
   makeMove(matchId: string, socketId: string, move: any): {
     success: boolean
     gameState?: any

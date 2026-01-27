@@ -1,6 +1,7 @@
 import * as gameRepo from './game.repository';
 import * as userRepo from '../user/user.repository';
 import { CreateGameDto, GameResponseDto, GameStateDto, UserGameHistoryDto, ResignResponseDto } from './DTOS/game.dto';
+import { ChessService } from '../../engine/ChessService';
 
 export const createGame = async (dto: CreateGameDto): Promise<GameResponseDto> => {
   const game = await gameRepo.createGame(
@@ -240,8 +241,8 @@ export const saveGameResult = async (
     const game = await gameRepo.createGame(whiteId, blackId, whiteDeckFinal, blackDeckFinal);
     console.log(`📝 Game created: ${game.id}`);
 
-    // 2. 게임 결과 업데이트
-    await gameRepo.updateGameResult(game.id, gameResult);
+    // 2. 게임 결과 업데이트 (PGN 포함)
+    await gameRepo.updateGameResult(game.id, gameResult, pgn);
 
     // 3. 레이팅 변화 계산 (간단한 고정값)
     const whiteRatingChange = winner === 'white' ? 12 : winner === 'black' ? -12 : 0;
@@ -319,3 +320,56 @@ function parseFenToBoard(fen: string): any[][] {
 
   return board;
 }
+
+export const getGameReplay = async (gameId: number): Promise<any[]> => {
+  const game = await gameRepo.findGameById(gameId);
+  if (!game || !game.pgn) return [];
+
+  const parts = game.pgn.split('|');
+  // PGN 형식이 맞지 않으면 빈 배열 반환 (whitePlacement|blackPlacement|moves)
+  if (parts.length < 3) return [];
+
+  try {
+    const whitePlacement = JSON.parse(parts[0]);
+    const blackPlacement = JSON.parse(parts[1]);
+    const movesStr = parts[2];
+    const moves = movesStr && movesStr.trim() !== '' ? movesStr.split(' ') : [];
+
+    const engine = new ChessService();
+    engine.initializeFromPlacement(whitePlacement, blackPlacement);
+
+    const history = [];
+
+    // Initial state
+    history.push({
+      board: JSON.parse(JSON.stringify(engine.getBoard())),
+      turn: engine.getTurn()
+    });
+
+    // Apply moves
+    for (const move of moves) {
+      if (!move || move.length < 4) continue;
+
+      const from = move.substring(0, 2);
+      const to = move.substring(2, 4);
+      const promotion = move.length > 4 ? move.substring(4, 5) : undefined;
+
+      // UCI 포맷을 engine.makeMove에 맞게 사용 (내부적으로 UCI 파싱함)
+      const uciFrom = move.substring(0, 2);
+      const uciTo = move.substring(2, 4);
+
+      engine.makeMove(uciFrom, uciTo, promotion);
+
+      history.push({
+        board: JSON.parse(JSON.stringify(engine.getBoard())),
+        turn: engine.getTurn(),
+        lastMove: { from: uciFrom, to: uciTo, promotion }
+      });
+    }
+
+    return history;
+  } catch (e) {
+    console.error('Error parsing replay data:', e);
+    return [];
+  }
+};
