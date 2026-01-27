@@ -229,6 +229,17 @@ export function setupSocketHandlers(io: Server) {
         winner: data.winner,
         reason: data.reason,
       })
+
+      // DB에 게임 결과 저장 (백업 선언도 저장)
+      const match = gameManager.getMatch(data.matchId)
+      if (match) {
+        const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
+        const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
+        const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
+        const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
+        const winner = data.winner as 'white' | 'black' | 'draw'
+        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner, data.reason)
+      }
     })
 
     // Resign - 기권
