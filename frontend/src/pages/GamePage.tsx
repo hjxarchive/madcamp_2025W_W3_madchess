@@ -803,19 +803,21 @@ export default function GamePage() {
       }
     }
 
-    // 내가 둔 수이므로 직전에 둔 색을 저장
-    setLastMoverColor(myColor)
-
     // Server-authoritative: send move without optimistic local update
-    if (gameState) {
-      socketService.sendMove(gameState.roomId, move)
-      console.log('Move sent to server:', move)
+    if (currentGameState && currentGameState.roomId) {
+      socketService.sendMove(currentGameState.roomId, move)
+      console.log(`Move sent to server (Room: ${currentGameState.roomId}):`, move)
+    } else {
+      console.error('❌ Cannot send move: Current gameState or roomId is missing', { currentGameState })
     }
   }
 
   // 프로모션 선택 핸들러
   const handlePromotionSelect = (pieceType: 'q' | 'r' | 'b' | 'n') => {
-    if (!promotionMove || !gameState) return
+    const storeState = useGameStore.getState()
+    const currentGameState = storeState.gameState
+
+    if (!promotionMove || !currentGameState) return
 
     console.log(`✅ Promotion selected: ${pieceType}`)
 
@@ -826,12 +828,13 @@ export default function GamePage() {
       piece: 'p',
     }
 
-    // 내가 둔 수이므로 직전에 둔 색을 저장
-    setLastMoverColor(myColor)
-
-    // 서버로 프로모션 정보 포함하여 전송
-    socketService.sendMove(gameState.roomId, move)
-    console.log('Promotion move sent to server:', move)
+    // 전송
+    if (currentGameState.roomId) {
+      socketService.sendMove(currentGameState.roomId, move)
+      console.log(`Promotion move sent to server (Room: ${currentGameState.roomId}):`, move)
+    } else {
+      console.error('❌ Cannot send promotion: RoomId missing')
+    }
 
     // 프로모션 UI 닫기
     setShowPromotion(false)
