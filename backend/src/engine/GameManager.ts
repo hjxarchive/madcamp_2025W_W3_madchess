@@ -630,7 +630,16 @@ export class GameManager {
       moveCount: match.gameState.moveCount + 1
     }
 
-    console.log(`✅ Move validated: ${moveStr}`)
+    // Update game status if game over
+    if (result.isCheckmate) {
+      match.gameState.status = 'checkmate'
+    } else if (result.isStalemate) {
+      match.gameState.status = 'draw' // Stalemate is a draw
+    } else if (result.isDraw) {
+      match.gameState.status = 'draw'
+    }
+
+    console.log(`✅ Move validated: ${moveStr}, Status: ${match.gameState.status}`)
 
     // If AI is enabled and it's AI's turn next, trigger AI move
     if (match.isAI) {
