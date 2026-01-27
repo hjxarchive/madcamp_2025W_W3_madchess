@@ -47,6 +47,7 @@ export class ChessService {
             castlingRights: { ...this.castlingRights },
             kingMoved: { ...this.kingMoved },
             rookMoved: { ...this.rookMoved },
+            moves: [...this.moves], // Save moves
         }
     }
 
@@ -59,6 +60,7 @@ export class ChessService {
         this.castlingRights = { ...snapshot.castlingRights }
         this.kingMoved = { ...snapshot.kingMoved }
         this.rookMoved = { ...snapshot.rookMoved }
+        this.moves = [...snapshot.moves] // Restore moves
     }
 
     /** Position to UCI helper */
