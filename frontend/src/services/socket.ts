@@ -476,6 +476,38 @@ class SocketService {
       this.socket.off('spectate-error')
     }
   }
+
+  // Analysis
+  requestAnalysis(matchId: string) {
+    if (this.socket) {
+      this.socket.emit('request-analysis', { matchId })
+      console.log('🧠 Requesting analysis for match', matchId)
+    }
+  }
+
+  onAnalysisResult(callback: (data: { type: 'cp' | 'mate', value: number, bestMove?: string }) => void) {
+    if (this.socket) {
+      this.socket.on('analysis-result', callback)
+    }
+  }
+
+  onAnalysisError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('analysis-error', callback)
+    }
+  }
+
+  offAnalysisResult() {
+    if (this.socket) {
+      this.socket.off('analysis-result')
+    }
+  }
+
+  offAnalysisError() {
+    if (this.socket) {
+      this.socket.off('analysis-error')
+    }
+  }
 }
 
 export const socketService = new SocketService()

@@ -54,11 +54,26 @@ interface Room {
   createdAt: number
 }
 
+import { StockfishService } from './StockfishService'
+
 export class GameManager {
   private queue: QueuePlayer[] = []
   private matches: Map<string, Match> = new Map()
   private rooms: Map<string, Room> = new Map() // Room code -> Room
   private spectators: Map<string, Set<string>> = new Map() // matchId -> Set of socketIds
+  private stockfishService: StockfishService
+
+  constructor() {
+    this.stockfishService = new StockfishService()
+  }
+
+  async analyzeGame(matchId: string): Promise<{ type: 'cp' | 'mate', value: number, bestMove?: string }> {
+    const match = this.matches.get(matchId)
+    if (!match) throw new Error('Match not found')
+
+    const fen = match.chessEngine.getFEN()
+    return this.stockfishService.evaluate(fen)
+  }
 
   // ===== Spectator Methods =====
 

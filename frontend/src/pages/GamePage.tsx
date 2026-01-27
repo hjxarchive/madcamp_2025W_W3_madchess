@@ -63,6 +63,46 @@ function CapturedBar({
   )
 }
 
+function EvalBar({ evaluation }: { evaluation: { type: 'cp' | 'mate', value: number } | null }) {
+  if (!evaluation) return <div className="w-6 h-full bg-gray-800/50 rounded border border-gray-700"></div>
+
+  let percent = 50
+  let label = '0.0'
+
+  if (evaluation.type === 'mate') {
+    if (evaluation.value > 0) {
+      percent = 100
+      label = `M${evaluation.value}`
+    } else {
+      percent = 0
+      label = `M${Math.abs(evaluation.value)}`
+    }
+  } else {
+    // Sigmoid mapping for CP
+    const score = evaluation.value
+    // Lichess-style winning chance
+    const winChance = 1 / (1 + Math.exp(-0.004 * score))
+    percent = winChance * 100
+    label = (score / 100).toFixed(1)
+    if (score > 0) label = '+' + label
+  }
+
+  // Clamp
+  percent = Math.max(0, Math.min(100, percent))
+
+  return (
+    <div className="w-6 h-full bg-gray-800 relative flex flex-col-reverse rounded overflow-hidden border border-gray-600 shadow-inner">
+      <div
+        className="w-full bg-white transition-all duration-700 ease-out"
+        style={{ height: `${percent}%` }}
+      />
+      <div className={`absolute w-full text-center text-[9px] font-bold z-10 ${percent > 50 ? 'text-gray-900 bottom-0.5' : 'text-white top-0.5'}`}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
   const navigate = useNavigate()
@@ -99,6 +139,17 @@ export default function GamePage() {
   // Draw offer state
   const [showDrawOffer, setShowDrawOffer] = useState(false)
   const [drawOfferPending, setDrawOfferPending] = useState(false)
+  // Analysis State
+  const [evalScore, setEvalScore] = useState<{ type: 'cp' | 'mate', value: number } | null>(null)
+
+  useEffect(() => {
+    socketService.onAnalysisResult(setEvalScore)
+    return () => socketService.offAnalysisResult()
+  }, [])
+
+  useEffect(() => {
+    if (gameState?.roomId) socketService.requestAnalysis(gameState.roomId)
+  }, [gameState?.roomId, gameState?.moveCount])
 
   // Game history state - stores board state (FEN-like) for each move
   const [moveHistory, setMoveHistory] = useState<Array<{
@@ -1340,34 +1391,39 @@ export default function GamePage() {
               </button>
             </div>
 
-            <div className="inline-block relative">
-              <ChessBoard
-                board={displayBoard}
-                currentTurn={gameState?.currentTurn || 'white'}
-                myColor={myColor}
-                isMyTurn={gameState?.currentTurn === myColor}
-                lastMove={isViewingHistory ? undefined : gameState?.lastMove}
-                isCheck={isViewingHistory ? false : (isCheck || gameState?.isCheck || false)}
-                onMove={handleMove}
-                useImages={useImages}
-                fetchLegalMoves={fetchLegalMovesFromServer}
-                castlingOptions={isViewingHistory ? [] : castlingOptions}
-                premove={premove || undefined}
-                onClearPmove={() => {
-                  setPremove(null)
-                  premoveRef.current = null
-                }}
-              />
-              {/* 히스토리 보기 모드 표시 */}
-              {isViewingHistory && (
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-yellow-600/90 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded">
-                  Move {viewingMoveIndex + 1} / {moveHistory.length}
+            <div className="flex gap-4 h-[600px]">
+              <div className="h-full shrink-0 pt-8 pb-8">
+                <EvalBar evaluation={evalScore} />
+              </div>
+              <div className="inline-block relative h-full">
+                <ChessBoard
+                  board={displayBoard}
+                  currentTurn={gameState?.currentTurn || 'white'}
+                  myColor={myColor}
+                  isMyTurn={gameState?.currentTurn === myColor}
+                  lastMove={isViewingHistory ? undefined : gameState?.lastMove}
+                  isCheck={isViewingHistory ? false : (isCheck || gameState?.isCheck || false)}
+                  onMove={handleMove}
+                  useImages={useImages}
+                  fetchLegalMoves={fetchLegalMovesFromServer}
+                  castlingOptions={isViewingHistory ? [] : castlingOptions}
+                  premove={premove || undefined}
+                  onClearPmove={() => {
+                    setPremove(null)
+                    premoveRef.current = null
+                  }}
+                />
+                {/* 히스토리 보기 모드 표시 */}
+                {isViewingHistory && (
+                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-yellow-600/90 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded">
+                    Move {viewingMoveIndex + 1} / {moveHistory.length}
+                  </div>
+                )}
+                {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
+                <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                  }`}>
+                  Current
                 </div>
-              )}
-              {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
-              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-                }`}>
-                Current
               </div>
             </div>
 
@@ -1397,6 +1453,16 @@ export default function GamePage() {
                     Resign
                   </button>
                 </div>
+                <button
+                  onClick={() => gameState?.roomId && socketService.requestAnalysis(gameState?.roomId)}
+                  className="mt-3 w-full px-4 py-2 border border-blue-900 text-blue-400 hover:text-white hover:bg-blue-900/20 uppercase tracking-widest text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                    <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                  </svg>
+                  Analyze Position
+                </button>
               </div>
             )}
           </div>

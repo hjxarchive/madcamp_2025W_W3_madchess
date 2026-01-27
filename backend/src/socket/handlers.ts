@@ -428,6 +428,19 @@ export function setupSocketHandlers(io: Server) {
       console.log(`👁️ ${socket.id} left spectating ${data.matchId}`)
     })
 
+    // Request game analysis
+    socket.on('request-analysis', async (data: { matchId: string }) => {
+      // console.log(`🧠 Analysis requested for match ${data.matchId}`)
+      try {
+        const result = await gameManager.analyzeGame(data.matchId)
+        console.log(`🧠 Analysis result:`, result)
+        socket.emit('analysis-result', result)
+      } catch (error: any) {
+        console.error('❌ Analysis failed:', error)
+        socket.emit('analysis-error', { message: error.message || 'Analysis failed' })
+      }
+    })
+
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`)

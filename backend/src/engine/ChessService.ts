@@ -851,4 +851,127 @@ export class ChessService {
         return this.moves.join(' ')
     }
 
+    /**
+     * Get FEN string for current state (Chess960 compatible)
+     */
+    getFEN(): string {
+        let fen = ''
+
+        // 1. Piece Placement
+        for (let rank = 7; rank >= 0; rank--) {
+            let emptyCount = 0
+            for (let file = 0; file < 8; file++) {
+                const piece = this.board[rank][file]
+                if (piece) {
+                    if (emptyCount > 0) {
+                        fen += emptyCount
+                        emptyCount = 0
+                    }
+                    const fenChar = piece.color === 'white' ? piece.type.toUpperCase() : piece.type.toLowerCase()
+                    fen += fenChar
+                } else {
+                    emptyCount++
+                }
+            }
+            if (emptyCount > 0) {
+                fen += emptyCount
+            }
+            if (rank > 0) {
+                fen += '/'
+            }
+        }
+
+        // 2. Active Color
+        fen += ` ${this.turn === 'white' ? 'w' : 'b'}`
+
+        // 3. Castling Availability
+        let castling = ''
+
+        // Helper to find potential castling rooks
+        const findCastlingRook = (rank: number, kingFile: number, side: 'kingside' | 'queenside', color: 'white' | 'black') => {
+            // Check castling right flag first
+            const right = color === 'white'
+                ? (side === 'kingside' ? this.castlingRights.whiteKingSide : this.castlingRights.whiteQueenSide)
+                : (side === 'kingside' ? this.castlingRights.blackKingSide : this.castlingRights.blackQueenSide)
+
+            if (!right) return null
+
+            // Find rook
+            const start = side === 'kingside' ? kingFile + 1 : 0
+            const end = side === 'kingside' ? 7 : kingFile - 1
+            const step = 1 // Loop direction doesn't strictly matter if we pick outermost, but let's iterate outward-in or inward-out?
+
+            // Iterate from outermost inward to find the primary rook for that side
+            // Actually, usually the outermost rook is the castling one.
+            if (side === 'kingside') {
+                for (let f = 7; f > kingFile; f--) {
+                    const p = this.board[rank][f]
+                    if (p?.type === 'r' && p?.color === color) {
+                        // Check if specific rook moved (if tracked) - simplified logic relies on global flag + existence
+                        // For FEN compatibility with Stockfish 960, we need the file letter
+                        return String.fromCharCode((color === 'white' ? 'A' : 'a').charCodeAt(0) + f)
+                    }
+                }
+            } else {
+                for (let f = 0; f < kingFile; f++) {
+                    const p = this.board[rank][f]
+                    if (p?.type === 'r' && p?.color === color) {
+                        return String.fromCharCode((color === 'white' ? 'A' : 'a').charCodeAt(0) + f)
+                    }
+                }
+            }
+            return null
+        }
+
+        // White Castling
+        if (!this.kingMoved.white) {
+            let kingFile = -1
+            for (let f = 0; f < 8; f++) {
+                if (this.board[0][f]?.type === 'k' && this.board[0][f]?.color === 'white') {
+                    kingFile = f; break;
+                }
+            }
+            if (kingFile !== -1) {
+                const k = findCastlingRook(0, kingFile, 'kingside', 'white')
+                if (k) castling += k
+                const q = findCastlingRook(0, kingFile, 'queenside', 'white')
+                if (q) castling += q
+            }
+        }
+
+        // Black Castling
+        if (!this.kingMoved.black) {
+            let kingFile = -1
+            for (let f = 0; f < 8; f++) {
+                if (this.board[7][f]?.type === 'k' && this.board[7][f]?.color === 'black') {
+                    kingFile = f; break;
+                }
+            }
+            if (kingFile !== -1) {
+                const k = findCastlingRook(7, kingFile, 'kingside', 'black')
+                if (k) castling += k
+                const q = findCastlingRook(7, kingFile, 'queenside', 'black')
+                if (q) castling += q
+            }
+        }
+
+        if (castling === '') castling = '-'
+        fen += ` ${castling}`
+
+        // 4. En Passant
+        if (this.enPassantTarget) {
+            fen += ` ${this.positionToUci(this.enPassantTarget)}`
+        } else {
+            fen += ' -'
+        }
+
+        // 5. Halfmove
+        fen += ` ${this.halfmoveClock}`
+
+        // 6. Fullmove
+        const fullmove = Math.floor(this.moves.length / 2) + 1
+        fen += ` ${fullmove}`
+
+        return fen
+    }
 }
