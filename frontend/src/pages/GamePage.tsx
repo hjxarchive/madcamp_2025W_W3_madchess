@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
 import ChessBoard from '../components/ChessBoard'
@@ -63,6 +63,7 @@ function CapturedBar({
 
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
+  const navigate = useNavigate()
   const { gameState, setGameState, makeMove, applyOpponentMove, rollbackMove } = useGameStore()
   const [useImages, setUseImages] = useState(true)
   const [myColor, setMyColor] = useState<PieceColor>('white')
@@ -850,7 +851,7 @@ export default function GamePage() {
                 : gameOverData.winner === myColor ? 'Victory!' : 'Defeat'}
             </p>
             <button
-              onClick={() => window.location.href = '/'}
+              onClick={() => navigate('/')}
               className="w-full bg-[#D4FF00] text-black py-3 font-bold uppercase tracking-widest text-sm hover:bg-white transition-colors"
             >
               Back to Arena

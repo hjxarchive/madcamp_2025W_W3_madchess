@@ -414,8 +414,8 @@ export default function PlacementPage() {
 
   // Timer countdown - auto-submit when time runs out
   useEffect(() => {
-    // Don't run timer if already waiting for opponent or no gameId
-    if (waitingForOpponent || !gameId) return
+    // Don't run timer if already waiting for opponent or locked
+    if (waitingForOpponent || isLocked) return
 
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -432,6 +432,7 @@ export default function PlacementPage() {
             })
             console.log('⏰ 시간 종료! 자동 배치 전송:', { color: myColor, placement: placedPieces })
             setWaitingForOpponent(true)
+            setIsLocked(true)
           }
           return 0
         }
@@ -440,7 +441,7 @@ export default function PlacementPage() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [waitingForOpponent, gameId, myColor, placedPieces])
+  }, [waitingForOpponent, isLocked, gameId, myColor, placedPieces])
 
   const availablePieces = getAvailablePieces()
 
