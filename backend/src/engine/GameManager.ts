@@ -199,7 +199,8 @@ export class GameManager {
       match.gameState = {
         ...match.gameState,
         currentTurn: 'white',
-        board: frontendBoard
+        board: frontendBoard,
+        status: 'playing'
       }
 
       // Start Timer
@@ -530,7 +531,7 @@ export class GameManager {
     return {
       board,
       currentTurn: 'white',
-      status: 'in_progress',
+      status: 'playing',
     }
   }
 }

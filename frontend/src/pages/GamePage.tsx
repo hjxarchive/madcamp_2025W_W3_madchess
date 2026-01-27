@@ -457,7 +457,7 @@ export default function GamePage() {
 
   // 게임 페이지 로드 시 재참가 시도 (소켓 재연결 및 상태 동기화)
   useEffect(() => {
-    if (gameId && user?.id) {
+    if (gameId && user?.id && gameId !== 'test-room') {
       console.log(`🔄 Attempting to rejoin game ${gameId}...`)
       setTimeout(() => {
         socketService.rejoinGame(gameId, user.id.toString())
@@ -492,7 +492,7 @@ export default function GamePage() {
 
   // 게임 시작 시 초기 체크 상태 확인 (배치 완료 후)
   useEffect(() => {
-    if (gameState && gameState.moveCount === 0 && gameState.roomId) {
+    if (gameState && gameState.moveCount === 0 && gameState.roomId && gameState.roomId !== 'test-room') {
       // 게임이 막 시작되었을 때 (moveCount === 0)
       // 백의 턴이므로 백이 체크 상태인지 확인
       console.log('🎮 Game started, checking initial check state')
@@ -508,7 +508,7 @@ export default function GamePage() {
 
   // 내 턴이 시작될 때 합법수 요청
   useEffect(() => {
-    if (gameState && gameState.currentTurn === myColor && !gameOverData) {
+    if (gameState && gameState.currentTurn === myColor && !gameOverData && gameState.roomId !== 'test-room') {
       console.log('🎯 My turn started, requesting legal moves and castling options')
       setHasLegalMovesResponse(false)
       setServerLegalMoves([])
