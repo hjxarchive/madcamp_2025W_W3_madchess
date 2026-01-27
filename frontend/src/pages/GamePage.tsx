@@ -994,9 +994,17 @@ export default function GamePage() {
             {/* 상대 프로필 */}
             <div className="border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 bg-gray-800 flex items-center justify-center font-serif text-lg">
-                  {opponent?.username?.[0]?.toUpperCase() || 'O'}
-                </div>
+                {opponent?.picture ? (
+                  <img
+                    src={opponent.picture}
+                    alt={opponent?.username || 'Opponent'}
+                    className="h-12 w-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-12 w-12 bg-gray-800 flex items-center justify-center font-serif text-lg rounded-full">
+                    {opponent?.username?.[0]?.toUpperCase() || 'O'}
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1006,7 +1014,7 @@ export default function GamePage() {
                       </div>
                     </div>
                     <div className="text-sm text-gray-500">
-                      {opponent?.rating || 1450}
+                      {opponent?.rating || 1500}
                     </div>
                   </div>
                   <CapturedBar
@@ -1051,9 +1059,17 @@ export default function GamePage() {
             {/* 내 프로필 */}
             <div className="border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 bg-[#D4FF00] flex items-center justify-center font-serif text-lg text-black">
-                  {user?.name?.[0]?.toUpperCase() || me?.username?.[0]?.toUpperCase() || 'Y'}
-                </div>
+                {user?.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user?.name || 'You'}
+                    className="h-12 w-12 rounded-full object-cover border-2 border-[#D4FF00]"
+                  />
+                ) : (
+                  <div className="h-12 w-12 bg-[#D4FF00] flex items-center justify-center font-serif text-lg text-black rounded-full">
+                    {user?.name?.[0]?.toUpperCase() || me?.username?.[0]?.toUpperCase() || 'Y'}
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <div>

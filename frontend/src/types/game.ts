@@ -117,6 +117,7 @@ export interface PlayerInfo {
   rating: number
   deckId: string
   color: PieceColor
+  picture?: string
 }
 
 // 이동 인터페이스 (UCI 표기법)
