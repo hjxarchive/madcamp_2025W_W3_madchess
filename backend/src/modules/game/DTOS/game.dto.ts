@@ -66,6 +66,7 @@ export interface MoveHistoryDto {
 
 export interface UserGameHistoryDto {
   id: number;
+  gameId: number;
   opponent: {
     userId: number;
     username: string;

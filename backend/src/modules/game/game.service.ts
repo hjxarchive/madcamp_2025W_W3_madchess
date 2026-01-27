@@ -93,6 +93,7 @@ export const getUserGames = async (userId: number, limit: number = 20, offset: n
 
     return {
       id: game.id,
+      gameId: game.id,
       opponent: {
         userId: opponent.id,
         username: opponent.username,
