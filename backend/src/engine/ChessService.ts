@@ -206,7 +206,8 @@ export class ChessService {
 
                             // Force turn to the querying color for validation
                             this.turn = color
-                            const result = this.makeMove(fromUci, toUci, promo)
+                            // Pass false to skip status checks (prevent recursion)
+                            const result = this.makeMove(fromUci, toUci, promo, false)
 
                             // Restore engine state after simulation
                             this.restoreSnapshot(snapshot)
@@ -489,8 +490,16 @@ export class ChessService {
 
     /**
      * Make a move
+     * @param checkStatus If true, checks for checkmate/stalemate/draw (can cause recursion if called from legal move generation)
      */
-    makeMove(from: string, to: string, promotion?: string): { success: boolean; isCheck: boolean; isCheckmate: boolean; isStalemate: boolean; isDraw: boolean; drawReason?: string } {
+    makeMove(from: string, to: string, promotion?: string, checkStatus: boolean = true): {
+        success: boolean
+        isCheck?: boolean
+        isCheckmate?: boolean
+        isStalemate?: boolean
+        isDraw?: boolean
+        drawReason?: string
+    } {
         const fromPos = this.uciToPosition(from)
         const toPos = this.uciToPosition(to)
 
@@ -613,8 +622,14 @@ export class ChessService {
 
         // Check for check, checkmate, and stalemate
         const isCheck = this.isKingInCheck(this.turn)
-        const isCheckmate = isCheck && this.isCheckmate(this.turn)
-        const isStalemate = !isCheck && this.isStalemate(this.turn)
+
+        let isCheckmate = false
+        let isStalemate = false
+
+        if (checkStatus) {
+            isCheckmate = isCheck && this.isCheckmate(this.turn)
+            isStalemate = !isCheck && this.isStalemate(this.turn)
+        }
 
         // Check for draw conditions
         let isDraw = false
