@@ -417,17 +417,43 @@ export default function GamePage() {
       }
 
       // 내 턴이 되었을 때 프리무브가 있다면 자동 실행
-      if (!iMoved) {
-        setTimeout(() => {
-          // 최신 보드 상태와 턴 정보를 기반으로 프리무브 실행
-          const latestState = useGameStore.getState()
-          const latestPremove = premoveRef.current
+      // 중요: 서버에서 받은 데이터 기준으로 턴을 확인하므로 stale state 문제 없음
+      const serverConfirmedTurn = data.gameState?.currentTurn
+      const nextTurnIsMe = serverConfirmedTurn === currentMyColor
 
-          if (latestPremove) {
-            console.log('🚀 Executing premove after server sync:', latestPremove)
-            handleMove(latestPremove)
+      if (!iMoved && nextTurnIsMe) {
+        setTimeout(() => {
+          const latestPremove = premoveRef.current
+          const latestGameState = useGameStore.getState().gameState
+
+          if (latestPremove && latestGameState?.roomId && latestGameState.roomId !== 'test-room') {
+            console.log('🚀 Executing premove directly (server confirmed my turn):', latestPremove)
+
+            // Clear premove BEFORE sending to prevent double execution
+            setPremove(null)
+            premoveRef.current = null
+
+            // 프로모션 체크
+            const from = latestPremove.uci.substring(0, 2)
+            const to = latestPremove.uci.substring(2, 4)
+            const toRank = parseInt(to[1])
+            const fromSquare = squareToRowCol({ file: from[0] as any, rank: parseInt(from[1]) as any })
+            const piece = latestGameState.board?.[fromSquare.row]?.[fromSquare.col]
+
+            let finalMove = latestPremove
+            if (piece?.type === 'p' && (toRank === 1 || toRank === 8)) {
+              // Auto-promote to queen for premoves
+              finalMove = { ...latestPremove, uci: latestPremove.uci + 'q', promotion: 'q' }
+              console.log('👑 Auto-promoting premove to queen')
+            }
+
+            // Send directly to server, bypassing handleMove's turn check
+            socketService.sendMove(latestGameState.roomId, finalMove)
+            console.log('📤 Premove sent directly to server:', finalMove)
+          } else if (latestPremove) {
+            console.log('⚠️ Premove exists but conditions not met. Turn:', serverConfirmedTurn, 'Me:', currentMyColor)
           }
-        }, 250) // 서버 상태가 완전히 반영될 시간을 충분히 확보 (Zustand + React)
+        }, 150) // Slightly shorter delay since we're more confident about state
       }
     }
 

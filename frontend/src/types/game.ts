@@ -126,6 +126,7 @@ export interface Move {
   piece: PieceType
   captured?: PieceType
   playerId?: string  // 누가 이동했는지 식별 (WebSocket 처리용)
+  promotion?: 'q' | 'r' | 'b' | 'n'  // 프로모션 기물 (있는 경우)
 }
 
 // 게임 상태
