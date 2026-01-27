@@ -40,6 +40,8 @@ interface Match {
     increment: number // seconds
     label: string
   }
+  isAI?: boolean
+  aiDifficulty?: number // 0-20
 }
 
 // Room interface for room-based matchmaking
@@ -62,9 +64,14 @@ export class GameManager {
   private rooms: Map<string, Room> = new Map() // Room code -> Room
   private spectators: Map<string, Set<string>> = new Map() // matchId -> Set of socketIds
   private stockfishService: StockfishService
+  private broadcastCallback?: (matchId: string, event: string, data: any) => void
 
   constructor() {
     this.stockfishService = new StockfishService()
+  }
+
+  setBroadcastCallback(callback: (matchId: string, event: string, data: any) => void) {
+    this.broadcastCallback = callback
   }
 
   async analyzeGame(matchId: string): Promise<{ type: 'cp' | 'mate', value: number, bestMove?: string }> {
@@ -307,6 +314,20 @@ export class GameManager {
       return { success: false, error: 'User not in this match' }
     }
 
+    // Check if next turn is AI
+    const nextTurnColor = match.chessEngine.getTurn() // 'white' or 'black'
+
+    // If next player is AI, trigger AI move
+    if (match.isAI) {
+      // Check if it's really AI's turn
+      const isAiTurn = (nextTurnColor === match.player1Color && match.player1SocketId === 'ai') ||
+        (nextTurnColor === match.player2Color && match.player2SocketId === 'ai')
+
+      if (isAiTurn && !match.gameState.isCheckmate && !match.gameState.isDraw) {
+        setTimeout(() => this.makeAIMove(matchId), 1500) // 1.5s delay for realism
+      }
+    }
+
     return {
       success: true,
       match,
@@ -324,7 +345,7 @@ export class GameManager {
     const isPlayer1 = match.player1SocketId === socketId
     const isPlayer2 = match.player2SocketId === socketId
 
-    if (!isPlayer1 && !isPlayer2) {
+    if (!isPlayer1 && !isPlayer2 && socketId !== 'ai') { // Allow AI to submit placement
       return { error: 'Player not in match' }
     }
 
@@ -345,31 +366,49 @@ export class GameManager {
     }
 
     // 양쪽 모두 배치 완료 확인 (색상 기준)
-    if (match.whitePlacement && match.blackPlacement) {
-      // Initialize chess engine with correct color placements
-      match.chessEngine.initializeFromPlacement(match.whitePlacement, match.blackPlacement)
-      console.log('✅ Chess engine initialized with custom placements (white/black mapped)')
-
-      // Get board and reverse it for frontend compatibility (Rank 8 at index 0)
-      const engineBoard = match.chessEngine.getBoard()
-      const frontendBoard = [...engineBoard].reverse()
-
-      // Reset turn to white at game start & Sync Board
-      match.gameState = {
-        ...match.gameState,
-        currentTurn: 'white',
-        board: frontendBoard,
-        status: 'playing',
-        capturedPieces: { white: [], black: [] }
-      }
-
-      // Start Timer
-      match.lastMoveTime = Date.now()
-
-      return { success: true }
+    if (match.player1Placement && match.player2Placement) {
+      this.startGame(matchId)
+      return { success: true } // Return success immediately after starting game
     }
 
     return { waiting: true }
+  }
+
+  private startGame(matchId: string) {
+    const match = this.matches.get(matchId)
+    if (!match) return
+
+    // Initialize chess engine with correct color placements
+    match.chessEngine.initializeFromPlacement(match.whitePlacement!, match.blackPlacement!)
+    console.log('✅ Chess engine initialized with custom placements (white/black mapped)')
+
+    // Get board and reverse it for frontend compatibility (Rank 8 at index 0)
+    const engineBoard = match.chessEngine.getBoard()
+    const frontendBoard = [...engineBoard].reverse()
+
+    // Reset turn to white at game start & Sync Board
+    match.gameState = {
+      ...match.gameState,
+      currentTurn: 'white',
+      board: frontendBoard,
+      status: 'playing',
+      capturedPieces: { white: [], black: [] }
+    }
+
+    // Start Timer
+    match.lastMoveTime = Date.now()
+
+    // If AI is to move first, trigger AI move
+    if (match.isAI) {
+      const nextTurnColor = match.chessEngine.getTurn() // 'white' or 'black'
+
+      const isAiTurn = (nextTurnColor === match.player1Color && match.player1SocketId === 'ai') ||
+        (nextTurnColor === match.player2Color && match.player2SocketId === 'ai')
+
+      if (isAiTurn) {
+        setTimeout(() => this.makeAIMove(matchId), 1500) // 1.5s delay for realism
+      }
+    }
   }
 
   getMatch(matchId: string): Match | undefined {
@@ -466,49 +505,72 @@ export class GameManager {
 
     console.log(`🔍 Validating move: ${from} -> ${to}${promotion ? ` (promotion: ${promotion})` : ''}`)
 
+    return this.processMove(matchId, socketId, { from, to, promotion })
+  }
+
+  async makeAIMove(matchId: string) {
+    const match = this.matches.get(matchId)
+    if (!match || !match.isAI) return
+
+    try {
+      // Get FEN
+      const fen = match.chessEngine.getFEN()
+
+      // Use Stockfish to find best move
+      // Difficulty handling: We can set Skill Level or depth. 
+      // For now let's just use depth but maybe random sub-optimal moves?
+      // StockfishService uses 'depth' param. 
+      // Let's map difficulty 1-10 to depth 1-10.
+      const depth = Math.max(1, Math.min(10, match.aiDifficulty || 5))
+
+      const result = await this.stockfishService.evaluate(fen, depth)
+
+      if (result.bestMove) {
+        // Apply move
+        // bestMove format: "e2e4"
+        const from = result.bestMove.substring(0, 2)
+        const to = result.bestMove.substring(2, 4)
+        const promotion = result.bestMove.length > 4 ? result.bestMove.substring(4, 5) : undefined
+
+        // We need to call processMove. But processMove expects socketId.
+        // We can overload processMove or create internal method.
+        // Let's call processMove with 'ai'.
+        this.processMove(matchId, 'ai', { from, to, promotion })
+      }
+    } catch (e) {
+      console.error('AI Move Error:', e)
+    }
+  }
+
+  processMove(matchId: string, socketId: string, move: { from: string; to: string; promotion?: string }): {
+    success: boolean
+    gameState?: any
+    error?: string
+    isCheck?: boolean
+    isCheckmate?: boolean
+    isStalemate?: boolean
+    isDraw?: boolean
+    drawReason?: string
+    winner?: string
+    moverColor?: string
+    whiteTime?: number
+    blackTime?: number
+  } {
+    const match = this.matches.get(matchId)
+    if (!match) {
+      return { success: false, error: 'Match not found' }
+    }
+
     // Use custom chess engine to validate move
-    const result = match.chessEngine.makeMove(from, to, promotion)
+    const result = match.chessEngine.makeMove(move.from, move.to, move.promotion)
 
     if (!result.success) {
-      console.log(`❌ Move validation failed: ${from} -> ${to}`)
-      // Revert timer if move is invalid? 
-      // Technically if it's not a valid move, time shouldn't be deducted, but in online chess, 
-      // usually the timer keeps running until a VALID move is made. 
-      // Here we deducted time already. This is tricky.
-      // Ideally we should deduct time only when a valid move is made.
-      // So we should calculate elapsed but apply deduction AFTER validation success.
-
-      // Let's revert for now to be safe, or recalculate.
-      // But simpler: Move timer logic AFTER validation success.
-      // BUT we need to check timeout BEFORE validation? No, time runs until valid move.
-      // So if invalid move, we just return error, and time keeps running on server (next request will deduct more).
-
-      // So we should NOT deduct time yet.
+      console.log(`❌ Move validation failed: ${move.from} -> ${move.to}`)
       return {
         success: false,
         error: 'Invalid move - 불법 이동입니다'
       }
     }
-
-    // Move is valid. Update timer now.
-    // Wait, we already updated it above. 
-    // If move was invalid, we returned early, but we modified update in place?
-    // match.whiteTime -= elapsed...
-
-    // We should better move timer logic here, OR revert it on failure.
-    // However, since we update `match` object directly, it persists.
-    // Let's move timer logic AFTER validation to be safe.
-
-    // ... Wait, I cannot easily move Logic down because replace_file_content is static.
-    // I will write the corrected logic in this replacement content.
-
-    // Corrected Logic: Don't update time yet.
-    // Just validation first.
-
-    /* 
-       Let's use the code structure where I do validation first. 
-       But I need to check Not Your Turn first.
-    */
 
     // Determine winner if checkmate
     let winner: string | undefined
@@ -520,7 +582,7 @@ export class GameManager {
     // Sync GameState from Engine and Update standardPgn
     const moverColor = match.player1SocketId === socketId ? match.player1Color : match.player2Color
     // We don't have algebraic yet, so use UCI space-separated for PGN logic
-    const moveStr = move.uci
+    const moveStr = `${move.from}${move.to}${move.promotion || ''}`
 
     if (moverColor === 'white') {
       const moveNumber = Math.floor(match.gameState.moveCount / 2) + 1
@@ -543,7 +605,43 @@ export class GameManager {
       moveCount: match.gameState.moveCount + 1
     }
 
-    console.log(`✅ Move validated: ${move.uci}`)
+    console.log(`✅ Move validated: ${moveStr}`)
+
+    // If AI is enabled and it's AI's turn next, trigger AI move
+    if (match.isAI) {
+      const nextTurnColor = match.chessEngine.getTurn() // 'white' or 'black'
+
+      const isAiTurn = (nextTurnColor === match.player1Color && match.player1SocketId === 'ai') ||
+        (nextTurnColor === match.player2Color && match.player2SocketId === 'ai')
+
+      if (isAiTurn && !result.isCheckmate && !result.isStalemate && !result.isDraw) {
+        setTimeout(() => this.makeAIMove(matchId), 1500) // 1.5s delay for realism
+      }
+    }
+
+    // Broadcast move if callback is available
+    if (this.broadcastCallback) {
+      const winner = result.isCheckmate ? (moverColor === 'white' ? 'white' : 'black') : (result.isDraw ? 'draw' : undefined)
+      const reason = result.isCheckmate ? 'checkmate' : (result.isStalemate ? 'stalemate' : (result.isDraw ? result.drawReason : undefined))
+
+      this.broadcastCallback(matchId, 'move-made', {
+        matchId,
+        move: { uci: moveStr }, // Wrap move back to UCI for frontend
+        socketId: socketId,
+        moverColor,
+        gameState: match.gameState,
+        isCheck: result.isCheck,
+        isCheckmate: result.isCheckmate,
+        isStalemate: result.isStalemate,
+        isDraw: result.isDraw,
+        whiteTime: match.whiteTime,
+        blackTime: match.blackTime
+      })
+
+      if (winner && reason) {
+        this.broadcastCallback(matchId, 'game-over', { winner, reason })
+      }
+    }
 
     return {
       success: true,
@@ -572,7 +670,10 @@ export class GameManager {
       color = match.player1Color
     } else if (match.player2SocketId === socketId) {
       color = match.player2Color
-    } else {
+    } else if (socketId === 'ai') { // Allow AI to request legal moves
+      color = match.player1SocketId === 'ai' ? match.player1Color : match.player2Color
+    }
+    else {
       return { success: false, error: 'Player not in match' }
     }
 
@@ -596,6 +697,100 @@ export class GameManager {
     } while (this.rooms.has(code))
 
     return code
+  }
+
+  createAIGame(
+    socketId: string,
+    userId: string,
+    deckId: string,
+    color: 'white' | 'black' | 'random',
+    difficulty: number,
+    username?: string,
+    picture?: string,
+    rating?: number
+  ): Match {
+    const matchId = `ai-match-${Date.now()}`
+
+    // Determine colors
+    let player1Color: 'white' | 'black' = 'white'
+    if (color === 'random') {
+      player1Color = Math.random() < 0.5 ? 'white' : 'black'
+    } else {
+      player1Color = color as 'white' | 'black'
+    }
+    const player2Color = player1Color === 'white' ? 'black' : 'white'
+
+    // AI Configuration
+    const aiPlayer: any = {
+      userId: 'ai-bot',
+      deckId: 'standard-deck',
+      color: player2Color,
+      username: `Fairy Stockfish (Lv.${difficulty})`,
+      picture: 'https://upload.wikimedia.org/wikipedia/commons/2/2a/Chess_Bot_Icon.png',
+      rating: 1500 + (difficulty * 100)
+    }
+
+    const humanPlayer = {
+      userId,
+      deckId,
+      color: player1Color,
+      username: username || 'Player',
+      picture: picture || '',
+      rating: rating || 1200
+    }
+
+    // Standard Chess Placement for AI
+    const aiPlacement = []
+    const pieces = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
+
+    for (let i = 0; i < 8; i++) {
+      const file = String.fromCharCode(97 + i) // a,b,c...
+      // Major pieces
+      aiPlacement.push({ type: pieces[i], file, rank: 1 })
+      // Pawns
+      aiPlacement.push({ type: 'p', file, rank: 2 })
+    }
+
+    const match: Match = {
+      id: matchId,
+      player1SocketId: socketId,
+      player2SocketId: 'ai',
+      player1: humanPlayer,
+      player2: aiPlayer,
+      player1Color,
+      player2Color,
+      standardPgn: '',
+      gameState: {
+        roomId: matchId,
+        white: (player1Color === 'white' ? humanPlayer : aiPlayer) as any,
+        black: (player1Color === 'black' ? humanPlayer : aiPlayer) as any,
+        board: [],
+        currentTurn: 'white',
+        moveCount: 0,
+        pgn: '',
+        status: 'placement',
+        isCheck: false,
+        capturedPieces: { white: [], black: [] },
+      },
+      chessEngine: new ChessService(),
+      whiteTime: 600 * 1000,
+      blackTime: 600 * 1000,
+      timeControl: { limit: 600, increment: 0, label: '10 min' },
+      isAI: true,
+      aiDifficulty: difficulty
+    }
+
+    // Set AI placement immediately
+    if (player2Color === 'white') {
+      match.whitePlacement = aiPlacement
+      match.player2Placement = aiPlacement
+    } else {
+      match.blackPlacement = aiPlacement
+      match.player2Placement = aiPlacement
+    }
+
+    this.matches.set(matchId, match)
+    return match
   }
 
   createRoom(hostSocketId: string, userId: string, deckId: string, color: 'white' | 'black', username?: string, picture?: string, rating?: number): Room {

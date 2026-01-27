@@ -5,6 +5,11 @@ import * as gameService from '../modules/game/game.service.js'
 const gameManager = new GameManager()
 
 export function setupSocketHandlers(io: Server) {
+  // Set broadcast callback for GameManager (for AI moves and consistency)
+  gameManager.setBroadcastCallback((matchId, event, data) => {
+    io.to(matchId).emit(event, data)
+  })
+
   io.on('connection', (socket: Socket) => {
     console.log(`User connected: ${socket.id}`)
 
@@ -24,6 +29,43 @@ export function setupSocketHandlers(io: Server) {
       })
 
       console.log(`✅ Room ${room.code} created and sent to ${socket.id}`)
+    })
+
+    // AI 게임 생성
+    socket.on('create-ai-game', (data: {
+      userId: string;
+      deckId: string;
+      color: 'white' | 'black' | 'random';
+      difficulty: number;
+      username?: string;
+      picture?: string;
+      rating?: number
+    }) => {
+      console.log(`🤖 User ${data.userId} creating AI game (difficulty: ${data.difficulty})...`)
+
+      const match = gameManager.createAIGame(
+        socket.id,
+        String(data.userId),
+        data.deckId,
+        data.color,
+        data.difficulty,
+        data.username,
+        data.picture,
+        data.rating
+      )
+
+      // Join the match room
+      socket.join(match.id)
+
+      // AI 게임 생성 성공 응답 (기존 game-found와 유사한 포맷 사용)
+      socket.emit('game-found', {
+        matchId: match.id,
+        opponent: match.player2,
+        yourColor: match.player1Color,
+        isAI: true
+      })
+
+      console.log(`✅ AI Match ${match.id} created and sent to ${socket.id}`)
     })
 
     // 방 참가
@@ -134,27 +176,12 @@ export function setupSocketHandlers(io: Server) {
 
     // Player makes a move
     socket.on('make-move', (data: { matchId: string; move: any }) => {
-      // console.log(`♟️ Move received in match ${data.matchId}:`, data.move)
-
       const result = gameManager.makeMove(data.matchId, socket.id, data.move)
 
       if (result.success) {
-        // Broadcast move to everyone in the room (including spectators)
-        io.to(data.matchId).emit('move-made', {
-          matchId: data.matchId,
-          move: data.move,
-          socketId: socket.id, // Who made the move
-          moverColor: result.moverColor, // 'white' or 'black'
-          gameState: result.gameState, // Updated board state
-          isCheck: result.isCheck,
-          isCheckmate: result.isCheckmate,
-          isStalemate: result.isStalemate,
-          isDraw: result.isDraw,
-          whiteTime: result.whiteTime,
-          blackTime: result.blackTime
-        })
+        // Broadcast and Game Over now handled inside GameManager via broadcastCallback
 
-        // Handle Game Over
+        // Save game result to DB if game ended
         if (result.isCheckmate || result.isStalemate || result.isDraw || result.winner) {
           const winner = result.winner || (result.isCheckmate
             ? (result.moverColor === 'white' ? 'white' : 'black')
@@ -162,17 +189,6 @@ export function setupSocketHandlers(io: Server) {
 
           const reason = result.drawReason || (result.isCheckmate ? 'checkmate' : (result.isStalemate ? 'stalemate' : 'draw'))
 
-          console.log(`👑 Game Over! Winner: ${winner}, Reason: ${reason}`)
-
-          // Update game status in GameManager
-          gameManager.endGame(data.matchId, { winner, reason })
-
-          io.to(data.matchId).emit('game-over', {
-            winner,
-            reason,
-          })
-
-          // Save game result to DB
           const match = gameManager.getMatch(data.matchId)
           if (match) {
             const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId

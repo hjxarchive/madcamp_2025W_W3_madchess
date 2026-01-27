@@ -57,6 +57,14 @@ class SocketService {
     }
   }
 
+  // AI 게임 생성
+  createAIGame(userId: string, deckId: string, color: 'white' | 'black' | 'random', difficulty: number, username?: string, picture?: string, rating?: number) {
+    if (this.socket) {
+      this.socket.emit('create-ai-game', { userId, deckId, color, difficulty, username, picture, rating })
+      console.log('Creating AI game:', { userId, deckId, color, difficulty, username })
+    }
+  }
+
   // 방 참가
   joinRoom(roomCode: string, userId: string, deckId: string, username?: string, picture?: string, rating?: number) {
     if (this.socket) {
