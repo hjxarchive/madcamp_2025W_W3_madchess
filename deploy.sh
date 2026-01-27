@@ -27,6 +27,8 @@ ssh -i $PEM_KEY $SERVER_USER@$SERVER_IP << EOF
     cd backend
     echo "   - Installing dependencies..."
     npm install
+    echo "   - Pushing DB Schema..."
+    npx prisma db push
     echo "   - Restarting PM2..."
     pm2 restart all || pm2 start 'npx tsx src/server.ts' --name "chess-backend"
     cd ..
