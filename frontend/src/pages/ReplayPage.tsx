@@ -128,6 +128,7 @@ export default function ReplayPage() {
 
   // Check for FEN and request analysis when index changes
   useEffect(() => {
+    console.log('Current History Item:', history[currentIndex])
     if (history[currentIndex]?.fen) {
       const socket = socketService.getSocket()
       if (socket) {
@@ -253,12 +254,12 @@ export default function ReplayPage() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-8 p-6">
 
-        {/* Helper Div for layout consistency with GamePage */}
-        <div className="flex gap-4">
-          <div className="h-[600px] pt-8 pb-8 shrink-0">
+        {/* Center: Chess Board */}
+        <div className="order-1 lg:order-2 flex gap-4 justify-center items-start">
+          <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center">
             <EvalBar evaluation={evalScore} />
           </div>
-          <div className="relative">
+          <div className="flex flex-col items-center">
             <ChessBoard
               board={displayBoard}
               currentTurn={currentState.turn}

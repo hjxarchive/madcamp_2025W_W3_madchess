@@ -225,8 +225,6 @@ export default function SpectatorPage() {
                     {/* Center: Chess Board */}
                     <div className="order-1 lg:order-2 flex gap-4 justify-center items-start h-[650px]">
                         <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center">
-                            {/* Debug Info */}
-                            <div className="text-[10px] text-red-500 font-mono mb-1">{evalScore?.value}</div>
                             <EvalBar evaluation={evalScore} />
                         </div>
                         <div className="flex flex-col items-center">
