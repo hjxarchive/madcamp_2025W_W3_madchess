@@ -86,6 +86,10 @@ export default function GamePage() {
   const [lastMoverColor, setLastMoverColor] = useState<PieceColor | null>(null)
   const [castlingOptions, setCastlingOptions] = useState<Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }>>([])
 
+  // Draw offer state
+  const [showDrawOffer, setShowDrawOffer] = useState(false)
+  const [drawOfferPending, setDrawOfferPending] = useState(false)
+
   // Ref for myColor to access in socket callbacks without closure issues
   const myColorRef = useRef<PieceColor>(myColor)
   useEffect(() => {
@@ -714,17 +718,52 @@ export default function GamePage() {
 
   const handleResign = () => {
     if (confirm('정말 기권하시겠습니까?')) {
-      // TODO: 항복 처리
-      console.log('Player resigned')
+      if (gameState) {
+        // 기권 처리: 상대가 승리
+        const winner = myColor === 'white' ? 'black' : 'white'
+        socketService.resign(gameState.roomId)
+        setGameOverData({ winner, reason: 'resignation' })
+        console.log('🏳️ Player resigned')
+      }
     }
   }
 
   const handleDrawOffer = () => {
+    if (drawOfferPending) {
+      alert('이미 무승부 제안을 보냈습니다. 상대방의 응답을 기다려주세요.')
+      return
+    }
     if (confirm('무승부를 제안하시겠습니까?')) {
-      // TODO: 무승부 제안
-      console.log('Draw offered')
+      if (gameState) {
+        socketService.offerDraw(gameState.roomId)
+        setDrawOfferPending(true)
+        console.log('🤝 Draw offered')
+      }
     }
   }
+
+  const handleDrawResponse = (accept: boolean) => {
+    if (gameState) {
+      socketService.respondToDraw(gameState.roomId, accept)
+      setShowDrawOffer(false)
+      if (accept) {
+        setGameOverData({ winner: 'draw', reason: 'mutual agreement' })
+      }
+    }
+  }
+
+  // Draw offer received handler
+  useEffect(() => {
+    const handleDrawOffered = () => {
+      setShowDrawOffer(true)
+    }
+
+    socketService.onDrawOffered(handleDrawOffered)
+
+    return () => {
+      socketService.offDrawOffered()
+    }
+  }, [])
 
   // 시간 포맷팅 (mm:ss)
   const formatTime = (seconds: number) => {
@@ -816,6 +855,35 @@ export default function GamePage() {
             >
               Back to Arena
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Draw Offer Modal */}
+      {showDrawOffer && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+          <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-md w-full mx-4 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 bg-gray-800 flex items-center justify-center">
+              <span className="text-2xl">🤝</span>
+            </div>
+            <h2 className="text-2xl font-serif mb-2">DRAW OFFER</h2>
+            <p className="text-lg text-gray-400 mb-6">
+              상대방이 무승부를 제안했습니다
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => handleDrawResponse(false)}
+                className="border border-gray-800 text-gray-400 py-3 font-bold uppercase tracking-widest text-sm hover:text-white hover:border-gray-600 transition-colors"
+              >
+                거절
+              </button>
+              <button
+                onClick={() => handleDrawResponse(true)}
+                className="bg-[#D4FF00] text-black py-3 font-bold uppercase tracking-widest text-sm hover:bg-white transition-colors"
+              >
+                수락
+              </button>
+            </div>
           </div>
         </div>
       )}
