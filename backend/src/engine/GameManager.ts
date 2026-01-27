@@ -79,11 +79,26 @@ export class GameManager {
     if (!match) throw new Error('Match not found')
 
     const fen = match.chessEngine.getFEN()
-    return this.stockfishService.evaluate(fen)
+    const result = await this.stockfishService.evaluate(fen)
+
+    // Score is relative to side-to-move. Convert to absolute (white-relative).
+    if (match.chessEngine.getTurn() === 'black') {
+      result.value = -result.value
+    }
+
+    return result
   }
 
   async analyzeFen(fen: string): Promise<{ type: 'cp' | 'mate', value: number, bestMove?: string }> {
-    return this.stockfishService.evaluate(fen)
+    const result = await this.stockfishService.evaluate(fen)
+
+    // FEN usually includes side-to-move at parts[1]
+    const parts = fen.split(' ')
+    if (parts.length > 1 && parts[1] === 'b') {
+      result.value = -result.value
+    }
+
+    return result
   }
 
   // ===== Spectator Methods =====
