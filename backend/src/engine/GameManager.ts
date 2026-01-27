@@ -598,6 +598,30 @@ export class GameManager {
     return room
   }
 
+  /**
+   * Update game status when game ends
+   */
+  endGame(matchId: string, result: { winner: string; reason: string }) {
+    const match = this.matches.get(matchId)
+    if (match) {
+      console.log(`🏁 Ending game ${matchId}: ${result.winner} won by ${result.reason}`)
+
+      // Update status so it doesn't show in live games
+      match.gameState = {
+        ...match.gameState,
+        status: result.winner === 'draw' ? 'draw' : (result.reason === 'resignation' ? 'resignation' : 'checkmate'),
+        // Store result in gameState if needed for reconnects
+        winner: result.winner,
+        reason: result.reason
+      }
+
+      return true
+    }
+    return false
+  }
+
+
+
   joinRoom(roomCode: string, guestSocketId: string, userId: string, deckId: string, username?: string, picture?: string, rating?: number): {
     success: boolean
     room?: Room

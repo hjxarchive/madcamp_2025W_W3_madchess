@@ -132,54 +132,47 @@ export function setupSocketHandlers(io: Server) {
       }
     })
 
-    // Make a move
+    // Player makes a move
     socket.on('make-move', (data: { matchId: string; move: any }) => {
-      console.log(`🎲 Move from ${socket.id} in match ${data.matchId}:`, data.move)
+      // console.log(`♟️ Move received in match ${data.matchId}:`, data.move)
+
       const result = gameManager.makeMove(data.matchId, socket.id, data.move)
 
       if (result.success) {
-        // Broadcast move with check/checkmate status
-        console.log(`📢 Broadcasting move to room ${data.matchId}`)
+        // Broadcast move to everyone in the room (including spectators)
         io.to(data.matchId).emit('move-made', {
+          matchId: data.matchId,
           move: data.move,
-          gameState: result.gameState,
-          socketId: socket.id,
-          moverColor: result.moverColor,
+          socketId: socket.id, // Who made the move
+          moverColor: result.moverColor, // 'white' or 'black'
+          gameState: result.gameState, // Updated board state
           isCheck: result.isCheck,
           isCheckmate: result.isCheckmate,
+          isStalemate: result.isStalemate,
+          isDraw: result.isDraw,
           whiteTime: result.whiteTime,
           blackTime: result.blackTime
         })
 
-        // Handle Game Over (Checkmate, Timeout)
-        if (result.winner) {
-          console.log(`👑 Game Over! Winner: ${result.winner}, Reason: ${result.drawReason || 'checkmate'}`)
-          io.to(data.matchId).emit('game-over', {
-            winner: result.winner,
-            reason: result.drawReason || 'checkmate',
-          })
-          // DB에 게임 결과 저장
-          const match = gameManager.getMatch(data.matchId)
-          if (match) {
-            const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
-            const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
-            const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
-            const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-            const pgn = gameManager.getMatchPGN(data.matchId)
-            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, result.winner as 'white' | 'black', result.drawReason || 'checkmate', pgn)
+        // Handle Game Over
+        if (result.isCheckmate || result.isStalemate || result.isDraw || result.winner) {
+          const winner = result.winner || (result.isCheckmate
+            ? (result.moverColor === 'white' ? 'white' : 'black')
+            : 'draw')
 
-            // Cleanup handled by disconnect or explicit room leave?
-            // Usually we keep match for a while.
-          }
-        }
-        // Handle stalemate
-        else if (result.isStalemate) {
-          console.log(`🤝 Stalemate!`)
+          const reason = result.drawReason || (result.isCheckmate ? 'checkmate' : (result.isStalemate ? 'stalemate' : 'draw'))
+
+          console.log(`👑 Game Over! Winner: ${winner}, Reason: ${reason}`)
+
+          // Update game status in GameManager
+          gameManager.endGame(data.matchId, { winner, reason })
+
           io.to(data.matchId).emit('game-over', {
-            winner: 'draw',
-            reason: 'stalemate',
+            winner,
+            reason,
           })
-          // DB에 게임 결과 저장
+
+          // Save game result to DB
           const match = gameManager.getMatch(data.matchId)
           if (match) {
             const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
@@ -187,25 +180,8 @@ export function setupSocketHandlers(io: Server) {
             const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
             const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
             const pgn = gameManager.getMatchPGN(data.matchId)
-            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'stalemate', pgn)
-          }
-        }
-        // Handle draw
-        else if (result.isDraw) {
-          console.log(`🤝 Draw by ${result.drawReason}!`)
-          io.to(data.matchId).emit('game-over', {
-            winner: 'draw',
-            reason: result.drawReason || 'draw',
-          })
-          // DB에 게임 결과 저장
-          const match = gameManager.getMatch(data.matchId)
-          if (match) {
-            const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
-            const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
-            const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
-            const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-            const pgn = gameManager.getMatchPGN(data.matchId)
-            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', result.drawReason || 'draw', pgn)
+
+            gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner as 'white' | 'black' | 'draw', reason, pgn)
           }
         }
       } else {
@@ -303,6 +279,8 @@ export function setupSocketHandlers(io: Server) {
 
         console.log(`🏆 Resigned player: ${socket.id} (${resignedPlayerColor}), Winner: ${winner}`)
 
+        gameManager.endGame(data.matchId, { winner, reason: 'resignation' }) // Status Update
+
         io.to(data.matchId).emit('game-over', {
           winner,
           reason: 'resignation',
@@ -355,6 +333,8 @@ export function setupSocketHandlers(io: Server) {
         const winner = timedOutColor === 'white' ? 'black' : 'white'
         console.log(`🏆 Timeout: ${timedOutColor} lost, ${winner} wins`)
 
+        gameManager.endGame(data.matchId, { winner, reason: 'timeout' }) // Status Update
+
         io.to(data.matchId).emit('game-over', {
           winner,
           reason: 'timeout',
@@ -390,6 +370,8 @@ export function setupSocketHandlers(io: Server) {
       console.log(`🤝 Player ${socket.id} ${data.accept ? 'accepted' : 'rejected'} draw in match ${data.matchId}`)
       if (data.accept) {
         // Draw accepted - game over
+        gameManager.endGame(data.matchId, { winner: 'draw', reason: 'mutual agreement' }) // Status Update
+
         io.to(data.matchId).emit('game-over', {
           winner: 'draw',
           reason: 'mutual agreement',

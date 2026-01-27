@@ -114,7 +114,13 @@ export default function SpectatorPage() {
     useEffect(() => {
         if (gameOver) {
             if (timerRef.current) clearInterval(timerRef.current)
-            return
+
+            // Auto-redirect countdown
+            const redirectTimer = setTimeout(() => {
+                navigate('/')
+            }, 5000) // 5 seconds
+
+            return () => clearTimeout(redirectTimer)
         }
 
         timerRef.current = setInterval(() => {
@@ -128,7 +134,7 @@ export default function SpectatorPage() {
         return () => {
             if (timerRef.current) clearInterval(timerRef.current)
         }
-    }, [currentTurn, gameOver])
+    }, [currentTurn, gameOver, navigate])
 
     const formatTime = (ms: number) => {
         const totalSeconds = Math.floor(ms / 1000)
