@@ -43,6 +43,7 @@ export default function PlacementPage() {
   const [hoverSquare, setHoverSquare] = useState<{ file: File; rank: Rank } | null>(null)
   const [usedBudget, setUsedBudget] = useState(0)
   const [waitingForOpponent, setWaitingForOpponent] = useState(false)
+  const [isLocked, setIsLocked] = useState(false) // Lock placement immediately when confirm is clicked
 
   // Timer state (2 minutes = 120 seconds)
   const [timeLeft, setTimeLeft] = useState(120)
@@ -271,7 +272,7 @@ export default function PlacementPage() {
 
   // 기물 클릭으로 선택
   const handlePieceSelect = (type: PieceType) => {
-    if (waitingForOpponent) return // 배치 완료 후 수정 불가
+    if (isLocked || waitingForOpponent) return // 배치 완료 후 수정 불가
     if (type === 'k') return // 킹은 선택 불가
     // 이미 선택된 기물을 다시 클릭하면 선택 해제
     if (selectedPieceType === type) {
@@ -283,7 +284,7 @@ export default function PlacementPage() {
 
   // 보드 칸 클릭으로 배치 또는 제거
   const handleSquareClick = (file: File, rank: Rank) => {
-    if (waitingForOpponent) return // 배치 완료 후 수정 불가
+    if (isLocked || waitingForOpponent) return // 배치 완료 후 수정 불가
     const clickedPiece = placedPieces.find(p => p.file === file && p.rank === rank)
 
     // 기존 기물이 있으면 제거하고 선택 상태로 만들기
@@ -385,10 +386,15 @@ export default function PlacementPage() {
 
   // 배치 완료
   const handleConfirmPlacement = () => {
+    // 즉시 잠금 (더 이상 수정 불가)
+    setIsLocked(true)
+    setSelectedPieceType(null)
+
     // 킹이 배치되었는지 확인
     const kingPlaced = placedPieces.some(p => p.type === 'k')
     if (!kingPlaced) {
       alert('킹을 배치해야 합니다')
+      setIsLocked(false) // 잠금 해제
       return
     }
 
