@@ -486,29 +486,20 @@ export class ChessService {
         const fromPos = this.uciToPosition(from)
         const toPos = this.uciToPosition(to)
 
-        console.log(`🔍 makeMove called: ${from} -> ${to}`)
-        console.log(`  From position:`, fromPos)
-        console.log(`  To position:`, toPos)
-
         const piece = this.getPiece(fromPos)
-        console.log(`  Piece at ${from}:`, piece)
-        console.log(`  Current turn:`, this.turn)
 
         if (!piece) {
-            console.log(`  ❌ No piece at ${from}`)
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Check if it's the right player's turn
         if (piece.color !== this.turn) {
-            console.log(`  ❌ Wrong turn. Piece is ${piece.color}, turn is ${this.turn}`)
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
         // Check if destination has own piece
         const targetPiece = this.getPiece(toPos)
         if (targetPiece && targetPiece.color === piece.color) {
-            console.log(`  ❌ Destination has own piece`)
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
         }
 
@@ -534,8 +525,6 @@ export class ChessService {
                 isValid = this.isValidKingMove(fromPos, toPos)
                 break
         }
-
-        console.log(`  Move validation result: ${isValid}`)
 
         if (!isValid) {
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
@@ -637,7 +626,6 @@ export class ChessService {
 
         const moveString = promotion ? `${from}${to}${promotion}` : `${from}${to}`
         this.moves.push(moveString)
-        console.log(`  ✅ Move completed. Check: ${isCheck}, Checkmate: ${isCheckmate}, Stalemate: ${isStalemate}, Draw: ${isDraw} ${drawReason ? `(${drawReason})` : ''}`)
 
         return { success: true, isCheck, isCheckmate, isStalemate, isDraw, drawReason }
     }
