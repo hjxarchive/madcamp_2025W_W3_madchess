@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { getUserGames, updateUser } from '../services/userApi'
-import type { UserGame } from '../types/api.types'
+import { getUserGames, getUserStats, updateUser } from '../services/userApi'
+import type { UserGame, UserStats } from '../types/api.types'
 
 export default function MyPage() {
     const navigate = useNavigate()
     const { user, logout, setUser } = useAuthStore()
     const [matchHistory, setMatchHistory] = useState<UserGame[]>([])
+    const [stats, setStats] = useState<UserStats | null>(null)
     const [isEditing, setIsEditing] = useState(false)
     const [editName, setEditName] = useState('')
 
@@ -16,6 +17,11 @@ export default function MyPage() {
             getUserGames(user.id).then((res) => {
                 if (res.success && res.data) {
                     setMatchHistory(res.data.games)
+                }
+            })
+            getUserStats(user.id).then((res) => {
+                if (res.success && res.data) {
+                    setStats(res.data)
                 }
             })
         }
@@ -155,7 +161,7 @@ export default function MyPage() {
                             </div>
                             <div className="border-l border-gray-800 pl-6">
                                 <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Favorite Deck</div>
-                                <div className="text-lg leading-tight truncate">Aggro Knight Rush</div>
+                                <div className="text-lg leading-tight truncate">{stats?.favoriteDeck || '-'}</div>
                             </div>
                         </div>
                     </div>
