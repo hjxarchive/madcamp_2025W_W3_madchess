@@ -7,6 +7,7 @@ import GamePage from './pages/GamePage'
 import DeckBuilderPage from './pages/DeckBuilderPage'
 import MyPage from './pages/MyPage'
 import ReplayPage from './pages/ReplayPage'
+import SpectatorPage from './pages/SpectatorPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -64,6 +65,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* Spectator route - no login required */}
+          <Route path="/spectate/:matchId" element={<SpectatorPage />} />
         </Routes>
       </div>
     </Router>

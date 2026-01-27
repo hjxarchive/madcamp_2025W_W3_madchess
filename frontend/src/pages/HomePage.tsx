@@ -2,7 +2,18 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUserGames } from '../services/userApi'
 import { useAuthStore } from '../stores/authStore'
+import { socketService } from '../services/socket'
 import type { UserGame } from '../types/api.types'
+
+interface LiveGame {
+  matchId: string
+  white: { username: string; rating: number }
+  black: { username: string; rating: number }
+  timeControl: string
+  spectatorCount: number
+  currentTurn: 'white' | 'black'
+  board: any
+}
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -11,6 +22,7 @@ export default function HomePage() {
   const [recentGames, setRecentGames] = useState<UserGame[]>([])
   const [serverOnline, setServerOnline] = useState<boolean>(true)
   const [onlineCount, setOnlineCount] = useState<number>(1429)
+  const [liveGames, setLiveGames] = useState<LiveGame[]>([])
 
   useEffect(() => {
     if (authUser?.id) {
@@ -19,6 +31,29 @@ export default function HomePage() {
       })
     }
   }, [authUser])
+
+  // Fetch live games on mount
+  useEffect(() => {
+    socketService.connect()
+
+    const handleLiveGames = (data: { games: LiveGame[] }) => {
+      console.log('📺 Live games received:', data.games)
+      setLiveGames(data.games)
+    }
+
+    socketService.onLiveGames(handleLiveGames)
+    socketService.requestLiveGames()
+
+    // Refresh live games every 10 seconds
+    const interval = setInterval(() => {
+      socketService.requestLiveGames()
+    }, 10000)
+
+    return () => {
+      clearInterval(interval)
+      socketService.offLiveGames()
+    }
+  }, [])
 
   const handleStartGame = () => {
     navigate('/matchmaking')
@@ -118,6 +153,53 @@ export default function HomePage() {
 
           {/* Recent Games Area */}
           <div className="flex-1 p-8 lg:p-12 z-10 overflow-y-auto">
+            {/* Live Games Section */}
+            {liveGames.length > 0 && (
+              <div className="mb-10">
+                <h2 className="text-2xl font-serif text-white mb-6 flex items-center gap-4">
+                  <span className="w-2 h-2 bg-red-500 animate-pulse"></span>
+                  Live Games
+                  <span className="text-sm text-gray-500 font-mono ml-2">({liveGames.length})</span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {liveGames.slice(0, 6).map((game) => (
+                    <button
+                      key={game.matchId}
+                      onClick={() => navigate(`/spectate/${game.matchId}`)}
+                      className="bg-[#0A0A0A] border border-gray-800 p-4 hover:border-[#D4FF00] transition-all group text-left"
+                    >
+                      <div className="flex justify-between items-center mb-3 text-xs tracking-widest text-gray-500 uppercase">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                          LIVE
+                        </span>
+                        <span>{game.timeControl}</span>
+                      </div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className={`text-sm font-bold ${game.currentTurn === 'white' ? 'text-[#D4FF00]' : 'text-white'}`}>
+                            {game.white.username}
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono">{game.white.rating}</div>
+                        </div>
+                        <div className="text-gray-500 text-xs">vs</div>
+                        <div className="text-right">
+                          <div className={`text-sm font-bold ${game.currentTurn === 'black' ? 'text-[#D4FF00]' : 'text-white'}`}>
+                            {game.black.username}
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono">{game.black.rating}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>👁️ {game.spectatorCount} watching</span>
+                        <span className="text-[#D4FF00] group-hover:underline">Watch →</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {isAuthenticated ? (
               <div>
                 <h2 className="text-2xl font-serif text-white mb-6 flex items-center gap-4">

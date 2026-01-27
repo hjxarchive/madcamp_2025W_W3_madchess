@@ -14,6 +14,7 @@ interface ChessBoardProps {
   castlingOptions?: Array<{ rookPos: string; kingPos: string; kingTarget: string; rookTarget: string; side: 'kingside' | 'queenside' }>
   premove?: Move
   onClearPmove?: () => void
+  isSpectator?: boolean // New: if true, disable all interactions
 }
 
 // 유니코드 체스 기물 심볼
@@ -74,6 +75,7 @@ export default function ChessBoard({
   castlingOptions = [],
   premove,
   onClearPmove,
+  isSpectator = false, // New: spectator mode
 }: ChessBoardProps) {
   const [selectedSquare, setSelectedSquare] = useState<{ row: number; col: number } | null>(null)
   const [legalMoves, setLegalMoves] = useState<{ row: number; col: number }[]>([])
@@ -97,6 +99,9 @@ export default function ChessBoard({
   }
 
   const handleSquareClick = async (displayRow: number, displayCol: number) => {
+    // Spectator mode: no interactions allowed
+    if (isSpectator) return
+
     // If it's not my turn, we support premoves.
     // If it's my turn, we do normal moves.
 
