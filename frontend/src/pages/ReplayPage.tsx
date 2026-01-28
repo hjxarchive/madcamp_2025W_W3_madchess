@@ -431,41 +431,41 @@ export default function ReplayPage() {
                 {currentIndex} <span className="text-gray-600 text-base">/ {history.length - 1}</span>
               </div>
             </div>
+          </div>
 
-            {/* Move History List */}
-            <div className="border-t border-gray-800 pt-4 flex-1 overflow-hidden flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h3>
-                <span className="text-xs text-gray-500">{history.length - 1} moves</span>
-              </div>
-              <div className="overflow-y-auto space-y-0.5 font-mono text-sm max-h-60 pr-1 custom-scrollbar">
-                {parseMoves(gameInfo?.pgn || '').map((m, idx) => {
-                  const whiteMoveIndex = idx * 2 + 1
-                  const blackMoveIndex = idx * 2 + 2
+          {/* Move History List */}
+          <div className="border-t border-gray-800 pt-4 flex-1 overflow-hidden flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h3>
+              <span className="text-xs text-gray-500">{history.length - 1} moves</span>
+            </div>
+            <div className="overflow-y-auto space-y-0.5 font-mono text-sm max-h-60 pr-1 custom-scrollbar">
+              {parseMoves(gameInfo?.pgn || '').map((m, idx) => {
+                const whiteMoveIndex = idx * 2 + 1
+                const blackMoveIndex = idx * 2 + 2
 
-                  // Highlight check
-                  const isWhiteActive = currentIndex === whiteMoveIndex
-                  const isBlackActive = currentIndex === blackMoveIndex
+                // Highlight check
+                const isWhiteActive = currentIndex === whiteMoveIndex
+                const isBlackActive = currentIndex === blackMoveIndex
 
-                  return (
-                    <div key={idx} className="grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1 hover:bg-gray-900/50 rounded">
-                      <span className="text-gray-600">{m.move}.</span>
-                      <span
-                        className={`cursor-pointer transition-colors ${isWhiteActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
-                        onClick={() => setCurrentIndex(whiteMoveIndex)}
-                      >
-                        {m.white}
-                      </span>
-                      <span
-                        className={`cursor-pointer transition-colors ${isBlackActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
-                        onClick={() => { if (m.black) setCurrentIndex(blackMoveIndex) }}
-                      >
-                        {m.black}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
+                return (
+                  <div key={idx} className="grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1 hover:bg-gray-900/50 rounded">
+                    <span className="text-gray-600">{m.move}.</span>
+                    <span
+                      className={`cursor-pointer transition-colors ${isWhiteActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
+                      onClick={() => setCurrentIndex(whiteMoveIndex)}
+                    >
+                      {m.white}
+                    </span>
+                    <span
+                      className={`cursor-pointer transition-colors ${isBlackActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
+                      onClick={() => { if (m.black) setCurrentIndex(blackMoveIndex) }}
+                    >
+                      {m.black}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
