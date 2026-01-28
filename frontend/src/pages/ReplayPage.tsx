@@ -397,49 +397,39 @@ export default function ReplayPage() {
             )}
           </div>
 
-          <div className="border-t border-gray-800 pt-4">
-            <div className="flex items-center justify-between mb-8">
-              <div className="text-gray-500 text-xs uppercase tracking-widest">Move</div>
-              <div className="text-2xl font-mono text-[#D4FF00]">
-                {currentIndex} <span className="text-gray-600 text-lg">/ {history.length - 1}</span>
-              </div>
-            </div>
+          <div className="border-t border-gray-800 pt-3 pb-1">
+            <div className="flex items-center justify-between gap-4">
+              {/* Left: Label */}
+              <div className="text-gray-500 text-xs uppercase tracking-widest shrink-0">Move</div>
 
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <button
-                onClick={() => setCurrentIndex(0)}
-                disabled={currentIndex === 0}
-                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
-              >
-                ⏮
-              </button>
-              <button
-                onClick={handlePrev}
-                disabled={currentIndex === 0}
-                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
-              >
-                ◀
-              </button>
-              <button
-                onClick={togglePlay}
-                className="p-3 bg-[#D4FF00] text-black hover:bg-white rounded transition-colors w-16 h-16 flex items-center justify-center text-2xl font-bold"
-              >
-                {isPlaying ? '⏸' : '▶'}
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={currentIndex === history.length - 1}
-                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
-              >
-                ▶
-              </button>
-              <button
-                onClick={() => setCurrentIndex(history.length - 1)}
-                disabled={currentIndex === history.length - 1}
-                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
-              >
-                ⏭
-              </button>
+              {/* Center: Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrev}
+                  disabled={currentIndex === 0}
+                  className="p-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-10 h-10 flex items-center justify-center font-bold text-white text-sm"
+                >
+                  ◀
+                </button>
+                <button
+                  onClick={togglePlay}
+                  className="p-2 bg-[#D4FF00] text-black hover:bg-white rounded transition-colors w-12 h-12 flex items-center justify-center text-xl font-bold"
+                >
+                  {isPlaying ? '⏸' : '▶'}
+                </button>
+                <button
+                  onClick={handleNext}
+                  disabled={currentIndex === history.length - 1}
+                  className="p-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-10 h-10 flex items-center justify-center font-bold text-white text-sm"
+                >
+                  ▶
+                </button>
+              </div>
+
+              {/* Right: Counter */}
+              <div className="text-xl font-mono text-[#D4FF00] shrink-0">
+                {currentIndex} <span className="text-gray-600 text-base">/ {history.length - 1}</span>
+              </div>
             </div>
 
             {/* Move History List */}
