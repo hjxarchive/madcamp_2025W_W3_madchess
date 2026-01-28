@@ -373,9 +373,9 @@ export default function ReplayPage() {
         </div>
 
         {/* Controls Panel */}
-        <div className="bg-[#0A0A0A] border border-gray-800 p-6 w-full max-w-sm flex flex-col gap-6">
+        <div className="bg-[#0A0A0A] border border-gray-800 p-8 w-full max-w-sm flex flex-col">
           {/* Engine Analysis */}
-          <div className="flex flex-col gap-2 w-full bg-[#0A0A0A]/80 backdrop-blur rounded p-2 text-xs font-mono border border-gray-800">
+          <div className="flex flex-col gap-2 w-full bg-[#0A0A0A]/80 backdrop-blur rounded p-2 text-xs font-mono border border-gray-800 mb-6">
             <div className="text-gray-500 uppercase tracking-widest text-[10px] mb-1">Engine Analysis</div>
             {analysisLines.length > 0 ? (
               analysisLines.map((line) => (
@@ -397,7 +397,7 @@ export default function ReplayPage() {
             )}
           </div>
 
-          <div className="border-t border-gray-800 py-4">
+          <div className="border-t border-gray-800 py-8">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center">
               {/* Left: Label */}
               <div className="text-gray-500 text-xs uppercase tracking-widest justify-self-start">Move</div>
