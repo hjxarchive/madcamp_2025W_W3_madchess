@@ -775,7 +775,7 @@ export class GameManager {
       deckId: 'standard-deck',
       color: player2Color,
       username: `Fairy Stockfish (Lv.${difficulty})`,
-      picture: 'https://upload.wikimedia.org/wikipedia/commons/2/2a/Chess_Bot_Icon.png',
+      picture: '/ai_profile.jpg',
       rating: 1500 + (difficulty * 100)
     }
 
