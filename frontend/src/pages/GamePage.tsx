@@ -1229,7 +1229,13 @@ export default function GamePage() {
         const tokens = cleanPgn.split(/\s+/).filter(t => t)
 
         // Initialize chess engine for SAN generation
-        const chess = new Chess(gameState?.initialFen || undefined)
+        let chess: Chess | null = null
+        try {
+          chess = new Chess(gameState?.initialFen || undefined)
+        } catch (e) {
+          console.warn('Initial FEN invalid or chess.js error', e)
+          try { chess = new Chess() } catch (err) { chess = null }
+        }
 
         let currentMoveNum = 1
         let currentPair: { move: number; white: string; black?: string } = { move: 1, white: '' }
@@ -1237,22 +1243,24 @@ export default function GamePage() {
         tokens.forEach((token, index) => {
           let san = token // Default to token (UCI) if parsing fails
 
-          try {
-            // Attempt to play move to get SAN
-            // Token is expected to be UCI (e.g. "e2e4", "a7a8q")
-            const from = token.substring(0, 2)
-            const to = token.substring(2, 4)
-            const promotion = token.length > 4 ? token.substring(4, 5) : undefined
+          if (chess) {
+            try {
+              // Attempt to play move to get SAN
+              // Token is expected to be UCI (e.g. "e2e4", "a7a8q")
+              const from = token.substring(0, 2)
+              const to = token.substring(2, 4)
+              const promotion = token.length > 4 ? token.substring(4, 5) : undefined
 
-            const result = chess.move({
-              from,
-              to,
-              promotion: promotion as any
-            })
-            if (result) san = result.san
-          } catch (e) {
-            // Fallback: try parsing as simple SAN or ignore error
-            // console.warn('SAN conversion failed for:', token, e)
+              const result = chess!.move({
+                from,
+                to,
+                promotion: promotion as any
+              })
+              if (result) san = result.san
+            } catch (e) {
+              // Fallback: try parsing as simple SAN or ignore error
+              // console.warn('SAN conversion failed for:', token, e)
+            }
           }
 
           if (index % 2 === 0) {
@@ -1273,7 +1281,18 @@ export default function GamePage() {
 
       } catch (e) {
         console.error('PGN parsing error:', e)
-        return []
+        // CRITICAL FALLBACK: Simply split the string and display
+        try {
+          const clean = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+          const list = clean.split(/\s+/).filter(t => t)
+          let mv = 1
+          let pair: any = { move: 1, white: '' }
+          list.forEach((t, i) => {
+            if (i % 2 === 0) pair = { move: mv, white: t }
+            else { pair.black = t; movedList.push(pair); mv++ }
+          })
+          if (list.length % 2 !== 0) movedList.push(pair)
+        } catch (err) { return [] }
       }
 
       return movedList
