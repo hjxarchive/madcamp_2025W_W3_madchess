@@ -167,15 +167,20 @@ export default function ReplayPage() {
     } as Move
   }
 
-  // Always reverse the board from Replay API (Rank 1-based) to Standard (Rank 8-based)
-  // Replay data comes from ChessService which returns rows 0..7 as Rank 1..8.
-  // Frontend/ChessBoard expects rows 0..7 as Rank 8..1 (FEN standard).
-  const displayBoard = [...currentState.board].reverse()
+  // Dynamic orientation detection
+  // Standard (FEN): Rank 8 at Index 0 (Black pieces). Rank 1 at Index 7 (White pieces).
+  // Inverted (ChessService): Rank 1 at Index 0 (White pieces). Rank 8 at Index 7 (Black pieces).
+  const isBoardInverted = (currentState.board[0] as (Piece | null)[]).some(p => p && p.color === 'white') ||
+    (currentState.board[7] as (Piece | null)[]).some(p => p && p.color === 'black')
+
+  const displayBoard = isBoardInverted ? [...currentState.board].reverse() : currentState.board
   const displayLastMove = lastMove
 
+  // Debug Info
+  const debugInfo = isBoardInverted ? 'Orientation: INVERTED (Fixed)' : 'Orientation: STANDARD'
+
   if (isFlipped) {
-    // Note: ChessBoard component handles visual flipping based on myColor prop.
-    // We don't need to manually reverse the board again here for that.
+    // ...
   }
 
   return (
@@ -186,8 +191,9 @@ export default function ReplayPage() {
           <button onClick={() => navigate('/mypage')} className="text-gray-500 hover:text-white transition-colors">
             ← BACK
           </button>
-          <div className="font-serif text-lg">
-            <span className="text-[#D4FF00]">REPLAY</span> MODE
+          <div className="font-serif text-lg flex flex-col">
+            <div><span className="text-[#D4FF00]">REPLAY</span> MODE</div>
+            <div className="text-[10px] text-gray-500 font-mono tracking-tighter">{debugInfo}</div>
           </div>
         </div>
 
