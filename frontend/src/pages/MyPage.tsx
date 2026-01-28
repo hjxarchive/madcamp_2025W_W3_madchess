@@ -194,7 +194,7 @@ export default function MyPage() {
                             Your Collection
                         </h2>
                         <button
-                            onClick={() => navigate('/deck')}
+                            onClick={() => window.location.href = 'https://madcamp.cloud/deck-builder'}
                             className="text-xs font-bold text-[#D4FF00] hover:text-white uppercase tracking-widest transition-colors"
                         >
                             Open Deck Builder →
