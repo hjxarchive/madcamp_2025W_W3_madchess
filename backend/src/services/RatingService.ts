@@ -135,7 +135,7 @@ export class RatingService {
       // 4. Update database
       const now = new Date();
 
-      await prisma.$transaction(async (tx: any) => {
+      const game = await prisma.$transaction(async (tx: any) => {
         // Update white player
         await tx.user.update({
           where: { id: whitePlayer.userId },
@@ -171,10 +171,10 @@ export class RatingService {
         // Create game record
         const game = await tx.game.create({
           data: {
-            white_player_id: whitePlayer.userId,
-            black_player_id: blackPlayer.userId,
-            white_deck_id: whitePlayer.deckId,
-            black_deck_id: blackPlayer.deckId,
+            user_game_white_player_idTouser: { connect: { id: whitePlayer.userId } },
+            user_game_black_player_idTouser: { connect: { id: blackPlayer.userId } },
+            deck_game_white_deck_idTodeck: { connect: { id: whitePlayer.deckId } },
+            deck_game_black_deck_idTodeck: { connect: { id: blackPlayer.deckId } },
             result: gameResult,
             pgn: pgn || null,
             rating_changes: {
@@ -237,6 +237,7 @@ export class RatingService {
         });
 
         console.log(`✅ Game ${game.id} saved with rating updates`);
+        return game;
       });
 
       return {
