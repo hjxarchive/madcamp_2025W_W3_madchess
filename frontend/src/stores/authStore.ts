@@ -1,13 +1,5 @@
 import { create } from 'zustand'
-
-interface User {
-    id: number
-    email: string
-    name: string
-    picture?: string
-    googleId: string
-    rating?: number
-}
+import { User } from '../types/api.types'
 
 interface AuthStore {
     user: User | null
