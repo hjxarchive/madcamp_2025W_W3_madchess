@@ -165,7 +165,11 @@ export default function ReplayPage() {
         try {
           // Sanitize FEN
           // Fallback to history[0].fen if gameInfo is missing
-          let fenToUse = (gameInfo as any)?.initialFen || history[0]?.fen
+          const fallbackFen = history[0]?.fen
+          const gameInfoFen = (gameInfo as any)?.initialFen
+          console.log('DEBUG: parseMoves - gameInfoFen:', gameInfoFen, 'fallbackFen:', fallbackFen)
+
+          let fenToUse = gameInfoFen || fallbackFen
           if (fenToUse) {
             const parts = fenToUse.split(' ')
             if (parts.length >= 3) {
