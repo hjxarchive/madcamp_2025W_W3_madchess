@@ -1,4 +1,5 @@
 import * as userRepo from './user.repository';
+import * as deckRepo from '../deck/deck.repository';
 import { CreateUserDto, UserStatsDto, RecentGameDto, UserWithStatsDto } from './DTOS/user.dto';
 
 export const registerUser = async (dto: CreateUserDto) => {
@@ -96,7 +97,7 @@ export const getUserStats = async (userId: number): Promise<UserStatsDto> => {
   });
 
   // Calculate Favorite Deck (Only consider currently owned decks)
-  const currentDecks = await userRepo.findDecksByUser(userId);
+  const currentDecks = await deckRepo.findDecksByUser(userId);
   const currentDeckIds = new Set(currentDecks.map(d => d.id));
   const deckCounts: Record<string, number> = {};
 
