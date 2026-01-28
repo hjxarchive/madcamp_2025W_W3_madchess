@@ -78,7 +78,10 @@ passport.use(
                     name: user.username,
                     // @ts-ignore
                     googleId: user.google_id || '',
-                    picture: user.picture || undefined
+                    picture: user.picture || undefined,
+                    rating: user.rating,
+                    rd: user.rd,
+                    volatility: user.volatility
                 }
 
                 return done(null, mappedUser)
@@ -104,7 +107,10 @@ passport.deserializeUser(async (id: number, done) => {
                 name: user.username,
                 // @ts-ignore
                 googleId: user.google_id || '',
-                picture: user.picture || undefined
+                picture: user.picture || undefined,
+                rating: user.rating,
+                rd: user.rd,
+                volatility: user.volatility
             }
             done(null, mappedUser)
         } else {
