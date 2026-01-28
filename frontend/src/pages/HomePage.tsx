@@ -166,6 +166,12 @@ export default function HomePage() {
                   <p className="text-xl text-gray-400 mt-2 font-serif">우리은행 정재우</p>
                 </div>
               </div>
+
+              <div className="mb-8 p-4 border border-[#D4FF00]/30 bg-[#D4FF00]/5 rounded animate-pulse">
+                <p className="text-[#D4FF00] font-serif text-lg">
+                  "부산대학교 안준영님 100원 후원 감사합니다"
+                </p>
+              </div>
               <button
                 onClick={() => setShowDonation(false)}
                 className="px-8 py-3 bg-[#D4FF00] text-black font-bold uppercase tracking-widest hover:bg-white transition-colors"
