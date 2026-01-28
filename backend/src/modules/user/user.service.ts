@@ -1,4 +1,5 @@
 import * as userRepo from './user.repository';
+import * as deckRepo from '../deck/deck.repository';
 import { CreateUserDto, UserStatsDto, RecentGameDto, UserWithStatsDto } from './DTOS/user.dto';
 
 export const registerUser = async (dto: CreateUserDto) => {
@@ -95,6 +96,32 @@ export const getUserStats = async (userId: number): Promise<UserStatsDto> => {
     };
   });
 
+  // Calculate Favorite Deck (Only consider currently owned decks)
+  const currentDecks = await deckRepo.findDecksByUser(userId);
+  const currentDeckIds = new Set(currentDecks.map(d => d.id));
+  const deckCounts: Record<string, number> = {};
+
+  gameHistory.forEach((gh: any) => {
+    const isWhite = gh.game.white_player_id === userId;
+    const deck = isWhite ? gh.game.deck_game_white_deck_idTodeck : gh.game.deck_game_black_deck_idTodeck;
+
+    // Only count if deck exists and is currently owned by the user
+    if (deck && currentDeckIds.has(deck.id)) {
+      // Use deck name, fallback to Untitled if null/empty
+      const name = deck.name || 'Untitled Deck';
+      deckCounts[name] = (deckCounts[name] || 0) + 1;
+    }
+  });
+
+  let favoriteDeck = '-';
+  let maxCount = 0;
+  for (const [name, count] of Object.entries(deckCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      favoriteDeck = name;
+    }
+  }
+
   return {
     totalGames,
     wins,
@@ -103,6 +130,7 @@ export const getUserStats = async (userId: number): Promise<UserStatsDto> => {
     winRate: Math.round(winRate * 1000) / 1000,
     currentStreak,
     bestStreak,
+    favoriteDeck,
     recentGames
   };
 };

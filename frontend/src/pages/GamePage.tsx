@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { Chess } from 'chess.js'
 import { useGameStore } from '../stores/gameStore'
 import { useAuthStore } from '../stores/authStore'
 import ChessBoard from '../components/ChessBoard'
@@ -63,6 +64,46 @@ function CapturedBar({
   )
 }
 
+export function EvalBar({ evaluation }: { evaluation: { type: 'cp' | 'mate', value: number } | null }) {
+  if (!evaluation) return <div className="w-6 h-full bg-gray-800/50 rounded border border-gray-700"></div>
+
+  let percent = 50
+  let label = '0.0'
+
+  if (evaluation.type === 'mate') {
+    if (evaluation.value > 0) {
+      percent = 100
+      label = `M${evaluation.value}`
+    } else {
+      percent = 0
+      label = evaluation.value === 0 ? '#' : `M${Math.abs(evaluation.value)}`
+    }
+  } else {
+    // Sigmoid mapping for CP
+    const score = evaluation.value
+    // Lichess-style winning chance
+    const winChance = 1 / (1 + Math.exp(-0.004 * score))
+    percent = winChance * 100
+    label = (score / 100).toFixed(1)
+    if (score > 0) label = '+' + label
+  }
+
+  // Clamp
+  percent = Math.max(0, Math.min(100, percent))
+
+  return (
+    <div className="w-6 h-full bg-gray-800 relative flex flex-col-reverse rounded overflow-hidden border border-gray-600 shadow-inner">
+      <div
+        className="w-full bg-white transition-all duration-700 ease-out"
+        style={{ height: `${percent}%` }}
+      />
+      <div className={`absolute w-full text-center text-[9px] font-bold z-10 ${percent > 50 ? 'text-gray-900 bottom-0.5' : 'text-white top-0.5'}`}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>()
   const navigate = useNavigate()
@@ -99,6 +140,29 @@ export default function GamePage() {
   // Draw offer state
   const [showDrawOffer, setShowDrawOffer] = useState(false)
   const [drawOfferPending, setDrawOfferPending] = useState(false)
+  // Analysis State
+  const [evalScore, setEvalScore] = useState<{ type: 'cp' | 'mate', value: number } | null>(null)
+
+  // Determine if analysis is allowed (Spectator or Game Over)
+  const canAnalyze = React.useMemo(() => {
+    if (!gameState) return false
+    if (!user?.id) return true // Guest/Spectator usually? Or if not logged in? Assuming spectator if not matched.
+    // Actually, if userId matches white/black, it's a player.
+    const myId = String(user.id)
+    const isPlayer = String(gameState.white?.userId) === myId || String(gameState.black?.userId) === myId
+    const isPlaying = gameState.status === 'playing'
+    // Allow if NOT player OR NOT playing (Review)
+    return !isPlayer || !isPlaying
+  }, [gameState?.status, gameState?.white?.userId, gameState?.black?.userId, user?.id])
+
+  useEffect(() => {
+    socketService.onAnalysisResult(setEvalScore)
+    return () => socketService.offAnalysisResult()
+  }, [])
+
+  useEffect(() => {
+    if (gameState?.roomId && canAnalyze) socketService.requestAnalysis(gameState.roomId)
+  }, [gameState?.roomId, gameState?.moveCount, canAnalyze])
 
   // Game history state - stores board state (FEN-like) for each move
   const [moveHistory, setMoveHistory] = useState<Array<{
@@ -255,6 +319,12 @@ export default function GamePage() {
     const uciToAlgebraic = (uci: string, piece: PieceType, capturedPiece?: PieceType): string => {
       console.log(`🔄 Converting UCI to algebraic: uci=${uci}, piece=${piece}, captured=${capturedPiece}`)
 
+      // Defensive check for missing piece info
+      if (!piece) {
+        console.warn('⚠️ Missing piece info for algebraic conversion, falling back to UCI')
+        return uci
+      }
+
       const from = uci.substring(0, 2)
       const to = uci.substring(2, 4)
       const promotion = uci.length > 4 ? uci.substring(4) : undefined
@@ -338,23 +408,28 @@ export default function GamePage() {
 
         // Algebraic notation으로 변환
         const algebraicMove = uciToAlgebraic(data.move.uci, data.move.piece, data.move.captured)
+        console.log(`✨ Algebraic Move: ${algebraicMove}`)
 
+        // Check/Checkmate symbol
+        let moveSymbol = ''
+        if (data.isCheckmate) moveSymbol = '#'
+        else if (data.isCheck) moveSymbol = '+'
+
+        const finalMoveNotation = algebraicMove + moveSymbol
         let newPgn = currentState.pgn
 
         if (moverColor === 'white') {
-          // 백의 수: "1. e4" 형식
           const currentCount = currentState.moveCount ?? 0
           const moveNumber = Math.floor(currentCount / 2) + 1
           if (newPgn) {
-            newPgn += ` ${moveNumber}. ${algebraicMove}`
+            newPgn += ` ${moveNumber}. ${finalMoveNotation}`
           } else {
-            newPgn = `${moveNumber}. ${algebraicMove}`
+            newPgn = `${moveNumber}. ${finalMoveNotation}`
           }
-          console.log(`⚪ White move ${moveNumber}: ${algebraicMove} (Total count: ${currentCount})`)
+          console.log(`⚪ White move ${moveNumber}: ${finalMoveNotation} (Total count: ${currentCount})`)
         } else {
-          // 흑의 수: 같은 줄에 추가
-          newPgn += ` ${algebraicMove}`
-          console.log(`⚫ Black move: ${algebraicMove}`)
+          newPgn += ` ${finalMoveNotation}`
+          console.log(`⚫ Black move: ${finalMoveNotation}`)
         }
 
         console.log(`📝 Calculated New PGN: "${newPgn}"`)
@@ -1138,32 +1213,141 @@ export default function GamePage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // PGN을 이동 목록으로 파싱
-  const parseMoves = (pgn: string) => {
-    if (!pgn) return []
-    const moves: { move: number; white: string; black?: string }[] = []
-    const parts = pgn.trim().split(/\s+/)
+  // PGN을 이동 목록으로 파싱 (UCI -> SAN 변환)
+  const parseMoves = useMemo(() => {
+    return (pgn: string) => {
+      if (!pgn) return []
 
-    let currentMove = 0
-    let moveObj: { move: number; white: string; black?: string } | null = null
+      const movedList: { move: number; white: string; black?: string }[] = []
 
-    parts.forEach(part => {
-      if (part.match(/^\d+\.$/)) {
-        if (moveObj) moves.push(moveObj)
-        currentMove = parseInt(part)
-        moveObj = { move: currentMove, white: '' }
-      } else if (moveObj) {
-        if (!moveObj.white) {
-          moveObj.white = part
-        } else if (!moveObj.black) {
-          moveObj.black = part
+      try {
+        // PGN string might contain "1. e2e4 2. ..." or just "e2e4 e7e5 ..."
+        // We clean it up to extract raw move tokens (UCI or SAN, but likely UCI here)
+        let cleanPgn = pgn
+          .replace(/\d+\./g, '')
+          .replace(/1-0|0-1|1\/2-1\/2/g, '')
+
+        let prev = ''
+        while (cleanPgn !== prev) {
+          prev = cleanPgn
+          cleanPgn = cleanPgn
+            .replace(/\[[^[\]]*?\]/g, '')
+            .replace(/\{[^\{\}]*?\}/g, '')
         }
-      }
-    })
 
-    if (moveObj) moves.push(moveObj)
-    return moves
-  }
+        cleanPgn = cleanPgn.replace(/[|"]/g, '').trim()
+        if (!cleanPgn) return []
+
+        const tokens = cleanPgn.split(/\s+/).filter(t => t && t.length > 1)
+
+        // Initialize chess engine for SAN generation
+        let chess: Chess | null = null
+        try {
+          // Sanitize FEN:
+          // 1. Strip Shredder-FEN characters (e.g. A-H) from castling rights.
+          // 2. Remove Pawns from Rank 1 and Rank 8 (Illegal in Standard Chess).
+          let fenToUse = gameState?.initialFen
+          if (fenToUse) {
+            const parts = fenToUse.split(' ')
+            if (parts.length >= 3) {
+              // 1. Castling Sanitization
+              let castling = parts[2].replace(/[^KQkq-]/g, '')
+              if (!castling) castling = '-'
+              parts[2] = castling
+
+              // 2. Pawn Sanitization (Edge Rows)
+              const boardStr = parts[0]
+              const rows = boardStr.split('/')
+              if (rows.length === 8) {
+                // Rank 8 (Index 0) and Rank 1 (Index 7) cannot have Pawns
+                rows[0] = rows[0].replace(/[pP]/g, '1')
+                rows[7] = rows[7].replace(/[pP]/g, '1')
+
+                // Normalize rows: Collapse adjacent numbers (e.g. "11" -> "2") because chess.js rejects consecutive digits
+                const collapseNumbers = (row: string) => {
+                  let newRow = row
+                  while (/\d\d/.test(newRow)) {
+                    newRow = newRow.replace(/(\d)(\d)/g, (_, d1, d2) => (parseInt(d1) + parseInt(d2)).toString())
+                  }
+                  return newRow
+                }
+                rows[0] = collapseNumbers(rows[0])
+                rows[7] = collapseNumbers(rows[7])
+
+                parts[0] = rows.join('/')
+              }
+
+              fenToUse = parts.join(' ')
+            }
+          }
+          console.log('DEBUG: parseMoves sanitized FEN:', fenToUse)
+          chess = new Chess(fenToUse || undefined)
+        } catch (e) {
+          console.warn('Initial FEN invalid or chess.js error', e)
+          try { chess = new Chess() } catch (err) { chess = null }
+        }
+
+        let currentMoveNum = 1
+        let currentPair: { move: number; white: string; black?: string } = { move: 1, white: '' }
+
+        tokens.forEach((token, index) => {
+          let san = token // Default to token (UCI) if parsing fails
+
+          if (chess) {
+            try {
+              // Attempt to play move to get SAN
+              // Token is expected to be UCI (e.g. "e2e4", "a7a8q")
+              const from = token.substring(0, 2)
+              const to = token.substring(2, 4)
+              const promotion = token.length > 4 ? token.substring(4, 5) : undefined
+
+              const result = chess!.move({
+                from,
+                to,
+                promotion: promotion as any
+              })
+              if (result) san = result.san
+            } catch (e) {
+              // Fallback: try parsing as simple SAN or ignore error
+              // console.warn('SAN conversion failed for:', token, e)
+            }
+          }
+
+          if (index % 2 === 0) {
+            // White
+            currentPair = { move: currentMoveNum, white: san }
+          } else {
+            // Black
+            currentPair.black = san
+            movedList.push(currentPair)
+            currentMoveNum++
+          }
+        })
+
+        // Push incomplete last move
+        if (tokens.length % 2 !== 0) {
+          movedList.push(currentPair)
+        }
+
+      } catch (e) {
+        console.error('PGN parsing error:', e)
+        // CRITICAL FALLBACK: Simply split the string and display
+        try {
+          const clean = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+          const list = clean.split(/\s+/).filter(t => t)
+          let mv = 1
+          let pair: any = { move: 1, white: '' }
+          list.forEach((t, i) => {
+            if (i % 2 === 0) pair = { move: mv, white: t }
+            else { pair.black = t; movedList.push(pair); mv++ }
+          })
+          if (list.length % 2 !== 0) movedList.push(pair)
+        } catch (err) { return [] }
+      }
+
+      return movedList
+    }
+  }, [gameState?.initialFen])
 
   // 기물 점수 계산
   const calculateMaterial = (color: PieceColor) => {
@@ -1305,7 +1489,7 @@ export default function GamePage() {
       {/* 헤더 */}
       <header className="sticky top-0 z-10 border-b border-gray-900 bg-[#050505]/90 backdrop-blur">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/')}>
             <div className="w-6 h-6 bg-white skew-x-12"></div>
             <div className="font-serif text-lg">
               <span className="text-[#D4FF00]">MAD</span>
@@ -1340,34 +1524,41 @@ export default function GamePage() {
               </button>
             </div>
 
-            <div className="inline-block relative">
-              <ChessBoard
-                board={displayBoard}
-                currentTurn={gameState?.currentTurn || 'white'}
-                myColor={myColor}
-                isMyTurn={gameState?.currentTurn === myColor}
-                lastMove={isViewingHistory ? undefined : gameState?.lastMove}
-                isCheck={isViewingHistory ? false : (isCheck || gameState?.isCheck || false)}
-                onMove={handleMove}
-                useImages={useImages}
-                fetchLegalMoves={fetchLegalMovesFromServer}
-                castlingOptions={isViewingHistory ? [] : castlingOptions}
-                premove={premove || undefined}
-                onClearPmove={() => {
-                  setPremove(null)
-                  premoveRef.current = null
-                }}
-              />
-              {/* 히스토리 보기 모드 표시 */}
-              {isViewingHistory && (
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-yellow-600/90 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded">
-                  Move {viewingMoveIndex + 1} / {moveHistory.length}
+            <div className="flex gap-4 h-[600px]">
+              {canAnalyze && (
+                <div className="h-full shrink-0 pt-8 pb-8">
+                  <EvalBar evaluation={evalScore} />
                 </div>
               )}
-              {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
-              <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-                }`}>
-                Current
+              <div className="inline-block relative h-full">
+                <ChessBoard
+                  board={displayBoard}
+                  currentTurn={gameState?.currentTurn || 'white'}
+                  myColor={myColor}
+                  isMyTurn={gameState?.currentTurn === myColor}
+                  lastMove={isViewingHistory ? undefined : gameState?.lastMove}
+                  isCheck={isViewingHistory ? false : (isCheck || gameState?.isCheck || false)}
+                  onMove={handleMove}
+                  useImages={useImages}
+                  fetchLegalMoves={fetchLegalMovesFromServer}
+                  castlingOptions={isViewingHistory ? [] : castlingOptions}
+                  premove={premove || undefined}
+                  onClearPmove={() => {
+                    setPremove(null)
+                    premoveRef.current = null
+                  }}
+                />
+                {/* 히스토리 보기 모드 표시 */}
+                {isViewingHistory && (
+                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-yellow-600/90 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded">
+                    Move {viewingMoveIndex + 1} / {moveHistory.length}
+                  </div>
+                )}
+                {/* Current 메시지 표시 (최신 수로 돌아왔을 때) */}
+                <div className={`absolute top-2 left-1/2 transform -translate-x-1/2 bg-[#D4FF00]/95 text-black px-3 py-1 text-xs font-bold uppercase tracking-widest rounded transition-all duration-500 ${showCurrentMessage ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                  }`}>
+                  Current
+                </div>
               </div>
             </div>
 
@@ -1397,6 +1588,18 @@ export default function GamePage() {
                     Resign
                   </button>
                 </div>
+                {canAnalyze && (
+                  <button
+                    onClick={() => gameState?.roomId && socketService.requestAnalysis(gameState?.roomId)}
+                    className="mt-3 w-full px-4 py-2 border border-blue-900 text-blue-400 hover:text-white hover:bg-blue-900/20 uppercase tracking-widest text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                      <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                    </svg>
+                    Analyze Position
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1450,7 +1653,7 @@ export default function GamePage() {
             {/* 대국 기록 */}
             <div className="flex-1 border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h2>
+                <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History (SAN)</h2>
               </div>
 
               <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-sm">

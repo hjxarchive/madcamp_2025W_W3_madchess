@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { socketService } from '../services/socket'
 import ChessBoard from '../components/ChessBoard'
 import { Piece, PieceColor, Move } from '../types/game'
+import { EvalBar } from './GamePage'
 
 interface PlayerInfo {
     username: string
@@ -17,8 +18,15 @@ export default function SpectatorPage() {
     const [currentTurn, setCurrentTurn] = useState<PieceColor>('white')
     const [white, setWhite] = useState<PlayerInfo>({ username: 'White', rating: 1500 })
     const [black, setBlack] = useState<PlayerInfo>({ username: 'Black', rating: 1500 })
+    // Displayed Time
     const [whiteTime, setWhiteTime] = useState(600000)
     const [blackTime, setBlackTime] = useState(600000)
+
+    // Server Truth (Reference for absolute sync)
+    const [serverWhiteTime, setServerWhiteTime] = useState(600000)
+    const [serverBlackTime, setServerBlackTime] = useState(600000)
+    const [lastMoveTime, setLastMoveTime] = useState<number | undefined>(undefined)
+
     const [timeControl, setTimeControl] = useState('10+0')
     const [pgn, setPgn] = useState('')
     const [isCheck, setIsCheck] = useState(false)
@@ -26,6 +34,7 @@ export default function SpectatorPage() {
     const [gameOver, setGameOver] = useState<{ winner: string; reason: string } | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [evalScore, setEvalScore] = useState<{ type: 'cp' | 'mate', value: number } | null>(null)
 
     // Timer interval refs
     const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -46,8 +55,15 @@ export default function SpectatorPage() {
 
             if (data.white) setWhite(data.white)
             if (data.black) setBlack(data.black)
-            if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
-            if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+            if (data.whiteTime !== undefined) {
+                setWhiteTime(data.whiteTime)
+                setServerWhiteTime(data.whiteTime)
+            }
+            if (data.blackTime !== undefined) {
+                setBlackTime(data.blackTime)
+                setServerBlackTime(data.blackTime)
+            }
+            if (data.lastMoveTime !== undefined) setLastMoveTime(data.lastMoveTime)
             if (data.timeControl) setTimeControl(data.timeControl)
             if (data.pgn) setPgn(data.pgn)
         }
@@ -67,8 +83,15 @@ export default function SpectatorPage() {
                 setLastMove(data.move)
             }
 
-            if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
-            if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+            if (data.whiteTime !== undefined) {
+                setWhiteTime(data.whiteTime)
+                setServerWhiteTime(data.whiteTime)
+            }
+            if (data.blackTime !== undefined) {
+                setBlackTime(data.blackTime)
+                setServerBlackTime(data.blackTime)
+            }
+            if (data.lastMoveTime !== undefined) setLastMoveTime(data.lastMoveTime)
         }
 
         // Handle game over
@@ -87,7 +110,10 @@ export default function SpectatorPage() {
         socketService.onSpectateJoined(handleSpectateJoined)
         socketService.onMoveMade(handleMoveMade)
         socketService.onGameOver(handleGameOver)
+        socketService.onGameOver(handleGameOver)
         socketService.onSpectateError(handleSpectateError)
+
+        socketService.onAnalysisResult(setEvalScore)
 
         // Join as spectator
         if (matchId) {
@@ -102,13 +128,22 @@ export default function SpectatorPage() {
             socketService.offSpectateJoined()
             socketService.offMoveMade()
             socketService.offGameOver()
+            socketService.offMoveMade()
+            socketService.offGameOver()
             socketService.offSpectateError()
+            socketService.offAnalysisResult()
 
             if (timerRef.current) {
                 clearInterval(timerRef.current)
             }
         }
     }, [matchId])
+
+    useEffect(() => {
+        if (matchId) {
+            socketService.requestAnalysis(matchId)
+        }
+    }, [matchId, pgn, lastMove, board])
 
     // Timer countdown (client-side)
     useEffect(() => {
@@ -124,17 +159,25 @@ export default function SpectatorPage() {
         }
 
         timerRef.current = setInterval(() => {
+            if (!lastMoveTime) return
+
+            const now = Date.now()
+            const elapsed = now - lastMoveTime
+
+            // Absolute sync: Display = ServerTime - (Now - LastMoveTime)
             if (currentTurn === 'white') {
-                setWhiteTime(prev => Math.max(0, prev - 100))
+                setWhiteTime(Math.max(0, serverWhiteTime - elapsed))
+                setBlackTime(serverBlackTime) // Black's time is static during White's turn
             } else {
-                setBlackTime(prev => Math.max(0, prev - 100))
+                setWhiteTime(serverWhiteTime) // White's time is static during Black's turn
+                setBlackTime(Math.max(0, serverBlackTime - elapsed))
             }
-        }, 100)
+        }, 50) // Update frequently for smooth UI
 
         return () => {
             if (timerRef.current) clearInterval(timerRef.current)
         }
-    }, [currentTurn, gameOver, navigate])
+    }, [currentTurn, gameOver, navigate, lastMoveTime, serverWhiteTime, serverBlackTime])
 
     const formatTime = (ms: number) => {
         const totalSeconds = Math.floor(ms / 1000)
@@ -183,7 +226,7 @@ export default function SpectatorPage() {
                         <span className="text-xl group-hover:-translate-x-1 transition-transform">←</span>
                         <span className="uppercase tracking-widest text-xs font-bold">Back to Home</span>
                     </button>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/')}>
                         <div className="px-3 py-1 bg-red-600 text-white text-xs font-bold uppercase tracking-widest animate-pulse">
                             LIVE
                         </div>
@@ -209,28 +252,33 @@ export default function SpectatorPage() {
                     </div>
 
                     {/* Center: Chess Board */}
-                    <div className="order-1 lg:order-2 flex flex-col items-center">
-                        <ChessBoard
-                            board={board}
-                            currentTurn={currentTurn}
-                            myColor="white" // Always show from white's perspective
-                            isMyTurn={false}
-                            lastMove={lastMove || undefined}
-                            isCheck={isCheck}
-                            onMove={() => { }} // No-op for spectators
-                            useImages={true}
-                            isSpectator={true}
-                        />
-
-                        {/* Time Control Badge */}
-                        <div className="mt-4 px-4 py-2 bg-[#0A0A0A] border border-gray-800 text-sm text-gray-400 uppercase tracking-widest">
-                            {timeControl}
+                    <div className="order-1 lg:order-2 flex gap-4 justify-center items-start h-[650px]">
+                        <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center">
+                            <EvalBar evaluation={evalScore} />
                         </div>
+                        <div className="flex flex-col items-center">
+                            <ChessBoard
+                                board={board}
+                                currentTurn={currentTurn}
+                                myColor="white" // Always show from white's perspective
+                                isMyTurn={false}
+                                lastMove={lastMove || undefined}
+                                isCheck={isCheck}
+                                onMove={() => { }} // No-op for spectators
+                                useImages={true}
+                                isSpectator={true}
+                            />
 
-                        {/* Spectator Badge */}
-                        <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                            <span>👁️</span>
-                            <span>Watching Live</span>
+                            {/* Time Control Badge */}
+                            <div className="mt-4 px-4 py-2 bg-[#0A0A0A] border border-gray-800 text-sm text-gray-400 uppercase tracking-widest">
+                                {timeControl}
+                            </div>
+
+                            {/* Spectator Badge */}
+                            <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                                <span>👁️</span>
+                                <span>Watching Live</span>
+                            </div>
                         </div>
                     </div>
 

@@ -9,7 +9,7 @@ const KING_IMAGES = {
   black: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
 }
 
-type Mode = 'select' | 'create' | 'join' | 'quick'
+type Mode = 'select' | 'create' | 'join' | 'quick' | 'ai'
 
 const TIME_CONTROLS = {
   bullet: [
@@ -44,6 +44,10 @@ export default function MatchmakingPage() {
   const [waiting, setWaiting] = useState(false)
   const [error, setError] = useState('')
   const { user } = useAuthStore()
+
+  // AI Mode State
+  const [aiDifficulty, setAiDifficulty] = useState<number>(5)
+  const [isStartingAI, setIsStartingAI] = useState(false)
 
   // WebSocket 연결
   useEffect(() => {
@@ -151,6 +155,24 @@ export default function MatchmakingPage() {
     socketService.joinQueue(userId, deckId, selectedTime, user?.name, user?.picture, user?.rating)
   }
 
+  const handleStartAI = () => {
+    if (!selectedColor) return
+    setIsStartingAI(true)
+
+    const userId = user?.id ? String(user.id) : `guest-${Date.now()}`
+    const deckId = 'default-deck'
+
+    socketService.createAIGame(
+      userId,
+      deckId,
+      selectedColor as any,
+      aiDifficulty,
+      user?.name,
+      user?.picture,
+      user?.rating
+    )
+  }
+
   const handleCancelQueue = () => {
     socketService.leaveQueue()
     setIsQueueing(false)
@@ -244,6 +266,16 @@ export default function MatchmakingPage() {
                 <div className="text-4xl mb-6 opacity-60 group-hover:opacity-100 transition-all">🚪</div>
                 <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Join Room</h3>
                 <p className="text-sm text-gray-500 uppercase tracking-widest">Enter code</p>
+              </button>
+
+              <button
+                onClick={() => setMode('ai')}
+                className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-8 text-left transition-all duration-300 relative bg-[#D4FF00]/5"
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-10 font-serif text-6xl group-hover:scale-110 transition-transform">🤖</div>
+                <div className="text-4xl mb-6 opacity-60 group-hover:opacity-100 transition-all">🤖</div>
+                <h3 className="text-2xl font-serif text-white mb-2 group-hover:text-[#D4FF00] transition-colors">Play with AI</h3>
+                <p className="text-sm text-gray-500 uppercase tracking-widest">Challenge Stockfish</p>
               </button>
             </div>
           )}
@@ -455,6 +487,87 @@ export default function MatchmakingPage() {
                     Join Room
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* AI 대전 설정 */}
+          {mode === 'ai' && (
+            <div className="border border-gray-800 p-10">
+              <h2 className="text-2xl font-serif mb-8 text-center">AI Battle Settings</h2>
+
+              <div className="mb-10">
+                <label className="block text-xs text-gray-500 uppercase tracking-widest mb-4 text-center font-bold">Difficulty Level (1-10)</label>
+                <div className="flex items-center gap-4">
+                  <span className="text-gray-500 font-bold">EASY</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={aiDifficulty}
+                    onChange={(e) => setAiDifficulty(parseInt(e.target.value))}
+                    className="flex-1 accent-[#D4FF00] bg-gray-900"
+                  />
+                  <span className="text-[#D4FF00] font-mono text-xl font-bold">{aiDifficulty}</span>
+                  <span className="text-gray-500 font-bold">HARD</span>
+                </div>
+              </div>
+
+              <h2 className="text-xs text-gray-500 uppercase tracking-widest mb-4 text-center font-bold">Select Your Side</h2>
+              <div className="grid grid-cols-2 gap-8 mb-10">
+                <button
+                  onClick={() => setSelectedColor('white')}
+                  className={`
+                    p-8 border-2 transition-all duration-200 flex flex-col items-center gap-4
+                    ${selectedColor === 'white'
+                      ? 'border-[#D4FF00] bg-[#D4FF00]/5'
+                      : 'border-gray-800 hover:border-gray-600'
+                    }
+                  `}
+                >
+                  <img src={KING_IMAGES.white} alt="White King" className="w-20 h-20" />
+                  <div className="text-center">
+                    <div className="font-serif text-xl text-white">WHITE</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setSelectedColor('black')}
+                  className={`
+                    p-8 border-2 transition-all duration-200 flex flex-col items-center gap-4
+                    ${selectedColor === 'black'
+                      ? 'border-[#D4FF00] bg-[#D4FF00]/5'
+                      : 'border-gray-800 hover:border-gray-600'
+                    }
+                  `}
+                >
+                  <img src={KING_IMAGES.black} alt="Black King" className="w-20 h-20" />
+                  <div className="text-center">
+                    <div className="font-serif text-xl text-white">BLACK</div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 py-4 border border-gray-800 hover:border-gray-600 text-gray-400 hover:text-white uppercase tracking-widest text-sm font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleStartAI}
+                  disabled={!selectedColor || isStartingAI}
+                  className={`
+                    flex-[2] py-4 font-bold uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3
+                    ${selectedColor && !isStartingAI
+                      ? 'bg-[#D4FF00] text-black hover:bg-white'
+                      : 'bg-gray-900 text-gray-600 cursor-not-allowed'
+                    }
+                  `}
+                >
+                  {isStartingAI && <span className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></span>}
+                  Start AI Game
+                </button>
               </div>
             </div>
           )}

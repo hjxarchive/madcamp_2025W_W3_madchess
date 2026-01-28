@@ -358,7 +358,8 @@ export const getGameReplay = async (gameId: number): Promise<any[]> => {
     // Initial state
     history.push({
       board: JSON.parse(JSON.stringify(engine.getBoard())),
-      turn: engine.getTurn()
+      turn: engine.getTurn(),
+      fen: engine.getFEN()
     });
 
     // Apply moves
@@ -378,6 +379,7 @@ export const getGameReplay = async (gameId: number): Promise<any[]> => {
       history.push({
         board: JSON.parse(JSON.stringify(engine.getBoard())),
         turn: engine.getTurn(),
+        fen: engine.getFEN(), // Add FEN for analysis
         lastMove: { from: uciFrom, to: uciTo, promotion }
       });
     }
@@ -388,3 +390,10 @@ export const getGameReplay = async (gameId: number): Promise<any[]> => {
     return [];
   }
 };
+
+export const getDailyStats = async () => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const gamesToday = await gameRepo.countGamesFromDate(today)
+  return { gamesToday }
+}

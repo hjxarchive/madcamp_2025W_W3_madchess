@@ -5,6 +5,11 @@ import * as gameService from '../modules/game/game.service.js'
 const gameManager = new GameManager()
 
 export function setupSocketHandlers(io: Server) {
+  // Set broadcast callback for GameManager (for AI moves and consistency)
+  gameManager.setBroadcastCallback((matchId, event, data) => {
+    io.to(matchId).emit(event, data)
+  })
+
   io.on('connection', (socket: Socket) => {
     console.log(`User connected: ${socket.id}`)
 
@@ -24,6 +29,43 @@ export function setupSocketHandlers(io: Server) {
       })
 
       console.log(`✅ Room ${room.code} created and sent to ${socket.id}`)
+    })
+
+    // AI 게임 생성
+    socket.on('create-ai-game', (data: {
+      userId: string;
+      deckId: string;
+      color: 'white' | 'black' | 'random';
+      difficulty: number;
+      username?: string;
+      picture?: string;
+      rating?: number
+    }) => {
+      console.log(`🤖 User ${data.userId} creating AI game (difficulty: ${data.difficulty})...`)
+
+      const match = gameManager.createAIGame(
+        socket.id,
+        String(data.userId),
+        data.deckId,
+        data.color,
+        data.difficulty,
+        data.username,
+        data.picture,
+        data.rating
+      )
+
+      // Join the match room
+      socket.join(match.id)
+
+      // AI 게임 생성 성공 응답 (기존 game-found와 유사한 포맷 사용)
+      socket.emit('game-found', {
+        matchId: match.id,
+        opponent: match.player2,
+        yourColor: match.player1Color,
+        isAI: true
+      })
+
+      console.log(`✅ AI Match ${match.id} created and sent to ${socket.id}`)
     })
 
     // 방 참가
@@ -134,27 +176,12 @@ export function setupSocketHandlers(io: Server) {
 
     // Player makes a move
     socket.on('make-move', (data: { matchId: string; move: any }) => {
-      // console.log(`♟️ Move received in match ${data.matchId}:`, data.move)
-
       const result = gameManager.makeMove(data.matchId, socket.id, data.move)
 
       if (result.success) {
-        // Broadcast move to everyone in the room (including spectators)
-        io.to(data.matchId).emit('move-made', {
-          matchId: data.matchId,
-          move: data.move,
-          socketId: socket.id, // Who made the move
-          moverColor: result.moverColor, // 'white' or 'black'
-          gameState: result.gameState, // Updated board state
-          isCheck: result.isCheck,
-          isCheckmate: result.isCheckmate,
-          isStalemate: result.isStalemate,
-          isDraw: result.isDraw,
-          whiteTime: result.whiteTime,
-          blackTime: result.blackTime
-        })
+        // Broadcast and Game Over now handled inside GameManager via broadcastCallback
 
-        // Handle Game Over
+        // Save game result to DB if game ended
         if (result.isCheckmate || result.isStalemate || result.isDraw || result.winner) {
           const winner = result.winner || (result.isCheckmate
             ? (result.moverColor === 'white' ? 'white' : 'black')
@@ -162,17 +189,6 @@ export function setupSocketHandlers(io: Server) {
 
           const reason = result.drawReason || (result.isCheckmate ? 'checkmate' : (result.isStalemate ? 'stalemate' : 'draw'))
 
-          console.log(`👑 Game Over! Winner: ${winner}, Reason: ${reason}`)
-
-          // Update game status in GameManager
-          gameManager.endGame(data.matchId, { winner, reason })
-
-          io.to(data.matchId).emit('game-over', {
-            winner,
-            reason,
-          })
-
-          // Save game result to DB
           const match = gameManager.getMatch(data.matchId)
           if (match) {
             const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
@@ -223,6 +239,11 @@ export function setupSocketHandlers(io: Server) {
       // DB에 게임 결과 저장 (백업 선언도 저장)
       const match = gameManager.getMatch(data.matchId)
       if (match) {
+        // [FIX] 중복 저장 방지
+        if (match.gameState.status !== 'playing') {
+          return
+        }
+
         const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
         const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
         const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
@@ -257,8 +278,9 @@ export function setupSocketHandlers(io: Server) {
           black: blackPlayer,
           pgn: gameManager.getMatchPGN(data.matchId)
         })
-        console.log(`✅ User ${data.userId} rejoined match ${data.matchId}`)
+        console.log(`✅ User ${data.userId} successfully rejoined match ${data.matchId}`)
       } else {
+        console.warn(`❌ Rejoin FAILED for user ${data.userId} in match ${data.matchId}: ${result.error}`)
         socket.emit('rejoin-error', { message: result.error || 'Failed to rejoin' })
       }
     })
@@ -304,6 +326,12 @@ export function setupSocketHandlers(io: Server) {
 
       const match = gameManager.getMatch(data.matchId)
       if (match) {
+        // [FIX] 중복 저장 방지: 게임이 이미 종료되었으면 무시
+        if (match.gameState.status !== 'playing') {
+          console.log(`⚠️ Timeout ignored for match ${data.matchId}: Game already finished (${match.gameState.status})`)
+          return
+        }
+
         // loserColor가 지정되면 그 색상이 패배, 아니면 보낸 플레이어가 패배
         let timedOutColor: 'white' | 'black'
         if (data.loserColor) {
@@ -369,6 +397,9 @@ export function setupSocketHandlers(io: Server) {
     socket.on('respond-draw', (data: { matchId: string; accept: boolean }) => {
       console.log(`🤝 Player ${socket.id} ${data.accept ? 'accepted' : 'rejected'} draw in match ${data.matchId}`)
       if (data.accept) {
+        const match = gameManager.getMatch(data.matchId)
+        if (!match || match.gameState.status !== 'playing') return
+
         // Draw accepted - game over
         gameManager.endGame(data.matchId, { winner: 'draw', reason: 'mutual agreement' }) // Status Update
 
@@ -378,15 +409,12 @@ export function setupSocketHandlers(io: Server) {
         })
 
         // DB에 게임 결과 저장
-        const match = gameManager.getMatch(data.matchId)
-        if (match) {
-          const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
-          const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
-          const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
-          const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-          const pgn = gameManager.getMatchPGN(data.matchId)
-          gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'mutual agreement', pgn)
-        }
+        const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
+        const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
+        const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
+        const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
+        const pgn = gameManager.getMatchPGN(data.matchId)
+        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'mutual agreement', pgn)
       }
       // If rejected, no action needed - game continues
     })
@@ -396,6 +424,18 @@ export function setupSocketHandlers(io: Server) {
       gameManager.removeFromQueue(socket.id)
     })
 
+    // Request FEN analysis (Stateless - used for Replay)
+    socket.on('analyze-fen', async (data: { fen: string }) => {
+      try {
+        if (!data.fen) return
+        const result = await gameManager.analyzeFen(data.fen)
+        socket.emit('analysis-result', result)
+      } catch (error: any) {
+        console.error('❌ FEN Analysis failed:', error)
+        socket.emit('analysis-error', { message: error.message || 'Analysis failed' })
+      }
+    })
+
     // ===== Spectator Events =====
 
     // Get list of live games
@@ -403,6 +443,20 @@ export function setupSocketHandlers(io: Server) {
       const liveGames = gameManager.getLiveGames()
       socket.emit('live-games', { games: liveGames })
       console.log(`📺 Sent ${liveGames.length} live games to ${socket.id}`)
+    })
+
+    // Get server stats
+    socket.on('get-server-stats', async () => {
+      try {
+        const { gamesToday } = await gameService.getDailyStats()
+        const onlineUsers = io.engine.clientsCount
+        socket.emit('server-stats', {
+          gamesToday,
+          onlineUsers
+        })
+      } catch (error) {
+        console.error('Failed to get server stats:', error)
+      }
     })
 
     // Join a game as spectator
@@ -426,6 +480,23 @@ export function setupSocketHandlers(io: Server) {
       socket.leave(data.matchId)
       gameManager.removeSpectator(data.matchId, socket.id)
       console.log(`👁️ ${socket.id} left spectating ${data.matchId}`)
+    })
+
+    // Request game analysis
+    // Request game analysis
+    socket.on('request-analysis', async (data: { matchId: string }) => {
+      try {
+        const match = gameManager.getMatch(data.matchId)
+        if (!match) throw new Error('Match not found')
+
+        // Allow live analysis for players (User request)
+        const result = await gameManager.analyzeGame(data.matchId)
+        console.log(`🧠 Analysis result sent to ${socket.id}`)
+        socket.emit('analysis-result', result)
+      } catch (error: any) {
+        console.error('❌ Analysis failed:', error)
+        socket.emit('analysis-error', { message: error.message || 'Analysis failed' })
+      }
     })
 
     // Disconnect

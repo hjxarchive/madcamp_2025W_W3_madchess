@@ -26,8 +26,9 @@ export interface UserStats {
     losses: number
     draws: number
     winRate: number
-    currentWinStreak: number
-    longestWinStreak: number
+    currentStreak: number
+    bestStreak: number
+    favoriteDeck: string
     recentGames: RecentGame[]
 }
 

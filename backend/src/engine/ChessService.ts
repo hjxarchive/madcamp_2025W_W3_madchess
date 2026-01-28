@@ -206,7 +206,8 @@ export class ChessService {
 
                             // Force turn to the querying color for validation
                             this.turn = color
-                            const result = this.makeMove(fromUci, toUci, promo)
+                            // Pass false to skip status checks (prevent recursion)
+                            const result = this.makeMove(fromUci, toUci, promo, false)
 
                             // Restore engine state after simulation
                             this.restoreSnapshot(snapshot)
@@ -254,6 +255,14 @@ export class ChessService {
         if (this.isOnBoard(pos)) {
             this.board[pos.rank][pos.file] = piece
         }
+    }
+
+    /**
+     * Get piece at UCI coordinate (e.g. "e2")
+     */
+    getPieceAtUci(uci: string): Piece | null {
+        const pos = this.uciToPosition(uci)
+        return this.getPiece(pos)
     }
 
     /**
@@ -481,8 +490,16 @@ export class ChessService {
 
     /**
      * Make a move
+     * @param checkStatus If true, checks for checkmate/stalemate/draw (can cause recursion if called from legal move generation)
      */
-    makeMove(from: string, to: string, promotion?: string): { success: boolean; isCheck: boolean; isCheckmate: boolean; isStalemate: boolean; isDraw: boolean; drawReason?: string } {
+    makeMove(from: string, to: string, promotion?: string, checkStatus: boolean = true): {
+        success: boolean
+        isCheck?: boolean
+        isCheckmate?: boolean
+        isStalemate?: boolean
+        isDraw?: boolean
+        drawReason?: string
+    } {
         const fromPos = this.uciToPosition(from)
         const toPos = this.uciToPosition(to)
 
@@ -605,8 +622,14 @@ export class ChessService {
 
         // Check for check, checkmate, and stalemate
         const isCheck = this.isKingInCheck(this.turn)
-        const isCheckmate = isCheck && this.isCheckmate(this.turn)
-        const isStalemate = !isCheck && this.isStalemate(this.turn)
+
+        let isCheckmate = false
+        let isStalemate = false
+
+        if (checkStatus) {
+            isCheckmate = isCheck && this.isCheckmate(this.turn)
+            isStalemate = !isCheck && this.isStalemate(this.turn)
+        }
 
         // Check for draw conditions
         let isDraw = false
@@ -648,113 +671,17 @@ export class ChessService {
      */
     isCheckmate(color: 'white' | 'black'): boolean {
         if (!this.isKingInCheck(color)) return false
-
-        // Try all possible moves to see if any can get out of check
-        for (let fromRank = 0; fromRank < 8; fromRank++) {
-            for (let fromFile = 0; fromFile < 8; fromFile++) {
-                const piece = this.board[fromRank][fromFile]
-                if (piece && piece.color === color) {
-                    for (let toRank = 0; toRank < 8; toRank++) {
-                        for (let toFile = 0; toFile < 8; toFile++) {
-                            // Try this move
-                            const from = { file: fromFile, rank: fromRank }
-                            const to = { file: toFile, rank: toRank }
-
-                            // Save state
-                            const originalTarget = this.getPiece(to)
-                            const originalTurn = this.turn
-
-                            // Try move (simplified check)
-                            this.turn = color
-                            this.setPiece(to, piece)
-                            this.setPiece(from, null)
-
-                            const stillInCheck = this.isKingInCheck(color)
-
-                            // Restore state
-                            this.setPiece(from, piece)
-                            this.setPiece(to, originalTarget)
-                            this.turn = originalTurn
-
-                            if (!stillInCheck) {
-                                return false // Found a move that gets out of check
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return true // No move can get out of check
+        const legalMoves = this.getLegalMovesForColor(color)
+        return legalMoves.length === 0
     }
 
     /**
      * Check if current player is in stalemate (no legal moves but not in check)
      */
     isStalemate(color: 'white' | 'black'): boolean {
-        // Must NOT be in check
         if (this.isKingInCheck(color)) return false
-
-        // Check if there are any legal moves
-        for (let fromRank = 0; fromRank < 8; fromRank++) {
-            for (let fromFile = 0; fromFile < 8; fromFile++) {
-                const piece = this.board[fromRank][fromFile]
-                if (piece && piece.color === color) {
-                    for (let toRank = 0; toRank < 8; toRank++) {
-                        for (let toFile = 0; toFile < 8; toFile++) {
-                            const from = { file: fromFile, rank: fromRank }
-                            const to = { file: toFile, rank: toRank }
-
-                            // Skip if target has own piece
-                            const targetPiece = this.getPiece(to)
-                            if (targetPiece && targetPiece.color === color) continue
-
-                            // Try to validate the move
-                            let isValidPieceMove = false
-                            switch (piece.type) {
-                                case 'p':
-                                    isValidPieceMove = this.isValidPawnMove(from, to, piece)
-                                    break
-                                case 'n':
-                                    isValidPieceMove = this.isValidKnightMove(from, to)
-                                    break
-                                case 'b':
-                                    isValidPieceMove = this.isValidBishopMove(from, to)
-                                    break
-                                case 'r':
-                                    isValidPieceMove = this.isValidRookMove(from, to)
-                                    break
-                                case 'q':
-                                    isValidPieceMove = this.isValidQueenMove(from, to)
-                                    break
-                                case 'k':
-                                    isValidPieceMove = this.isValidKingMove(from, to)
-                                    break
-                            }
-
-                            if (!isValidPieceMove) continue
-
-                            // Test if move would put own king in check
-                            const originalTarget = this.getPiece(to)
-                            this.setPiece(to, piece)
-                            this.setPiece(from, null)
-
-                            const wouldBeInCheck = this.isKingInCheck(color)
-
-                            // Restore board
-                            this.setPiece(from, piece)
-                            this.setPiece(to, originalTarget)
-
-                            if (!wouldBeInCheck) {
-                                return false // Found a legal move
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return true // No legal moves available
+        const legalMoves = this.getLegalMovesForColor(color)
+        return legalMoves.length === 0
     }
 
     /**
@@ -851,4 +778,128 @@ export class ChessService {
         return this.moves.join(' ')
     }
 
+    /**
+     * Get FEN string for current state (Chess960 compatible)
+     */
+    getFEN(): string {
+        let fen = ''
+
+        // 1. Piece Placement
+        for (let rank = 7; rank >= 0; rank--) {
+            let emptyCount = 0
+            for (let file = 0; file < 8; file++) {
+                const piece = this.board[rank][file]
+                if (piece) {
+                    if (emptyCount > 0) {
+                        fen += emptyCount
+                        emptyCount = 0
+                    }
+                    const fenChar = piece.color === 'white' ? piece.type.toUpperCase() : piece.type.toLowerCase()
+                    fen += fenChar
+                } else {
+                    emptyCount++
+                }
+            }
+            if (emptyCount > 0) {
+                fen += emptyCount
+            }
+            if (rank > 0) {
+                fen += '/'
+            }
+        }
+
+        // 2. Active Color
+        fen += ` ${this.turn === 'white' ? 'w' : 'b'}`
+
+        // 3. Castling Availability
+        let castling = ''
+
+        // Helper to find potential castling rooks
+        const findCastlingRook = (rank: number, kingFile: number, side: 'kingside' | 'queenside', color: 'white' | 'black') => {
+            // Check castling right flag first
+            const right = color === 'white'
+                ? (side === 'kingside' ? this.castlingRights.whiteKingSide : this.castlingRights.whiteQueenSide)
+                : (side === 'kingside' ? this.castlingRights.blackKingSide : this.castlingRights.blackQueenSide)
+
+            if (!right) return null
+
+            // Find rook
+            const start = side === 'kingside' ? kingFile + 1 : 0
+            const end = side === 'kingside' ? 7 : kingFile - 1
+            const step = 1 // Loop direction doesn't strictly matter if we pick outermost, but let's iterate outward-in or inward-out?
+
+            // Iterate from outermost inward to find the primary rook for that side
+            if (side === 'kingside') {
+                for (let f = 7; f > kingFile; f--) {
+                    const p = this.board[rank][f]
+                    if (p?.type === 'r' && p?.color === color) {
+                        // For Standard Chess compatibility (chess.js), use K/Q if on standard files
+                        if (f === 7) return color === 'white' ? 'K' : 'k'
+                        // Fallback to Shredder-FEN (File letters) for 960 positions
+                        return String.fromCharCode((color === 'white' ? 'A' : 'a').charCodeAt(0) + f)
+                    }
+                }
+            } else {
+                for (let f = 0; f < kingFile; f++) {
+                    const p = this.board[rank][f]
+                    if (p?.type === 'r' && p?.color === color) {
+                        if (f === 0) return color === 'white' ? 'Q' : 'q'
+                        return String.fromCharCode((color === 'white' ? 'A' : 'a').charCodeAt(0) + f)
+                    }
+                }
+            }
+            return null
+        }
+
+        // White Castling
+        if (!this.kingMoved.white) {
+            let kingFile = -1
+            for (let f = 0; f < 8; f++) {
+                if (this.board[0][f]?.type === 'k' && this.board[0][f]?.color === 'white') {
+                    kingFile = f; break;
+                }
+            }
+            if (kingFile !== -1) {
+                const k = findCastlingRook(0, kingFile, 'kingside', 'white')
+                if (k) castling += k
+                const q = findCastlingRook(0, kingFile, 'queenside', 'white')
+                if (q) castling += q
+            }
+        }
+
+        // Black Castling
+        if (!this.kingMoved.black) {
+            let kingFile = -1
+            for (let f = 0; f < 8; f++) {
+                if (this.board[7][f]?.type === 'k' && this.board[7][f]?.color === 'black') {
+                    kingFile = f; break;
+                }
+            }
+            if (kingFile !== -1) {
+                const k = findCastlingRook(7, kingFile, 'kingside', 'black')
+                if (k) castling += k
+                const q = findCastlingRook(7, kingFile, 'queenside', 'black')
+                if (q) castling += q
+            }
+        }
+
+        if (castling === '') castling = '-'
+        fen += ` ${castling}`
+
+        // 4. En Passant
+        if (this.enPassantTarget) {
+            fen += ` ${this.positionToUci(this.enPassantTarget)}`
+        } else {
+            fen += ' -'
+        }
+
+        // 5. Halfmove
+        fen += ` ${this.halfmoveClock}`
+
+        // 6. Fullmove
+        const fullmove = Math.floor(this.moves.length / 2) + 1
+        fen += ` ${fullmove}`
+
+        return fen
+    }
 }

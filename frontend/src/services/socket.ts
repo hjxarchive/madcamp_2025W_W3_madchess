@@ -5,6 +5,7 @@ class SocketService {
   private socket: Socket | null = null
 
   connect() {
+    if (this.socket) return this.socket
     const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:5001'
     this.socket = io(socketUrl, {
       transports: ['websocket'],
@@ -53,6 +54,14 @@ class SocketService {
     if (this.socket) {
       this.socket.emit('create-room', { userId, deckId, color, username, picture, rating })
       console.log('Creating room:', { userId, deckId, color, username })
+    }
+  }
+
+  // AI 게임 생성
+  createAIGame(userId: string, deckId: string, color: 'white' | 'black' | 'random', difficulty: number, username?: string, picture?: string, rating?: number) {
+    if (this.socket) {
+      this.socket.emit('create-ai-game', { userId, deckId, color, difficulty, username, picture, rating })
+      console.log('Creating AI game:', { userId, deckId, color, difficulty, username })
     }
   }
 
@@ -474,6 +483,57 @@ class SocketService {
   offSpectateError() {
     if (this.socket) {
       this.socket.off('spectate-error')
+    }
+  }
+
+  // Analysis
+  requestAnalysis(matchId: string) {
+    if (this.socket) {
+      this.socket.emit('request-analysis', { matchId })
+      console.log('🧠 Requesting analysis for match', matchId)
+    }
+  }
+
+  onAnalysisResult(callback: (data: { type: 'cp' | 'mate', value: number, bestMove?: string }) => void) {
+    if (this.socket) {
+      this.socket.on('analysis-result', callback)
+    }
+  }
+
+  onAnalysisError(callback: (data: { message: string }) => void) {
+    if (this.socket) {
+      this.socket.on('analysis-error', callback)
+    }
+  }
+
+  offAnalysisResult() {
+    if (this.socket) {
+      this.socket.off('analysis-result')
+    }
+  }
+
+  offAnalysisError() {
+    if (this.socket) {
+      this.socket.off('analysis-error')
+    }
+  }
+
+  // Server Stats
+  requestServerStats() {
+    if (this.socket) {
+      this.socket.emit('get-server-stats')
+    }
+  }
+
+  onServerStats(callback: (data: { gamesToday: number; onlineUsers: number }) => void) {
+    if (this.socket) {
+      this.socket.on('server-stats', callback)
+    }
+  }
+
+  offServerStats() {
+    if (this.socket) {
+      this.socket.off('server-stats')
     }
   }
 }

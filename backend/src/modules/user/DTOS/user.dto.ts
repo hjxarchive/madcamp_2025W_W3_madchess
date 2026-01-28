@@ -19,6 +19,7 @@ export interface UserStatsDto {
   winRate: number;
   currentStreak: number;
   bestStreak: number;
+  favoriteDeck: string;
   recentGames: RecentGameDto[];
 }
 

@@ -29,7 +29,7 @@ export default function LoginPage() {
                 localStorage.removeItem('loginRedirect')
                 navigate(savedRedirect, { replace: true })
             } else {
-                navigate('/matchmaking', { replace: true })
+                navigate('/', { replace: true })
             }
         }
     }, [isAuthenticated, user, navigate])
