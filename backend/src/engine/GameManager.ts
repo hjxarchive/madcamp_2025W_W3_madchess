@@ -684,7 +684,8 @@ export class GameManager {
         isStalemate: result.isStalemate,
         isDraw: result.isDraw,
         whiteTime: match.whiteTime,
-        blackTime: match.blackTime
+        blackTime: match.blackTime,
+        lastMoveTime: match.lastMoveTime
       })
 
       if (winner && reason) {

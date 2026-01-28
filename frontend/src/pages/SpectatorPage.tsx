@@ -18,8 +18,15 @@ export default function SpectatorPage() {
     const [currentTurn, setCurrentTurn] = useState<PieceColor>('white')
     const [white, setWhite] = useState<PlayerInfo>({ username: 'White', rating: 1500 })
     const [black, setBlack] = useState<PlayerInfo>({ username: 'Black', rating: 1500 })
+    // Displayed Time
     const [whiteTime, setWhiteTime] = useState(600000)
     const [blackTime, setBlackTime] = useState(600000)
+
+    // Server Truth (Reference for absolute sync)
+    const [serverWhiteTime, setServerWhiteTime] = useState(600000)
+    const [serverBlackTime, setServerBlackTime] = useState(600000)
+    const [lastMoveTime, setLastMoveTime] = useState<number | undefined>(undefined)
+
     const [timeControl, setTimeControl] = useState('10+0')
     const [pgn, setPgn] = useState('')
     const [isCheck, setIsCheck] = useState(false)
@@ -48,8 +55,15 @@ export default function SpectatorPage() {
 
             if (data.white) setWhite(data.white)
             if (data.black) setBlack(data.black)
-            if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
-            if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+            if (data.whiteTime !== undefined) {
+                setWhiteTime(data.whiteTime)
+                setServerWhiteTime(data.whiteTime)
+            }
+            if (data.blackTime !== undefined) {
+                setBlackTime(data.blackTime)
+                setServerBlackTime(data.blackTime)
+            }
+            if (data.lastMoveTime !== undefined) setLastMoveTime(data.lastMoveTime)
             if (data.timeControl) setTimeControl(data.timeControl)
             if (data.pgn) setPgn(data.pgn)
         }
@@ -69,8 +83,15 @@ export default function SpectatorPage() {
                 setLastMove(data.move)
             }
 
-            if (data.whiteTime !== undefined) setWhiteTime(data.whiteTime)
-            if (data.blackTime !== undefined) setBlackTime(data.blackTime)
+            if (data.whiteTime !== undefined) {
+                setWhiteTime(data.whiteTime)
+                setServerWhiteTime(data.whiteTime)
+            }
+            if (data.blackTime !== undefined) {
+                setBlackTime(data.blackTime)
+                setServerBlackTime(data.blackTime)
+            }
+            if (data.lastMoveTime !== undefined) setLastMoveTime(data.lastMoveTime)
         }
 
         // Handle game over
@@ -138,12 +159,20 @@ export default function SpectatorPage() {
         }
 
         timerRef.current = setInterval(() => {
+            if (!lastMoveTime) return
+
+            const now = Date.now()
+            const elapsed = now - lastMoveTime
+
+            // Absolute sync: Display = ServerTime - (Now - LastMoveTime)
             if (currentTurn === 'white') {
-                setWhiteTime(prev => Math.max(0, prev - 100))
+                setWhiteTime(Math.max(0, serverWhiteTime - elapsed))
+                setBlackTime(serverBlackTime) // Black's time is static during White's turn
             } else {
-                setBlackTime(prev => Math.max(0, prev - 100))
+                setWhiteTime(serverWhiteTime) // White's time is static during Black's turn
+                setBlackTime(Math.max(0, serverBlackTime - elapsed))
             }
-        }, 100)
+        }, 50) // Update frequently for smooth UI
 
         return () => {
             if (timerRef.current) clearInterval(timerRef.current)
