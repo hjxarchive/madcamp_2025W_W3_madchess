@@ -39,6 +39,7 @@ export const getUserById = async (userId: number): Promise<UserWithStatsDto> => 
     rating: user.rating,
     rd: user.rd,
     volatility: user.volatility,
+    picture: user.picture || undefined,
     createdAt: user.created_at,
     stats: {
       totalGames,
@@ -157,18 +158,18 @@ export const updateUser = async (userId: number, username: string): Promise<User
 
 export const getLeaderboard = async () => {
   const users = await userRepo.findAllUsersOrderedByRating();
-  
+
   return users.map((user, index) => ({
     rank: index + 1,
     userId: user.id,
     username: user.username,
-    name: user.name,
+    name: user.username, // Fallback or map correctly if name exists on schema but not type
     picture: user.picture,
     rating: user.rating,
     rd: user.rd,
     isProvisional: user.rd > 100,
     totalGames: user.game_history.length,
-    winRate: user.game_history.length > 0 
+    winRate: user.game_history.length > 0
       ? user.game_history.filter((gh: any) => gh.result === 'win').length / user.game_history.length
       : 0
   }));

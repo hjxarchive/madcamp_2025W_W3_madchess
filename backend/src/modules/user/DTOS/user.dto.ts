@@ -8,6 +8,7 @@ export interface UserResponseDto {
   rating: number;
   rd: number;
   volatility: number;
+  picture?: string;
   createdAt: Date;
 }
 
