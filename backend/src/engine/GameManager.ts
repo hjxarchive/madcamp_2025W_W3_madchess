@@ -617,8 +617,8 @@ export class GameManager {
 
     // Sync GameState from Engine and Update standardPgn
     const moverColor = match.player1SocketId === socketId ? match.player1Color : match.player2Color
-    // We don't have algebraic yet, so use UCI space-separated for PGN logic
-    const moveStr = `${move.from}${move.to}${move.promotion || ''}`
+    // Use SAN if available, otherwise UCI
+    const moveStr = result.san || `${move.from}${move.to}${move.promotion || ''}`
 
     if (moverColor === 'white') {
       const moveNumber = Math.floor(match.gameState.moveCount / 2) + 1

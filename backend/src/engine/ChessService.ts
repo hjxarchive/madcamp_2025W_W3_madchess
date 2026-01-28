@@ -488,6 +488,84 @@ export class ChessService {
         return this.isSquareAttacked(kingPos, opponentColor)
     }
 
+    // Helper to Convert File to Char
+    private fileToChar(file: number): string {
+        return ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'][file]
+    }
+
+    // Generate SAN for a move
+    private generateSan(from: Position, to: Position, piece: Piece, isCapture: boolean, isCheck: boolean, isCheckmate: boolean, promotion: string | undefined, ambiguityCandidates: Position[]): string {
+        if (piece.type === 'k' && Math.abs(to.file - from.file) === 2) {
+            return to.file > from.file ? 'O-O' : 'O-O-O'
+        }
+
+        let san = ''
+
+        if (piece.type === 'p') {
+            if (isCapture) {
+                san = `${this.fileToChar(from.file)}x${this.positionToUci(to)}`
+            } else {
+                san = this.positionToUci(to)
+            }
+        } else {
+            san = piece.type.toUpperCase()
+
+            // Disambiguation
+            const others = ambiguityCandidates
+            if (others.length > 0) {
+                const sameFile = others.some(p => p.file === from.file)
+                const sameRank = others.some(p => p.rank === from.rank)
+
+                if (!sameFile) {
+                    san += this.fileToChar(from.file)
+                } else if (!sameRank) {
+                    san += (from.rank + 1).toString()
+                } else {
+                    san += this.fileToChar(from.file) + (from.rank + 1).toString()
+                }
+            }
+
+            if (isCapture) san += 'x'
+            san += this.positionToUci(to)
+        }
+
+        if (promotion) {
+            san += `=${promotion.toUpperCase()}`
+        }
+
+        if (isCheckmate) san += '#'
+        else if (isCheck) san += '+'
+
+        return san
+    }
+
+    private findAmbiguousPieces(from: Position, to: Position, piece: Piece): Position[] {
+        const candidates: Position[] = []
+        const toUci = this.positionToUci(to)
+
+        for (let r = 0; r < 8; r++) {
+            for (let f = 0; f < 8; f++) {
+                if (r === from.rank && f === from.file) continue
+
+                const p = this.board[r][f]
+                if (p && p.type === piece.type && p.color === piece.color) {
+                    const fromUci = this.positionToUci({ file: f, rank: r })
+
+                    const snapshot = this.createSnapshot()
+                    this.turn = piece.color
+
+                    const result = this.makeMove(fromUci, toUci, undefined, false)
+                    this.restoreSnapshot(snapshot)
+
+                    if (result.success) {
+                        candidates.push({ file: f, rank: r })
+                    }
+                }
+            }
+        }
+        return candidates
+    }
+
     /**
      * Make a move
      * @param checkStatus If true, checks for checkmate/stalemate/draw (can cause recursion if called from legal move generation)
@@ -499,6 +577,7 @@ export class ChessService {
         isStalemate?: boolean
         isDraw?: boolean
         drawReason?: string
+        san?: string
     } {
         const fromPos = this.uciToPosition(from)
         const toPos = this.uciToPosition(to)
@@ -545,6 +624,38 @@ export class ChessService {
 
         if (!isValid) {
             return { success: false, isCheck: false, isCheckmate: false, isStalemate: false, isDraw: false }
+        }
+
+        // Pre-calculate Capture and Disambiguation for SAN (if real move)
+        let isCapture = false
+        let disambiguation = '' // We calculate full SAN later, but might need pre-calculation if findAmbiguousPieces relies on old board.
+        // Actually, findAmbiguousPieces relies on OLD board. generateSan handles it? 
+        // No, findAmbiguousPieces IS CALLED inside generateSan in my previous code.
+        // BUT generateSan is called at end, when BOARD IS CHANGED.
+        // ERROR in previous thought: findAmbiguousPieces will fail if board is changed because 'from' piece is gone.
+        // FIX: I must capture disambiguation here, or at least the raw data needed.
+        // Actually, piece is moved. 'from' is empty.
+        // So findAmbiguousPieces must be called HERE.
+
+        let san = ''
+        if (checkStatus) {
+            isCapture = !!targetPiece || (piece.type === 'p' && !!this.enPassantTarget && toPos.file === this.enPassantTarget.file && toPos.rank === this.enPassantTarget.rank)
+
+            // Calculate SAN here? No, we need isCheck/isCheckmate which are calculated AFTER move.
+            // But we need disambiguation BEFORE move.
+            // So we calculate disambiguation here, store it (or candidates), and pass to generateSan.
+            // I'll modify generateSan signature to accept `candidates` or assume I handle it?
+            // Actually, simply:
+            // Calculate ambiguous pieces HERE.
+            // But generateSan logic is encapsulated.
+            // I'll modify generateSan to take "ambiguousPieces" list.
+            // No, I'll calculate `sanBase` here (e.g. 'Nbd7' part) and append check/mate later.
+            // Actually, simpler: just call findAmbiguousPieces HERE.
+        }
+
+        let ambiguityInfo: Position[] = []
+        if (checkStatus) {
+            ambiguityInfo = this.findAmbiguousPieces(fromPos, toPos, piece)
         }
 
         // Make the move temporarily to check if it puts own king in check
@@ -647,10 +758,16 @@ export class ChessService {
             drawReason = 'insufficient material'
         }
 
-        const moveString = promotion ? `${from}${to}${promotion}` : `${from}${to}`
-        this.moves.push(moveString)
+        if (checkStatus) {
+            // Use pre-calculated ambiguityInfo
+            san = this.generateSan(fromPos, toPos, piece, isCapture, isCheck, isCheckmate, promotion, ambiguityInfo)
+            this.moves.push(san)
+        } else {
+            const moveString = promotion ? `${from}${to}${promotion}` : `${from}${to}`
+            this.moves.push(moveString)
+        }
 
-        return { success: true, isCheck, isCheckmate, isStalemate, isDraw, drawReason }
+        return { success: true, isCheck, isCheckmate, isStalemate, isDraw, drawReason, san }
     }
 
     /**
