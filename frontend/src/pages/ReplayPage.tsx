@@ -353,27 +353,7 @@ export default function ReplayPage() {
         <div className="flex gap-4 justify-center items-start">
           <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center gap-4">
             {/* Engine Lines */}
-            <div className="flex flex-col gap-2 w-64 bg-[#0A0A0A]/80 backdrop-blur rounded p-2 text-xs font-mono border border-gray-800">
-              <div className="text-gray-500 uppercase tracking-widest text-[10px] mb-1">Engine Analysis</div>
-              {analysisLines.length > 0 ? (
-                analysisLines.map((line) => (
-                  <div key={line.id} className="flex flex-col gap-0.5 border-b border-gray-800 last:border-0 pb-1 last:pb-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#D4FF00]">
-                        {line.type === 'mate' ? `M${Math.abs(line.value)}` :
-                          (line.value > 0 ? `+${(line.value / 100).toFixed(1)}` : (line.value / 100).toFixed(1))}
-                      </span>
-                      <span className="text-gray-600">Depth 19</span>
-                    </div>
-                    <div className="text-gray-400 truncate" title={line.pv}>
-                      {line.pv || 'Thinking...'}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-gray-600 italic">Analysis loading...</div>
-              )}
-            </div>
+            {/* Engine Analysis moved to right column */}
 
             <EvalBar evaluation={analysisLines.length > 0 ? { type: analysisLines[0].type, value: analysisLines[0].value } : null} />
           </div>
@@ -393,84 +373,109 @@ export default function ReplayPage() {
         </div>
 
         {/* Controls Panel */}
-        <div className="bg-[#0A0A0A] border border-gray-800 p-6 w-full max-w-sm">
-          <div className="flex items-center justify-between mb-8">
-            <div className="text-gray-500 text-xs uppercase tracking-widest">Move</div>
-            <div className="text-2xl font-mono text-[#D4FF00]">
-              {currentIndex} <span className="text-gray-600 text-lg">/ {history.length - 1}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <button
-              onClick={() => setCurrentIndex(0)}
-              disabled={currentIndex === 0}
-              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
-            >
-              ⏮
-            </button>
-            <button
-              onClick={handlePrev}
-              disabled={currentIndex === 0}
-              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
-            >
-              ◀
-            </button>
-            <button
-              onClick={togglePlay}
-              className="p-3 bg-[#D4FF00] text-black hover:bg-white rounded transition-colors w-16 h-16 flex items-center justify-center text-2xl font-bold"
-            >
-              {isPlaying ? '⏸' : '▶'}
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={currentIndex === history.length - 1}
-              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
-            >
-              ▶
-            </button>
-            <button
-              onClick={() => setCurrentIndex(history.length - 1)}
-              disabled={currentIndex === history.length - 1}
-              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
-            >
-              ⏭
-            </button>
-          </div>
-
-          {/* Move History List */}
-          <div className="border-t border-gray-800 pt-4 flex-1 overflow-hidden flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h3>
-              <span className="text-xs text-gray-500">{history.length - 1} moves</span>
-            </div>
-            <div className="overflow-y-auto space-y-0.5 font-mono text-sm max-h-60 pr-1 custom-scrollbar">
-              {parseMoves(gameInfo?.pgn || '').map((m, idx) => {
-                const whiteMoveIndex = idx * 2 + 1
-                const blackMoveIndex = idx * 2 + 2
-
-                // Highlight check
-                const isWhiteActive = currentIndex === whiteMoveIndex
-                const isBlackActive = currentIndex === blackMoveIndex
-
-                return (
-                  <div key={idx} className="grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1 hover:bg-gray-900/50 rounded">
-                    <span className="text-gray-600">{m.move}.</span>
-                    <span
-                      className={`cursor-pointer transition-colors ${isWhiteActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
-                      onClick={() => setCurrentIndex(whiteMoveIndex)}
-                    >
-                      {m.white}
+        <div className="bg-[#0A0A0A] border border-gray-800 p-6 w-full max-w-sm flex flex-col gap-6">
+          {/* Engine Analysis */}
+          <div className="flex flex-col gap-2 w-full bg-[#0A0A0A]/80 backdrop-blur rounded p-2 text-xs font-mono border border-gray-800">
+            <div className="text-gray-500 uppercase tracking-widest text-[10px] mb-1">Engine Analysis</div>
+            {analysisLines.length > 0 ? (
+              analysisLines.map((line) => (
+                <div key={line.id} className="flex flex-col gap-0.5 border-b border-gray-800 last:border-0 pb-1 last:pb-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[#D4FF00]">
+                      {line.type === 'mate' ? `M${Math.abs(line.value)}` :
+                        (line.value > 0 ? `+${(line.value / 100).toFixed(1)}` : (line.value / 100).toFixed(1))}
                     </span>
-                    <span
-                      className={`cursor-pointer transition-colors ${isBlackActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
-                      onClick={() => { if (m.black) setCurrentIndex(blackMoveIndex) }}
-                    >
-                      {m.black}
-                    </span>
+                    <span className="text-gray-600">Depth 19</span>
                   </div>
-                )
-              })}
+                  <div className="text-gray-400 truncate" title={line.pv}>
+                    {line.pv || 'Thinking...'}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-gray-600 italic">Analysis loading...</div>
+            )}
+          </div>
+
+          <div className="border-t border-gray-800 pt-4">
+            <div className="flex items-center justify-between mb-8">
+              <div className="text-gray-500 text-xs uppercase tracking-widest">Move</div>
+              <div className="text-2xl font-mono text-[#D4FF00]">
+                {currentIndex} <span className="text-gray-600 text-lg">/ {history.length - 1}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <button
+                onClick={() => setCurrentIndex(0)}
+                disabled={currentIndex === 0}
+                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
+              >
+                ⏮
+              </button>
+              <button
+                onClick={handlePrev}
+                disabled={currentIndex === 0}
+                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
+              >
+                ◀
+              </button>
+              <button
+                onClick={togglePlay}
+                className="p-3 bg-[#D4FF00] text-black hover:bg-white rounded transition-colors w-16 h-16 flex items-center justify-center text-2xl font-bold"
+              >
+                {isPlaying ? '⏸' : '▶'}
+              </button>
+              <button
+                onClick={handleNext}
+                disabled={currentIndex === history.length - 1}
+                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
+              >
+                ▶
+              </button>
+              <button
+                onClick={() => setCurrentIndex(history.length - 1)}
+                disabled={currentIndex === history.length - 1}
+                className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
+              >
+                ⏭
+              </button>
+            </div>
+
+            {/* Move History List */}
+            <div className="border-t border-gray-800 pt-4 flex-1 overflow-hidden flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h3>
+                <span className="text-xs text-gray-500">{history.length - 1} moves</span>
+              </div>
+              <div className="overflow-y-auto space-y-0.5 font-mono text-sm max-h-60 pr-1 custom-scrollbar">
+                {parseMoves(gameInfo?.pgn || '').map((m, idx) => {
+                  const whiteMoveIndex = idx * 2 + 1
+                  const blackMoveIndex = idx * 2 + 2
+
+                  // Highlight check
+                  const isWhiteActive = currentIndex === whiteMoveIndex
+                  const isBlackActive = currentIndex === blackMoveIndex
+
+                  return (
+                    <div key={idx} className="grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1 hover:bg-gray-900/50 rounded">
+                      <span className="text-gray-600">{m.move}.</span>
+                      <span
+                        className={`cursor-pointer transition-colors ${isWhiteActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
+                        onClick={() => setCurrentIndex(whiteMoveIndex)}
+                      >
+                        {m.white}
+                      </span>
+                      <span
+                        className={`cursor-pointer transition-colors ${isBlackActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
+                        onClick={() => { if (m.black) setCurrentIndex(blackMoveIndex) }}
+                      >
+                        {m.black}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
