@@ -241,6 +241,7 @@ export class RatingService {
 
       return {
         success: true,
+        gameId: game.id,
         white: {
           userId: whitePlayer.userId,
           oldRating: whiteChange.oldRating,
