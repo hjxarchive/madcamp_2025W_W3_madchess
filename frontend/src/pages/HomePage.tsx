@@ -220,14 +220,14 @@ export default function HomePage() {
                               <div className={`text-sm font-bold ${game.currentTurn === 'white' ? 'text-[#D4FF00]' : 'text-white'}`}>
                                 {game.white.username}
                               </div>
-                              <div className="text-xs text-gray-500 font-mono">{game.white.rating}</div>
+                              <div className="text-xs text-gray-500 font-mono">{Math.round(game.white.rating)}</div>
                             </div>
                             <div className="text-gray-500 text-xs">vs</div>
                             <div className="text-right">
                               <div className={`text-sm font-bold ${game.currentTurn === 'black' ? 'text-[#D4FF00]' : 'text-white'}`}>
                                 {game.black.username}
                               </div>
-                              <div className="text-xs text-gray-500 font-mono">{game.black.rating}</div>
+                              <div className="text-xs text-gray-500 font-mono">{Math.round(game.black.rating)}</div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between text-xs text-gray-500">

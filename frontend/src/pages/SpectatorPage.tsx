@@ -248,7 +248,7 @@ export default function SpectatorPage() {
                     <div className="order-2 lg:order-1 flex flex-col items-center lg:items-end gap-4">
                         <div className="text-center lg:text-right">
                             <div className="text-2xl font-bold text-white">{black.username}</div>
-                            <div className="text-sm text-gray-500 font-mono">{black.rating} ELO</div>
+                            <div className="text-sm text-gray-500 font-mono">{Math.round(black.rating)} ELO</div>
                         </div>
                         <div className={`text-4xl font-mono px-6 py-3 border ${currentTurn === 'black' ? 'border-[#D4FF00] text-[#D4FF00] bg-[#D4FF00]/10' : 'border-gray-800 text-gray-400'}`}>
                             {formatTime(blackTime)}
@@ -290,7 +290,7 @@ export default function SpectatorPage() {
                     <div className="order-3 flex flex-col items-center lg:items-start gap-4">
                         <div className="text-center lg:text-left">
                             <div className="text-2xl font-bold text-white">{white.username}</div>
-                            <div className="text-sm text-gray-500 font-mono">{white.rating} ELO</div>
+                            <div className="text-sm text-gray-500 font-mono">{Math.round(white.rating)} ELO</div>
                         </div>
                         <div className={`text-4xl font-mono px-6 py-3 border ${currentTurn === 'white' ? 'border-[#D4FF00] text-[#D4FF00] bg-[#D4FF00]/10' : 'border-gray-800 text-gray-400'}`}>
                             {formatTime(whiteTime)}

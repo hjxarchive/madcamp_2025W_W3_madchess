@@ -1640,7 +1640,7 @@ export default function GamePage() {
                       </div>
                     </div>
                     <div className="text-sm text-gray-500">
-                      {opponent?.rating || 1500}
+                      {opponent?.rating !== undefined ? Math.round(opponent.rating) : 1500}
                     </div>
                   </div>
                   <CapturedBar
