@@ -1223,14 +1223,22 @@ export default function GamePage() {
       try {
         // PGN string might contain "1. e2e4 2. ..." or just "e2e4 e7e5 ..."
         // We clean it up to extract raw move tokens (UCI or SAN, but likely UCI here)
-        const cleanPgn = pgn
-          .replace(/\[[\s\S]*?\]/g, '')
+        let cleanPgn = pgn
           .replace(/\d+\./g, '')
           .replace(/1-0|0-1|1\/2-1\/2/g, '')
-          .trim()
+
+        let prev = ''
+        while (cleanPgn !== prev) {
+          prev = cleanPgn
+          cleanPgn = cleanPgn
+            .replace(/\[[^[\]]*?\]/g, '')
+            .replace(/\{[^\{\}]*?\}/g, '')
+        }
+
+        cleanPgn = cleanPgn.replace(/[|"]/g, '').trim()
         if (!cleanPgn) return []
 
-        const tokens = cleanPgn.split(/\s+/).filter(t => t)
+        const tokens = cleanPgn.split(/\s+/).filter(t => t && t.length > 1)
 
         // Initialize chess engine for SAN generation
         let chess: Chess | null = null

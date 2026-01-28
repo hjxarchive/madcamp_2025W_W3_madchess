@@ -141,16 +141,25 @@ export default function ReplayPage() {
       const movedList: { move: number; white: string; black?: string }[] = []
 
       try {
-        // Remove PGN tags/headers (which might include placement JSON in brackets)
-        // Also remove move numbers and result
-        const cleanPgn = pgn
-          .replace(/\[[\s\S]*?\]/g, '')
+        let cleanPgn = pgn
           .replace(/\d+\./g, '')
           .replace(/1-0|0-1|1\/2-1\/2/g, '')
-          .trim()
+
+        // Recursively remove bracketed/braced content to handle nesting [[...]] or {{...}}
+        // Also specific fix for User's reported "||" artifact or JSON residue
+        let prev = ''
+        while (cleanPgn !== prev) {
+          prev = cleanPgn
+          cleanPgn = cleanPgn
+            .replace(/\[[^[\]]*?\]/g, '') // Remove innermost []
+            .replace(/\{[^\{\}]*?\}/g, '') // Remove innermost {}
+        }
+
+        cleanPgn = cleanPgn.replace(/[|"]/g, '').trim() // Remove pipes and quotes
+
         if (!cleanPgn) return []
 
-        const tokens = cleanPgn.split(/\s+/).filter(t => t)
+        const tokens = cleanPgn.split(/\s+/).filter(t => t && t.length > 1) // Filter empty or single-char noise
 
         let chess: Chess | null = null
         try {
