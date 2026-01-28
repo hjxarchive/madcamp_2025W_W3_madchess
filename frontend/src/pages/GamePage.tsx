@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { Chess } from 'chess.js'
 import { useGameStore } from '../stores/gameStore'
 import { useAuthStore } from '../stores/authStore'
 import ChessBoard from '../components/ChessBoard'
@@ -1212,32 +1213,72 @@ export default function GamePage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // PGN을 이동 목록으로 파싱
-  const parseMoves = (pgn: string) => {
-    if (!pgn) return []
-    const moves: { move: number; white: string; black?: string }[] = []
-    const parts = pgn.trim().split(/\s+/)
+  // PGN을 이동 목록으로 파싱 (UCI -> SAN 변환)
+  const parseMoves = useMemo(() => {
+    return (pgn: string) => {
+      if (!pgn) return []
 
-    let currentMove = 0
-    let moveObj: { move: number; white: string; black?: string } | null = null
+      const movedList: { move: number; white: string; black?: string }[] = []
 
-    parts.forEach(part => {
-      if (part.match(/^\d+\.$/)) {
-        if (moveObj) moves.push(moveObj)
-        currentMove = parseInt(part)
-        moveObj = { move: currentMove, white: '' }
-      } else if (moveObj) {
-        if (!moveObj.white) {
-          moveObj.white = part
-        } else if (!moveObj.black) {
-          moveObj.black = part
+      try {
+        // PGN string might contain "1. e2e4 2. ..." or just "e2e4 e7e5 ..."
+        // We clean it up to extract raw move tokens (UCI or SAN, but likely UCI here)
+        const cleanPgn = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+        if (!cleanPgn) return []
+
+        const tokens = cleanPgn.split(/\s+/).filter(t => t)
+
+        // Initialize chess engine for SAN generation
+        const chess = new Chess(gameState?.initialFen || undefined)
+
+        let currentMoveNum = 1
+        let currentPair: { move: number; white: string; black?: string } = { move: 1, white: '' }
+
+        tokens.forEach((token, index) => {
+          let san = token // Default to token (UCI) if parsing fails
+
+          try {
+            // Attempt to play move to get SAN
+            // Token is expected to be UCI (e.g. "e2e4", "a7a8q")
+            const from = token.substring(0, 2)
+            const to = token.substring(2, 4)
+            const promotion = token.length > 4 ? token.substring(4, 5) : undefined
+
+            const result = chess.move({
+              from,
+              to,
+              promotion: promotion as any
+            })
+            if (result) san = result.san
+          } catch (e) {
+            // Fallback: try parsing as simple SAN or ignore error
+            // console.warn('SAN conversion failed for:', token, e)
+          }
+
+          if (index % 2 === 0) {
+            // White
+            currentPair = { move: currentMoveNum, white: san }
+          } else {
+            // Black
+            currentPair.black = san
+            movedList.push(currentPair)
+            currentMoveNum++
+          }
+        })
+
+        // Push incomplete last move
+        if (tokens.length % 2 !== 0) {
+          movedList.push(currentPair)
         }
-      }
-    })
 
-    if (moveObj) moves.push(moveObj)
-    return moves
-  }
+      } catch (e) {
+        console.error('PGN parsing error:', e)
+        return []
+      }
+
+      return movedList
+    }
+  }, [gameState?.initialFen])
 
   // 기물 점수 계산
   const calculateMaterial = (color: PieceColor) => {
