@@ -494,7 +494,7 @@ class SocketService {
     }
   }
 
-  onAnalysisResult(callback: (data: { type: 'cp' | 'mate', value: number, bestMove?: string }) => void) {
+  onAnalysisResult(callback: (data: any) => void) {
     if (this.socket) {
       this.socket.on('analysis-result', callback)
     }

@@ -156,7 +156,16 @@ export default function GamePage() {
   }, [gameState?.status, gameState?.white?.userId, gameState?.black?.userId, user?.id])
 
   useEffect(() => {
-    socketService.onAnalysisResult(setEvalScore)
+    socketService.onAnalysisResult((results: any) => {
+      // Backend now sends an array (AnalysisLine[]) because of MultiPV support.
+      // GamePage EvalBar only needs the best line.
+      if (Array.isArray(results) && results.length > 0) {
+        setEvalScore({ type: results[0].type, value: results[0].value })
+      } else if (results && !Array.isArray(results)) {
+        // Fallback for old single-object format if any
+        setEvalScore(results)
+      }
+    })
     return () => socketService.offAnalysisResult()
   }, [])
 

@@ -113,7 +113,11 @@ export default function SpectatorPage() {
         socketService.onGameOver(handleGameOver)
         socketService.onSpectateError(handleSpectateError)
 
-        socketService.onAnalysisResult(setEvalScore)
+        socketService.onAnalysisResult((results: any[]) => {
+            if (results && results.length > 0) {
+                setEvalScore({ type: results[0].type, value: results[0].value })
+            }
+        })
 
         // Join as spectator
         if (matchId) {

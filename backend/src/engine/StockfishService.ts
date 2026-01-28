@@ -56,6 +56,7 @@ export class StockfishService {
                             const scoreIndex = parts.indexOf('score')
                             const type = parts[scoreIndex + 1] as 'cp' | 'mate'
                             let value = parseInt(parts[scoreIndex + 2])
+                            if (isNaN(value) || isNaN(id)) continue;
 
                             // Invert score if black to move (Stockfish gives white-relative? No, Stockfish gives side-relative usually, but we need absolute? 
                             // Actually Stockfish gives side-to-move relative score. We handle inversion in GameManager usually.
