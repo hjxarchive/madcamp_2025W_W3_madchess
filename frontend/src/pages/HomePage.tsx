@@ -111,7 +111,7 @@ export default function HomePage() {
                 <div className="text-xs text-gray-500 font-mono">{authUser.rating || 1500} ELO</div>
               </div>
               <img
-                src={authUser.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(authUser.name)}`}
+                src={authUser.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(authUser.name || 'User')}`}
                 alt="Avatar"
                 className="w-10 h-10 rounded-sm border border-gray-700 group-hover:border-[#D4FF00] transition-colors"
               />

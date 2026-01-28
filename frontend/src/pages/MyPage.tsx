@@ -118,7 +118,7 @@ export default function MyPage() {
                     <div className="md:col-span-4 flex flex-col items-center md:items-start">
                         <div className="w-48 h-48 bg-gray-900 border border-gray-800 p-2 mb-6 relative group">
                             <img
-                                src={user.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(user.name)}`}
+                                src={user.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(user.name || 'User')}`}
                                 alt="Profile"
                                 className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
                             />
@@ -129,8 +129,8 @@ export default function MyPage() {
 
                         <div className="w-full">
                             <div className="text-gray-500 text-xs uppercase tracking-widest mb-3">Standard Rating</div>
-                            <RatingDisplay 
-                                rating={user.rating || 1500} 
+                            <RatingDisplay
+                                rating={user.rating || 1500}
                                 rd={user.rd || 350}
                                 variant="detailed"
                                 showProvisional={true}
