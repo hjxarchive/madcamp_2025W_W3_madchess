@@ -28,6 +28,8 @@ export const findUserById = async (userId: number) => {
             include: {
               user_game_white_player_idTouser: true,
               user_game_black_player_idTouser: true,
+              deck_game_white_deck_idTodeck: true,
+              deck_game_black_deck_idTodeck: true,
             }
           }
         },
