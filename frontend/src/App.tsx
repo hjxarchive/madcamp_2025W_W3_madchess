@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useAuthStore } from './stores/authStore'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import MatchmakingPage from './pages/MatchmakingPage'
@@ -11,6 +13,12 @@ import SpectatorPage from './pages/SpectatorPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
+  const { checkAuth } = useAuthStore()
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-900 text-white">
