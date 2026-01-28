@@ -259,13 +259,6 @@ export const saveGameResult = async (
       gameResult = 'draw';
     }
 
-    // 1. 게임 레코드 생성
-    const game = await gameRepo.createGame(whiteId, blackId, whiteDeckFinal, blackDeckFinal);
-    console.log(`📝 Game created: ${game.id}`);
-
-    // 2. 게임 결과 업데이트 (PGN 포함)
-    await gameRepo.updateGameResult(game.id, gameResult, pgn);
-
     // 1. Calculate piece scores
     const [whitePieceScore, blackPieceScore] = await Promise.all([
       ratingService.calculateDeckPieceScore(whiteDeckFinal),
@@ -282,7 +275,7 @@ export const saveGameResult = async (
 
     // 3. Update ratings using Glicko-2 service
     const ratingResult = await ratingService.updateRatingsAfterMatch(
-      game.id.toString(),
+      `game-${whiteId}-${blackId}`,
       winnerId,
       { userId: whiteId, pieceScore: whitePieceScore, deckId: whiteDeckFinal },
       { userId: blackId, pieceScore: blackPieceScore, deckId: blackDeckFinal },
@@ -300,10 +293,10 @@ export const saveGameResult = async (
       await deckRepo.updateDeckStats(blackDeckFinal, !whiteWon);
     }
 
-    console.log(`✅ Game ${game.id} saved: ${gameResult} by ${reason}`);
+    console.log(`✅ Game ${ratingResult.gameId} saved: ${gameResult} by ${reason}`);
     console.log(`📊 Rating changes: White ${ratingResult.white.ratingDelta > 0 ? '+' : ''}${ratingResult.white.ratingDelta.toFixed(1)}, Black ${ratingResult.black.ratingDelta > 0 ? '+' : ''}${ratingResult.black.ratingDelta.toFixed(1)}`);
 
-    return { success: true, gameId: game.id };
+    return { success: true, gameId: ratingResult.gameId };
   } catch (error) {
     console.error('❌ Error saving game result:', error);
     return { success: false, error: String(error) };
