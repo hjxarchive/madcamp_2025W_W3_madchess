@@ -27,15 +27,22 @@ passport.use(
                     where: { google_id: googleId },
                 })
 
-                if (!user) {
-                    // 2. Email로 찾기 (기존 계정 연동)
+                if (user) {
+                    // 1. 이미 Google ID로 찾은 경우 -> 사진만 업데이트
+                    // @ts-ignore
+                    user = await prisma.user.update({
+                        where: { id: user.id },
+                        data: { picture },
+                    })
+                } else {
+                    // 2. Google ID로 못 찾음 -> Email로 찾기 (기존 계정 연동)
                     // @ts-ignore
                     user = await prisma.user.findUnique({
                         where: { email },
                     })
 
                     if (user) {
-                        // 이메일로 찾았으면 Google ID 업데이트
+                        // 이메일로 찾았으면 Google ID 및 사진 업데이트
                         // @ts-ignore
                         user = await prisma.user.update({
                             where: { id: user.id },
