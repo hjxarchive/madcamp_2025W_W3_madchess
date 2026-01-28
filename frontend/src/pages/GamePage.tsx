@@ -1231,16 +1231,28 @@ export default function GamePage() {
         // Initialize chess engine for SAN generation
         let chess: Chess | null = null
         try {
-          // Sanitize FEN: chess.js only accepts KQkq for castling. Strip Shredder-FEN characters (e.g. A-H)
-          // FEN: placement turn castling ep half full
+          // Sanitize FEN:
+          // 1. Strip Shredder-FEN characters (e.g. A-H) from castling rights.
+          // 2. Remove Pawns from Rank 1 and Rank 8 (Illegal in Standard Chess).
           let fenToUse = gameState?.initialFen
           if (fenToUse) {
             const parts = fenToUse.split(' ')
             if (parts.length >= 3) {
-              // Keep only standard chars
+              // 1. Castling Sanitization
               let castling = parts[2].replace(/[^KQkq-]/g, '')
               if (!castling) castling = '-'
               parts[2] = castling
+
+              // 2. Pawn Sanitization (Edge Rows)
+              const boardStr = parts[0]
+              const rows = boardStr.split('/')
+              if (rows.length === 8) {
+                // Rank 8 (Index 0) and Rank 1 (Index 7) cannot have Pawns
+                rows[0] = rows[0].replace(/[pP]/g, '1')
+                rows[7] = rows[7].replace(/[pP]/g, '1')
+                parts[0] = rows.join('/')
+              }
+
               fenToUse = parts.join(' ')
             }
           }
