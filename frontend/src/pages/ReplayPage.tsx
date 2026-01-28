@@ -141,7 +141,13 @@ export default function ReplayPage() {
       const movedList: { move: number; white: string; black?: string }[] = []
 
       try {
-        const cleanPgn = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+        // Remove PGN tags/headers (which might include placement JSON in brackets)
+        // Also remove move numbers and result
+        const cleanPgn = pgn
+          .replace(/\[[\s\S]*?\]/g, '')
+          .replace(/\d+\./g, '')
+          .replace(/1-0|0-1|1\/2-1\/2/g, '')
+          .trim()
         if (!cleanPgn) return []
 
         const tokens = cleanPgn.split(/\s+/).filter(t => t)

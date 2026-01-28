@@ -1223,7 +1223,11 @@ export default function GamePage() {
       try {
         // PGN string might contain "1. e2e4 2. ..." or just "e2e4 e7e5 ..."
         // We clean it up to extract raw move tokens (UCI or SAN, but likely UCI here)
-        const cleanPgn = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+        const cleanPgn = pgn
+          .replace(/\[[\s\S]*?\]/g, '')
+          .replace(/\d+\./g, '')
+          .replace(/1-0|0-1|1\/2-1\/2/g, '')
+          .trim()
         if (!cleanPgn) return []
 
         const tokens = cleanPgn.split(/\s+/).filter(t => t)
