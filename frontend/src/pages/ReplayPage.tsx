@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Chess } from 'chess.js'
 import { getGameReplay, getGameById } from '../services/gameApi'
 import ChessBoard from '../components/ChessBoard'
 import { useAuthStore } from '../stores/authStore'
@@ -132,6 +133,98 @@ export default function ReplayPage() {
     setIsPlaying(!isPlaying)
   }
 
+  // PGN parsing logic (Copied from GamePage for consistency)
+  const parseMoves = useMemo(() => {
+    return (pgn: string) => {
+      if (!pgn) return []
+
+      const movedList: { move: number; white: string; black?: string }[] = []
+
+      try {
+        const cleanPgn = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+        if (!cleanPgn) return []
+
+        const tokens = cleanPgn.split(/\s+/).filter(t => t)
+
+        let chess: Chess | null = null
+        try {
+          // Sanitize FEN
+          let fenToUse = (gameInfo as any)?.initialFen
+          if (fenToUse) {
+            const parts = fenToUse.split(' ')
+            if (parts.length >= 3) {
+              let castling = parts[2].replace(/[^KQkq-]/g, '')
+              if (!castling) castling = '-'
+              parts[2] = castling
+
+              const boardStr = parts[0]
+              const rows = boardStr.split('/')
+              if (rows.length === 8) {
+                rows[0] = rows[0].replace(/[pP]/g, '1')
+                rows[7] = rows[7].replace(/[pP]/g, '1')
+                // Normalize rows: Collapse adjacent numbers
+                const collapseNumbers = (row: string) => {
+                  let newRow = row
+                  while (/\d\d/.test(newRow)) {
+                    newRow = newRow.replace(/(\d)(\d)/g, (_, d1, d2) => (parseInt(d1) + parseInt(d2)).toString())
+                  }
+                  return newRow
+                }
+                rows[0] = collapseNumbers(rows[0])
+                rows[7] = collapseNumbers(rows[7])
+                parts[0] = rows.join('/')
+              }
+              fenToUse = parts.join(' ')
+            }
+          }
+          chess = new Chess(fenToUse || undefined)
+        } catch (e) {
+          try { chess = new Chess() } catch (err) { chess = null }
+        }
+
+        let currentMoveNum = 1
+        let currentPair: { move: number; white: string; black?: string } = { move: 1, white: '' }
+
+        tokens.forEach((token, index) => {
+          let san = token
+          if (chess) {
+            try {
+              const from = token.substring(0, 2)
+              const to = token.substring(2, 4)
+              const promotion = token.length > 4 ? token.substring(4, 5) : undefined
+              const result = chess!.move({ from, to, promotion: promotion as any })
+              if (result) san = result.san
+            } catch (e) { }
+          }
+
+          if (index % 2 === 0) {
+            currentPair = { move: currentMoveNum, white: san }
+          } else {
+            currentPair.black = san
+            movedList.push(currentPair)
+            currentMoveNum++
+          }
+        })
+        if (tokens.length % 2 !== 0) movedList.push(currentPair)
+
+      } catch (e) {
+        // Fallback
+        try {
+          const clean = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+          const list = clean.split(/\s+/).filter(t => t)
+          let mv = 1
+          let pair: any = { move: 1, white: '' }
+          list.forEach((t, i) => {
+            if (i % 2 === 0) pair = { move: mv, white: t }
+            else { pair.black = t; movedList.push(pair); mv++ }
+          })
+          if (list.length % 2 !== 0) movedList.push(pair)
+        } catch (err) { return [] }
+      }
+      return movedList
+    }
+  }, [(gameInfo as any)?.initialFen])
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center font-mono">
@@ -193,7 +286,7 @@ export default function ReplayPage() {
           </button>
           <div className="font-serif text-lg flex flex-col">
             <div><span className="text-[#D4FF00]">REPLAY</span> MODE</div>
-            <div className="text-[10px] text-gray-500 font-mono tracking-tighter">{debugInfo}</div>
+            {/* Debug info removed */}
           </div>
         </div>
 
@@ -227,7 +320,7 @@ export default function ReplayPage() {
         {/* Center: Chess Board */}
         <div className="flex gap-4 justify-center items-start">
           <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center">
-            <div className="text-[10px] text-red-500 font-mono mb-1">{evalScore?.value}</div>
+            {/* Red debug text removed */}
             <EvalBar evaluation={evalScore} />
           </div>
           <div className="flex flex-col items-center">
@@ -254,18 +347,18 @@ export default function ReplayPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 mb-8">
+          <div className="flex items-center justify-center gap-4 mb-4">
             <button
               onClick={() => setCurrentIndex(0)}
               disabled={currentIndex === 0}
-              className="p-3 text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
             >
               ⏮
             </button>
             <button
               onClick={handlePrev}
               disabled={currentIndex === 0}
-              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center"
+              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
             >
               ◀
             </button>
@@ -278,36 +371,53 @@ export default function ReplayPage() {
             <button
               onClick={handleNext}
               disabled={currentIndex === history.length - 1}
-              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center"
+              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-white"
             >
               ▶
             </button>
             <button
               onClick={() => setCurrentIndex(history.length - 1)}
               disabled={currentIndex === history.length - 1}
-              className="p-3 text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+              className="p-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 rounded transition-colors w-12 h-12 flex items-center justify-center font-bold text-gray-400 hover:text-white"
             >
               ⏭
             </button>
           </div>
 
-          <div className="border-t border-gray-800 pt-6">
-            <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Status</div>
-            <div className="text-lg">
-              {currentState.turn === 'white' ? 'White to move' : 'Black to move'}
+          {/* Move History List */}
+          <div className="border-t border-gray-800 pt-4 flex-1 overflow-hidden flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h3>
+              <span className="text-xs text-gray-500">{history.length - 1} moves</span>
             </div>
-            {gameInfo && currentIndex === history.length - 1 && (
-              <div className="mt-2 text-[#D4FF00] font-bold">
-                GAME OVER - {gameInfo.result === 'draw' ? 'DRAW' : gameInfo.result === 'white_win' ? 'WHITE WON' : 'BLACK WON'}
-              </div>
-            )}
+            <div className="overflow-y-auto space-y-0.5 font-mono text-sm max-h-60 pr-1 custom-scrollbar">
+              {parseMoves(gameInfo?.pgn || '').map((m, idx) => {
+                const whiteMoveIndex = idx * 2 + 1
+                const blackMoveIndex = idx * 2 + 2
 
-            {/* Last Move info */}
-            {lastMove && (
-              <div className="mt-4 text-gray-500 text-sm font-mono">
-                Last Move: {lastMove.uci}
-              </div>
-            )}
+                // Highlight check
+                const isWhiteActive = currentIndex === whiteMoveIndex
+                const isBlackActive = currentIndex === blackMoveIndex
+
+                return (
+                  <div key={idx} className="grid grid-cols-[2rem_1fr_1fr] gap-2 px-2 py-1 hover:bg-gray-900/50 rounded">
+                    <span className="text-gray-600">{m.move}.</span>
+                    <span
+                      className={`cursor-pointer transition-colors ${isWhiteActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
+                      onClick={() => setCurrentIndex(whiteMoveIndex)}
+                    >
+                      {m.white}
+                    </span>
+                    <span
+                      className={`cursor-pointer transition-colors ${isBlackActive ? 'text-[#D4FF00] font-bold bg-[#D4FF00]/10 rounded px-1 -mx-1' : 'text-gray-300 hover:text-white'}`}
+                      onClick={() => { if (m.black) setCurrentIndex(blackMoveIndex) }}
+                    >
+                      {m.black}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       </main>
