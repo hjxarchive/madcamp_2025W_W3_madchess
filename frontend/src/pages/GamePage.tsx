@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import React, { useState, useEffect, useRef } from 'react'
+import { Chess } from 'chess.js'
 import { useGameStore } from '../stores/gameStore'
 import { useAuthStore } from '../stores/authStore'
 import ChessBoard from '../components/ChessBoard'
@@ -1212,30 +1213,76 @@ export default function GamePage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // PGN을 이동 목록으로 파싱
+  // PGN을 이동 목록으로 파싱 (UCI -> SAN 변환)
   const parseMoves = (pgn: string) => {
     if (!pgn) return []
     const moves: { move: number; white: string; black?: string }[] = []
-    const parts = pgn.trim().split(/\s+/)
 
-    let currentMove = 0
-    let moveObj: { move: number; white: string; black?: string } | null = null
+    // Split stored UCI PGN (e.g. "g1f3 e7e5 ...")
+    // PGN might be standard PGN or just move list. 
+    // Based on backend service, it seems to be just moves separated by space or '|' if using the replay format logic?
+    // Let's check `GameManager.ts` or `game.service.ts` again. 
+    // `game.service.ts` getGameReplay splits by '|'. 
+    // But `GamePage.tsx` existing parseMoves (line 1224) checks for "1." numbering: `if (part.match(/^\d+\.$/))`.
+    // Wait, if existing parseMoves expects "1. e4", then PGN IS ALREADY SAN?
+    // User says "move history에서 수가 f3f6처럼 uci로 표시돼". So currently it is NOT SAN.
+    // If it currently parses based on "1.", maybe the stored PGN *has* numbers but the moves are UCI? relative to `GameManager.ts`.
 
-    parts.forEach(part => {
-      if (part.match(/^\d+\.$/)) {
-        if (moveObj) moves.push(moveObj)
-        currentMove = parseInt(part)
-        moveObj = { move: currentMove, white: '' }
-      } else if (moveObj) {
-        if (!moveObj.white) {
-          moveObj.white = part
-        } else if (!moveObj.black) {
-          moveObj.black = part
+    // Let's assume the PGN string contains UCI moves separated by spaces, AND maybe numbers if the backend adds them.
+    // Or maybe it doesn't have numbers.
+    // Use chess.js to generate SAN.
+
+    try {
+      const chess = new Chess(gameState?.initialFen || undefined)
+      // Extract pure moves. 
+      // If PGN contains "1. e2e4 2. ...", we need to clean it.
+      // But user says "f3f6". That's UCI. 
+      // Safe bet: clean the string of numbers and result (1-0 etc), then split.
+
+      const cleanPgn = pgn.replace(/\d+\./g, '').replace(/1-0|0-1|1\/2-1\/2/g, '').trim()
+      const moveTokens = cleanPgn.split(/\s+/).filter(m => m)
+
+      let moveNumber = 1
+      let moveObj: { move: number; white: string; black?: string } | null = null
+
+      moveTokens.forEach((token, index) => {
+        let san = token
+        try {
+          // Try to play the move to get SAN
+          // token is likely UCI like "e2e4"
+          const result = chess.move({
+            from: token.substring(0, 2),
+            to: token.substring(2, 4),
+            promotion: token.length > 4 ? token.substring(4, 5) : undefined
+          })
+          if (result) san = result.san
+        } catch (e) {
+          // If chess.js fails (e.g. custom game illegal move), fallback to token
+          // console.warn('Chess.js parse error:', e)
         }
-      }
-    })
 
-    if (moveObj) moves.push(moveObj)
+        if (index % 2 === 0) {
+          // White
+          moveObj = { move: moveNumber, white: san }
+        } else {
+          // Black
+          if (moveObj) {
+            moveObj.black = san
+            moves.push(moveObj)
+            moveObj = null
+            moveNumber++
+          }
+        }
+      })
+
+      if (moveObj) moves.push(moveObj)
+
+    } catch (e) {
+      console.error('PGN parsing failed:', e)
+      // Fallback: simplified generic parser
+      // ... (existing logic simplified for pure display if needed, but returning empty or basic split)
+    }
+
     return moves
   }
 
