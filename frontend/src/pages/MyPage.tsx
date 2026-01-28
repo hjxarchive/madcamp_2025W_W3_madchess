@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { getUserGames, getUserStats, updateUser, getUserDecks } from '../services/userApi'
 import type { UserGame, UserStats, DeckWithStats } from '../types/api.types'
+import RatingDisplay from '../components/rating/RatingDisplay'
 
 export default function MyPage() {
     const navigate = useNavigate()
@@ -127,11 +128,13 @@ export default function MyPage() {
                         </div>
 
                         <div className="w-full">
-                            <div className="text-gray-500 text-xs uppercase tracking-widest mb-1">Standard Rating</div>
-                            <div className="text-6xl font-serif font-light text-white leading-none flex items-start gap-2">
-                                {user.rating}
-                                <span className="text-lg text-[#D4FF00] mt-1">●</span>
-                            </div>
+                            <div className="text-gray-500 text-xs uppercase tracking-widest mb-3">Standard Rating</div>
+                            <RatingDisplay 
+                                rating={user.rating || 1500} 
+                                rd={user.rd || 350}
+                                variant="detailed"
+                                showProvisional={true}
+                            />
                         </div>
                     </div>
 

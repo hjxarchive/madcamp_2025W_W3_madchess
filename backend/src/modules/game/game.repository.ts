@@ -31,7 +31,8 @@ export const findGameById = async (id: number) => {
             include: { piece: true }
           }
         }
-      }
+      },
+      game_history: true
     }
   });
 };

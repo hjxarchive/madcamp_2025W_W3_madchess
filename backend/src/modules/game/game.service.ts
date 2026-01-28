@@ -33,6 +33,30 @@ export const getGameById = async (gameId: number): Promise<GameStateDto> => {
   // FEN에서 보드 파싱 (간단한 구현)
   const board = parseFenToBoard(game.initial_fen || '');
 
+  // 레이팅 변화 정보 가져오기 (게임이 종료된 경우)
+  let ratingChanges = undefined;
+  if (game.result && game.game_history && game.game_history.length > 0) {
+    const whiteHistory = game.game_history.find((gh: any) => gh.user_id === game.white_player_id);
+    const blackHistory = game.game_history.find((gh: any) => gh.user_id === game.black_player_id);
+
+    if (whiteHistory && blackHistory) {
+      ratingChanges = {
+        white: {
+          oldRating: whiteHistory.old_rating || game.user_game_white_player_idTouser.rating,
+          newRating: whiteHistory.new_rating || game.user_game_white_player_idTouser.rating,
+          ratingDelta: whiteHistory.rating_change || 0,
+          pieceScore: whiteHistory.piece_score || 30
+        },
+        black: {
+          oldRating: blackHistory.old_rating || game.user_game_black_player_idTouser.rating,
+          newRating: blackHistory.new_rating || game.user_game_black_player_idTouser.rating,
+          ratingDelta: blackHistory.rating_change || 0,
+          pieceScore: blackHistory.piece_score || 30
+        }
+      };
+    }
+  }
+
   return {
     id: game.id,
     white: {
@@ -74,7 +98,8 @@ export const getGameById = async (gameId: number): Promise<GameStateDto> => {
       white: [],
       black: []
     },
-    playedAt: game.played_at
+    playedAt: game.played_at,
+    ratingChanges
   };
 };
 
