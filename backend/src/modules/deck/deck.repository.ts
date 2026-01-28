@@ -53,7 +53,9 @@ export const findDecksByUser = async (userId: number, sort?: string, limit?: num
     include: {
       deck_composition: {
         include: { piece: true }
-      }
+      },
+      game_game_white_deck_idTodeck: true,
+      game_game_black_deck_idTodeck: true
     },
     orderBy: orderBy,
     take: limit
@@ -134,4 +136,13 @@ export const updateDeck = async (deckId: number, data: UpdateDeckDto, pieceMap?:
 
 export const deleteDeck = async (id: number) => {
   return await prisma.deck.delete({ where: { id } });
+};
+export const updateDeckStats = async (deckId: number, isWin: boolean) => {
+  return await prisma.deck.update({
+    where: { id: deckId },
+    data: {
+      win_cnt: { increment: isWin ? 1 : 0 },
+      lose_cnt: { increment: isWin ? 0 : 1 },
+    }
+  });
 };

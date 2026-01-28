@@ -90,7 +90,7 @@ export default function HomePage() {
         <div className="flex items-center gap-12">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setShowDonation(false)}>
             <div className="w-8 h-8 bg-white skew-x-12 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+              <div className="absolute inset-0 bg-[url('/logo.jpg')] bg-cover bg-center opacity-80"></div>
             </div>
             <div>
               <div className="font-serif text-2xl leading-none tracking-tight text-[#D4FF00]">MAD</div>
@@ -165,6 +165,12 @@ export default function HomePage() {
                   <p className="text-2xl text-white font-mono break-all select-all">1002961962863</p>
                   <p className="text-xl text-gray-400 mt-2 font-serif">우리은행 정재우</p>
                 </div>
+              </div>
+
+              <div className="mb-8 p-4 border border-[#D4FF00]/30 bg-[#D4FF00]/5 rounded animate-pulse">
+                <p className="text-[#D4FF00] font-serif text-lg">
+                  "부산대학교 안준영님 100원 후원 감사합니다"
+                </p>
               </div>
               <button
                 onClick={() => setShowDonation(false)}
@@ -271,12 +277,12 @@ export default function HomePage() {
                 ) : (
                   <div className="h-full flex flex-col justify-center items-center text-center">
                     <h1 className="text-6xl md:text-8xl font-serif font-light leading-none mb-6">
-                      <span className="block text-white">WORLD</span>
-                      <span className="block text-[#D4FF00]">CLASS</span>
-                      <span className="block text-white">STRATEGY</span>
+                      <span className="block text-white">CHESS,</span>
+                      <span className="block text-[#D4FF00]">BUILT</span>
+                      <span className="block text-white">DIFFERENT.</span>
                     </h1>
                     <p className="text-gray-400 max-w-md text-lg font-light tracking-wide">
-                      Join the ultimate deck-building chess arena. Compete globally.
+                      Don't just play the board. Architect the kill. <br />A new meta driven by 30-point madness.
                     </p>
                   </div>
                 )}

@@ -456,8 +456,10 @@ export default function PlacementPage() {
       {/* 헤더 */}
       <header className="sticky top-0 z-10 border-b border-gray-900 bg-[#050505]/90 backdrop-blur">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-white skew-x-12"></div>
+          <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/')}>
+            <div className="w-6 h-6 bg-white skew-x-12 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('/logo.jpg')] bg-cover bg-center opacity-80"></div>
+            </div>
             <div className="font-serif text-lg">
               <span className="text-[#D4FF00]">MAD</span>
               <span className="text-white">CHESS</span>

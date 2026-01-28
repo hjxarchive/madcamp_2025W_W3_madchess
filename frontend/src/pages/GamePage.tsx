@@ -156,7 +156,16 @@ export default function GamePage() {
   }, [gameState?.status, gameState?.white?.userId, gameState?.black?.userId, user?.id])
 
   useEffect(() => {
-    socketService.onAnalysisResult(setEvalScore)
+    socketService.onAnalysisResult((results: any) => {
+      // Backend now sends an array (AnalysisLine[]) because of MultiPV support.
+      // GamePage EvalBar only needs the best line.
+      if (Array.isArray(results) && results.length > 0) {
+        setEvalScore({ type: results[0].type, value: results[0].value })
+      } else if (results && !Array.isArray(results)) {
+        // Fallback for old single-object format if any
+        setEvalScore(results)
+      }
+    })
     return () => socketService.offAnalysisResult()
   }, [])
 
@@ -1490,7 +1499,9 @@ export default function GamePage() {
       <header className="sticky top-0 z-10 border-b border-gray-900 bg-[#050505]/90 backdrop-blur">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/')}>
-            <div className="w-6 h-6 bg-white skew-x-12"></div>
+            <div className="w-6 h-6 bg-white skew-x-12 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('/logo.jpg')] bg-cover bg-center opacity-80"></div>
+            </div>
             <div className="font-serif text-lg">
               <span className="text-[#D4FF00]">MAD</span>
               <span className="text-white">CHESS</span>

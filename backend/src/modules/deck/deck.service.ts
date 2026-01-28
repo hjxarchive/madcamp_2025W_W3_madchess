@@ -130,19 +130,37 @@ export const getUserDecks = async (userId: number, sort?: string, limit?: number
       totalCost += dc.piece.value;
     });
 
-    const totalGames = deck.win_cnt + deck.lose_cnt;
-    const winRate = totalGames > 0 ? deck.win_cnt / totalGames : 0;
+    // Calculate real stats from game history
+    let winCnt = 0;
+    let loseCnt = 0;
+
+    if (deck.game_game_white_deck_idTodeck) {
+      deck.game_game_white_deck_idTodeck.forEach((g: any) => {
+        if (g.result === 'white_win') winCnt++;
+        else if (g.result === 'black_win') loseCnt++;
+      });
+    }
+
+    if (deck.game_game_black_deck_idTodeck) {
+      deck.game_game_black_deck_idTodeck.forEach((g: any) => {
+        if (g.result === 'black_win') winCnt++;
+        else if (g.result === 'white_win') loseCnt++;
+      });
+    }
+
+    const totalGames = winCnt + loseCnt;
+    const winRate = totalGames > 0 ? winCnt / totalGames : 0;
 
     return {
-      id: deck.id,
-      userId: deck.user_id,
-      name: deck.name || `Deck ${deck.id}`,
+      id: (deck as any).id,
+      userId: (deck as any).user_id,
+      name: (deck as any).name || `Deck ${(deck as any).id}`,
       placement,
       totalCost,
-      winCnt: deck.win_cnt,
-      loseCnt: deck.lose_cnt,
+      winCnt,
+      loseCnt,
       winRate: Math.round(winRate * 1000) / 1000,
-      createdAt: deck.created_at
+      createdAt: (deck as any).created_at
     };
   });
 };
@@ -166,8 +184,26 @@ export const getDeckById = async (deckId: number): Promise<DeckWithPiecesDto> =>
     totalCost += dc.piece.value;
   });
 
-  const totalGames = deck.win_cnt + deck.lose_cnt;
-  const winRate = totalGames > 0 ? deck.win_cnt / totalGames : 0;
+  // Calculate real stats
+  let winCnt = 0;
+  let loseCnt = 0;
+
+  if (deck.game_game_white_deck_idTodeck) {
+    deck.game_game_white_deck_idTodeck.forEach((g: any) => {
+      if (g.result === 'white_win') winCnt++;
+      else if (g.result === 'black_win') loseCnt++;
+    });
+  }
+
+  if (deck.game_game_black_deck_idTodeck) {
+    deck.game_game_black_deck_idTodeck.forEach((g: any) => {
+      if (g.result === 'black_win') winCnt++;
+      else if (g.result === 'white_win') loseCnt++;
+    });
+  }
+
+  const totalGames = winCnt + loseCnt;
+  const winRate = totalGames > 0 ? winCnt / totalGames : 0;
 
   // 최근 게임
   const allGames = [...deck.game_game_white_deck_idTodeck, ...deck.game_game_black_deck_idTodeck];
@@ -194,15 +230,15 @@ export const getDeckById = async (deckId: number): Promise<DeckWithPiecesDto> =>
   });
 
   return {
-    id: deck.id,
-    userId: deck.user_id,
-    name: deck.name || `Deck ${deck.id}`,
+    id: (deck as any).id,
+    userId: (deck as any).user_id,
+    name: (deck as any).name || `Deck ${(deck as any).id}`,
     placement,
     totalCost,
-    winCnt: deck.win_cnt,
-    loseCnt: deck.lose_cnt,
+    winCnt,
+    loseCnt,
     winRate: Math.round(winRate * 1000) / 1000,
-    createdAt: deck.created_at,
+    createdAt: (deck as any).created_at,
     recentGames
   };
 };
