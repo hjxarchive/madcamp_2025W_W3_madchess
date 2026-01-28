@@ -60,26 +60,6 @@ export default function ReplayPage() {
     }
   }, [gameInfo, user])
 
-  // Detect if data is mirrored (White pieces in top half, Rank 8)
-  const isDataMirrored = useMemo(() => {
-    if (!history.length) return false
-
-    // Check initial board placement
-    const initialBoard = history[0].board as (Piece | null)[][]
-
-    // Scan top 4 rows (Rank 8, 7, 6, 5 -> index 0, 1, 2, 3)
-    // If we find White King here, it's definitely mirrored (or very weird strategy)
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 8; c++) {
-        const p = initialBoard[r][c]
-        if (p && p.type === 'k' && p.color === 'white') {
-          console.log("🔄 Detected mirrored replay data (White King at top)")
-          return true
-        }
-      }
-    }
-    return false
-  }, [history])
 
   // Key controls
   useEffect(() => {
@@ -187,13 +167,15 @@ export default function ReplayPage() {
     } as Move
   }
 
-  // Fix mirrored data for display
-  let displayBoard = currentState.board
-  let displayLastMove = lastMove
+  // Always reverse the board from Replay API (Rank 1-based) to Standard (Rank 8-based)
+  // Replay data comes from ChessService which returns rows 0..7 as Rank 1..8.
+  // Frontend/ChessBoard expects rows 0..7 as Rank 8..1 (FEN standard).
+  const displayBoard = [...currentState.board].reverse()
+  const displayLastMove = lastMove
 
-  if (isDataMirrored) {
-    // Reverse board rows (Top <-> Bottom)
-    displayBoard = [...displayBoard].reverse()
+  if (isFlipped) {
+    // Note: ChessBoard component handles visual flipping based on myColor prop.
+    // We don't need to manually reverse the board again here for that.
   }
 
   return (
