@@ -1250,6 +1250,18 @@ export default function GamePage() {
                 // Rank 8 (Index 0) and Rank 1 (Index 7) cannot have Pawns
                 rows[0] = rows[0].replace(/[pP]/g, '1')
                 rows[7] = rows[7].replace(/[pP]/g, '1')
+
+                // Normalize rows: Collapse adjacent numbers (e.g. "11" -> "2") because chess.js rejects consecutive digits
+                const collapseNumbers = (row: string) => {
+                  let newRow = row
+                  while (/\d\d/.test(newRow)) {
+                    newRow = newRow.replace(/(\d)(\d)/g, (_, d1, d2) => (parseInt(d1) + parseInt(d2)).toString())
+                  }
+                  return newRow
+                }
+                rows[0] = collapseNumbers(rows[0])
+                rows[7] = collapseNumbers(rows[7])
+
                 parts[0] = rows.join('/')
               }
 
