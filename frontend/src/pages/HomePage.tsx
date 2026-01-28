@@ -77,7 +77,7 @@ export default function HomePage() {
       {/* Navbar */}
       <nav className="flex items-center justify-between px-8 py-6 border-b border-gray-900 z-10">
         <div className="flex items-center gap-12">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setShowDonation(false)}>
             <div className="w-8 h-8 bg-white skew-x-12 relative overflow-hidden">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
             </div>

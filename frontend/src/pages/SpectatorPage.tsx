@@ -226,7 +226,7 @@ export default function SpectatorPage() {
                         <span className="text-xl group-hover:-translate-x-1 transition-transform">←</span>
                         <span className="uppercase tracking-widest text-xs font-bold">Back to Home</span>
                     </button>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/')}>
                         <div className="px-3 py-1 bg-red-600 text-white text-xs font-bold uppercase tracking-widest animate-pulse">
                             LIVE
                         </div>
