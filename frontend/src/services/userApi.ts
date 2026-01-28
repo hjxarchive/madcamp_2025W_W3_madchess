@@ -48,8 +48,10 @@ export const getUserDecks = async (userId: number): Promise<ApiResponse<DeckWith
  * Get user's game history
  * GET /api/users/:userId/games
  */
-export const getUserGames = async (userId: number): Promise<ApiResponse<UserGamesResponse>> => {
-    const response = await apiClient.get<ApiResponse<UserGamesResponse>>(`/api/users/${userId}/games`)
+export const getUserGames = async (userId: number, limit: number = 20, offset: number = 0): Promise<ApiResponse<UserGamesResponse>> => {
+    const response = await apiClient.get<ApiResponse<UserGamesResponse>>(`/api/users/${userId}/games`, {
+        params: { limit, offset }
+    })
     return response.data
 }
 
