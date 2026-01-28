@@ -138,7 +138,6 @@ export interface GameState {
   currentTurn: PieceColor
   moveCount: number
   pgn: string
-  initialFen?: string
   status: 'placement' | 'playing' | 'checkmate' | 'resignation' | 'draw'
   isCheck: boolean
   lastMove?: Move
