@@ -270,13 +270,13 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className="h-full flex flex-col justify-center items-center text-center">
-                    <h1 className="text-7xl md:text-[10rem] font-black italic tracking-tighter leading-[0.75] mb-8 skew-x-[-8deg] uppercase">
-                      <span className="block text-white">MAD</span>
-                      <span className="block text-[#D4FF00]">BEYOND</span>
-                      <span className="block text-white">LEVELS</span>
+                    <h1 className="text-6xl md:text-8xl font-serif font-light leading-none mb-6">
+                      <span className="block text-white">WORLD</span>
+                      <span className="block text-[#D4FF00]">CLASS</span>
+                      <span className="block text-white">STRATEGY</span>
                     </h1>
-                    <p className="text-gray-500 max-w-sm text-[10px] font-mono tracking-[0.6em] uppercase border-l border-[#D4FF00] pl-6 ml-2">
-                      Deck-building chess reimagined. <br /> proven by strategy, driven by madness.
+                    <p className="text-gray-400 max-w-md text-lg font-light tracking-wide">
+                      Join the ultimate deck-building chess arena. Compete globally.
                     </p>
                   </div>
                 )}
