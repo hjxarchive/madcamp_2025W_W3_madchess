@@ -194,23 +194,6 @@ export default function ReplayPage() {
   if (isDataMirrored) {
     // Reverse board rows (Top <-> Bottom)
     displayBoard = [...displayBoard].reverse()
-
-    // Reverse Move Ranks (1 <-> 8, 2 <-> 7, etc.)
-    if (displayLastMove) {
-      const flipUci = (uci: string) => {
-        if (!uci || uci.length < 4) return uci
-        const fromFile = uci[0]
-        const fromRank = parseInt(uci[1])
-        const toFile = uci[2]
-        const toRank = parseInt(uci[3])
-        const prom = uci.substring(4)
-
-        const newFromRank = 9 - fromRank
-        const newToRank = 9 - toRank
-        return `${fromFile}${newFromRank}${toFile}${newToRank}${prom}`
-      }
-      displayLastMove = { ...displayLastMove, uci: flipUci(displayLastMove.uci) }
-    }
   }
 
   return (
