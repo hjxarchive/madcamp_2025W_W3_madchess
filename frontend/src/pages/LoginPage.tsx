@@ -45,7 +45,8 @@ export default function LoginPage() {
                 {/* Logo Area */}
                 <div className="mb-12">
                     <div className="w-16 h-16 bg-white mx-auto mb-6 skew-x-12 relative overflow-hidden flex items-center justify-center">
-                        <span className="text-3xl font-black skew-x-[-12deg] text-black">M</span>
+                        <div className="absolute inset-0 bg-[url('/logo.jpg')] bg-cover bg-center opacity-80"></div>
+                        <span className="text-3xl font-black skew-x-[-12deg] text-black z-10">M</span>
                     </div>
                     <h1 className="text-6xl font-serif font-light leading-none mb-2">
                         <span className="text-white">MAD</span>
