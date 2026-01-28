@@ -144,9 +144,16 @@ export default function HomePage() {
             <div className="flex-1 flex flex-col justify-center items-center p-12 text-center z-20">
               <h2 className="text-4xl font-serif text-[#D4FF00] mb-8">Support Development</h2>
               <div className="bg-[#0A0A0A] border border-gray-800 p-8 max-w-lg w-full mb-8">
-                <p className="text-gray-500 uppercase tracking-widest text-sm mb-4">Donation Account</p>
-                <p className="text-2xl text-white font-mono break-all select-all">41780204068358</p>
-                <p className="text-xl text-gray-400 mt-2 font-serif">국민은행 탁한진</p>
+                <div className="mb-6 border-b border-gray-800 pb-6">
+                  <p className="text-gray-500 uppercase tracking-widest text-sm mb-4">Donation Account 1</p>
+                  <p className="text-2xl text-white font-mono break-all select-all">41780204068358</p>
+                  <p className="text-xl text-gray-400 mt-2 font-serif">국민은행 탁한진</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 uppercase tracking-widest text-sm mb-4">Donation Account 2</p>
+                  <p className="text-2xl text-white font-mono break-all select-all">1002961962863</p>
+                  <p className="text-xl text-gray-400 mt-2 font-serif">우리은행 정재우</p>
+                </div>
               </div>
               <button
                 onClick={() => setShowDonation(false)}
