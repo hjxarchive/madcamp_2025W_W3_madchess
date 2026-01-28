@@ -56,7 +56,7 @@ interface Room {
   createdAt: number
 }
 
-import { StockfishService } from './StockfishService'
+import { StockfishService, AnalysisLine } from './StockfishService'
 
 export class GameManager {
   private queue: QueuePlayer[] = []
@@ -74,31 +74,31 @@ export class GameManager {
     this.broadcastCallback = callback
   }
 
-  async analyzeGame(matchId: string): Promise<{ type: 'cp' | 'mate', value: number, bestMove?: string }> {
+  async analyzeGame(matchId: string): Promise<AnalysisLine[]> {
     const match = this.matches.get(matchId)
     if (!match) throw new Error('Match not found')
 
     const fen = match.chessEngine.getFEN()
-    const result = await this.stockfishService.evaluate(fen)
+    const results = await this.stockfishService.evaluate(fen, 10, 3) // MultiPV 3
 
     // Score is relative to side-to-move. Convert to absolute (white-relative).
     if (match.chessEngine.getTurn() === 'black') {
-      result.value = -result.value
+      results.forEach(r => r.value = -r.value)
     }
 
-    return result
+    return results
   }
 
-  async analyzeFen(fen: string): Promise<{ type: 'cp' | 'mate', value: number, bestMove?: string }> {
-    const result = await this.stockfishService.evaluate(fen)
+  async analyzeFen(fen: string): Promise<AnalysisLine[]> {
+    const results = await this.stockfishService.evaluate(fen, 10, 3) // MultiPV 3
 
     // FEN usually includes side-to-move at parts[1]
     const parts = fen.split(' ')
     if (parts.length > 1 && parts[1] === 'b') {
-      result.value = -result.value
+      results.forEach(r => r.value = -r.value)
     }
 
-    return result
+    return results
   }
 
   // ===== Spectator Methods =====
@@ -550,20 +550,18 @@ export class GameManager {
       const fen = match.chessEngine.getFEN()
 
       // Use Stockfish to find best move
-      // Difficulty handling: We can set Skill Level or depth. 
-      // For now let's just use depth but maybe random sub-optimal moves?
-      // StockfishService uses 'depth' param. 
-      // Let's map difficulty 1-10 to depth 1-10.
+      // MultiPV=1 for AI Move (we only need the best one)
       const depth = Math.max(1, Math.min(10, match.aiDifficulty || 5))
+      const results = await this.stockfishService.evaluate(fen, depth, 1)
 
-      const result = await this.stockfishService.evaluate(fen, depth)
-
-      if (result.bestMove) {
+      if (results.length > 0) {
         // Apply move
-        // bestMove format: "e2e4"
-        const from = result.bestMove.substring(0, 2)
-        const to = result.bestMove.substring(2, 4)
-        const promotion = result.bestMove.length > 4 ? result.bestMove.substring(4, 5) : undefined
+        // bestMove format: extracted from PV "e2e4 ..."
+        const bestMove = results[0].pv.split(' ')[0]
+
+        const from = bestMove.substring(0, 2)
+        const to = bestMove.substring(2, 4)
+        const promotion = bestMove.length > 4 ? bestMove.substring(4, 5) : undefined
 
         // We need to call processMove. But processMove expects socketId.
         // We can overload processMove or create internal method.

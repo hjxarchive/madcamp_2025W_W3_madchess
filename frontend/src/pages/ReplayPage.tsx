@@ -14,13 +14,20 @@ export default function ReplayPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
 
+  interface AnalysisLine {
+    id: number
+    type: 'cp' | 'mate'
+    value: number
+    pv: string
+  }
+
   const [history, setHistory] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [gameInfo, setGameInfo] = useState<Game | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isFlipped, setIsFlipped] = useState(false)
-  const [evalScore, setEvalScore] = useState<{ type: 'cp' | 'mate', value: number } | null>(null)
+  const [analysisLines, setAnalysisLines] = useState<AnalysisLine[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Load data
@@ -96,8 +103,13 @@ export default function ReplayPage() {
   useEffect(() => {
     const socket = socketService.connect() // Connect if not connected
 
-    const handleAnalysis = (data: { type: 'cp' | 'mate', value: number }) => {
-      setEvalScore(data)
+    const handleAnalysis = (data: AnalysisLine[] | { type: 'cp' | 'mate', value: number }) => {
+      if (Array.isArray(data)) {
+        setAnalysisLines(data)
+      } else {
+        // Fallback for single object (legacy)
+        setAnalysisLines([{ id: 1, type: data.type, value: data.value, pv: '' }])
+      }
     }
 
     socket.on('analysis-result', handleAnalysis)
@@ -115,7 +127,7 @@ export default function ReplayPage() {
         socket.emit('analyze-fen', { fen: history[currentIndex].fen })
       }
     } else {
-      setEvalScore(null)
+      setAnalysisLines([])
     }
   }, [currentIndex, history])
 
@@ -339,9 +351,31 @@ export default function ReplayPage() {
 
         {/* Center: Chess Board */}
         <div className="flex gap-4 justify-center items-start">
-          <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center">
-            {/* Red debug text removed */}
-            <EvalBar evaluation={evalScore} />
+          <div className="h-[600px] shrink-0 pt-8 pb-8 flex flex-col items-center gap-4">
+            {/* Engine Lines */}
+            <div className="flex flex-col gap-2 w-64 bg-[#0A0A0A]/80 backdrop-blur rounded p-2 text-xs font-mono border border-gray-800">
+              <div className="text-gray-500 uppercase tracking-widest text-[10px] mb-1">Engine Analysis</div>
+              {analysisLines.length > 0 ? (
+                analysisLines.map((line) => (
+                  <div key={line.id} className="flex flex-col gap-0.5 border-b border-gray-800 last:border-0 pb-1 last:pb-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#D4FF00]">
+                        {line.type === 'mate' ? `M${Math.abs(line.value)}` :
+                          (line.value > 0 ? `+${(line.value / 100).toFixed(1)}` : (line.value / 100).toFixed(1))}
+                      </span>
+                      <span className="text-gray-600">Depth 19</span>
+                    </div>
+                    <div className="text-gray-400 truncate" title={line.pv}>
+                      {line.pv || 'Thinking...'}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-600 italic">Analysis loading...</div>
+              )}
+            </div>
+
+            <EvalBar evaluation={analysisLines.length > 0 ? { type: analysisLines[0].type, value: analysisLines[0].value } : null} />
           </div>
           <div className="flex flex-col items-center">
             <ChessBoard
