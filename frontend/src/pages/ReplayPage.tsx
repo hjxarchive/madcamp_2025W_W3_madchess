@@ -397,13 +397,13 @@ export default function ReplayPage() {
             )}
           </div>
 
-          <div className="border-t border-gray-800 pt-3 pb-1">
+          <div className="border-t border-gray-800 py-4">
             <div className="flex items-center justify-between gap-4">
               {/* Left: Label */}
               <div className="text-gray-500 text-xs uppercase tracking-widest shrink-0">Move</div>
 
               {/* Center: Controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4">
                 <button
                   onClick={handlePrev}
                   disabled={currentIndex === 0}
