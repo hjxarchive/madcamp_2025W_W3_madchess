@@ -7,7 +7,7 @@ import RatingDisplay from '../components/rating/RatingDisplay'
 
 export default function MyPage() {
     const navigate = useNavigate()
-    const { user, logout, setUser, checkAuth } = useAuthStore()
+    const { user, logout, setUser } = useAuthStore()
     const [matchHistory, setMatchHistory] = useState<UserGame[]>([])
     const [stats, setStats] = useState<UserStats | null>(null)
     const [userDecks, setUserDecks] = useState<DeckWithStats[]>([])
@@ -44,9 +44,6 @@ export default function MyPage() {
                     setUserDecks(res.data)
                 }
             })
-
-            // Refresh user data (rating, etc.)
-            checkAuth()
         }
     }, [user?.id, currentPage])
 
