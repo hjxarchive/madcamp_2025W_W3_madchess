@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { getUserGames, getUserStats, updateUser, getUserDecks } from '../services/userApi'
-import type { UserGame, UserStats, DeckWithStats } from '../types/api.types'
+import { getUserGames, getUserStats, updateUser, getUserDecks, getUserById } from '../services/userApi'
+import type { UserGame, UserStats, DeckWithStats, User } from '../types/api.types'
 import RatingDisplay from '../components/rating/RatingDisplay'
+
+function getRatingTier(rating: number): string {
+    if (rating >= 2400) return 'Grandmaster';
+    if (rating >= 2200) return 'Master';
+    if (rating >= 2000) return 'Expert';
+    if (rating >= 1800) return 'Class A';
+    if (rating >= 1600) return 'Class B';
+    if (rating >= 1400) return 'Class C';
+    if (rating >= 1200) return 'Class D';
+    return 'Beginner';
+}
 
 export default function MyPage() {
     const navigate = useNavigate()
     const { user, logout, setUser } = useAuthStore()
+    const [userData, setUserData] = useState<User | null>(null)
     const [matchHistory, setMatchHistory] = useState<UserGame[]>([])
     const [stats, setStats] = useState<UserStats | null>(null)
     const [userDecks, setUserDecks] = useState<DeckWithStats[]>([])
@@ -20,52 +32,73 @@ export default function MyPage() {
     const ITEMS_PER_PAGE = 10
 
     useEffect(() => {
-        if (user?.id) {
-            // Fetch games with pagination
-            const offset = (currentPage - 1) * ITEMS_PER_PAGE
-            getUserGames(user.id, ITEMS_PER_PAGE, offset).then((res) => {
-                if (res.success && res.data) {
-                    setMatchHistory(res.data.games)
-                    setTotalGames(res.data.total)
-                }
-            })
+        if (user) {
+            // Initialize local data with store data eagerly
+            // Only if userData is null to prevent overwriting fetched data with stale store data on re-renders
+            // But we want to start with something.
+            // Actually, we should just set it if it's null.
+            setUserData(prev => prev || user)
 
-            // Stats are fetched separately, but we can also use totalGames for "Total Matches" if needed.
-            // However, getUserStats might return aggregated data. Let's keep fetching it.
-            getUserStats(user.id).then((res) => {
-                if (res.success && res.data) {
-                    setStats(res.data)
-                }
-            })
+            if (user.id) {
+                // Fetch latest user data (rating etc) - This fixes the stale rating issue
+                getUserById(user.id).then(res => {
+                    if (res.success && res.data) {
+                        setUserData(res.data)
+                    }
+                })
 
-            // Fetch user decks
-            getUserDecks(user.id).then((res) => {
-                if (res.success && res.data) {
-                    setUserDecks(res.data)
-                }
-            })
+                // Fetch games with pagination
+                const offset = (currentPage - 1) * ITEMS_PER_PAGE
+                getUserGames(user.id, ITEMS_PER_PAGE, offset).then((res) => {
+                    if (res.success && res.data) {
+                        setMatchHistory(res.data.games)
+                        setTotalGames(res.data.total)
+                    }
+                })
+
+                // Stats are fetched separately
+                getUserStats(user.id).then((res) => {
+                    if (res.success && res.data) {
+                        setStats(res.data)
+                    }
+                })
+
+                // Fetch user decks
+                getUserDecks(user.id).then((res) => {
+                    if (res.success && res.data) {
+                        setUserDecks(res.data)
+                    }
+                })
+            }
         }
-    }, [user?.id, currentPage])
+    }, [user?.id, currentPage]) // user.id is stable
 
     useEffect(() => {
-        if (user?.name) {
-            setEditName(user.name)
+        if (userData?.username || userData?.name) {
+            setEditName(userData.username || userData.name || '')
         }
-    }, [user])
+    }, [userData])
 
     const handleLogout = () => {
         logout()
     }
 
     const handleSaveName = async () => {
-        if (!user) return
+        if (!user || !userData) return
         try {
             const res = await updateUser(user.id, editName)
             // @ts-ignore
             if (res.success || res.status === 200) { // Handle implicit success
                 const updatedData = res.data || res
                 // @ts-ignore
-                setUser({ ...user, name: updatedData.username || editName })
+                const newName = updatedData.username || editName
+
+                // Update local state
+                setUserData({ ...userData, name: newName, username: newName })
+
+                // Update store if possible/needed, but be careful.
+                setUser({ ...user, name: newName })
+
                 setIsEditing(false)
             }
         } catch (e: any) {
@@ -90,7 +123,7 @@ export default function MyPage() {
 
     const totalPages = Math.ceil(totalGames / ITEMS_PER_PAGE)
 
-    if (!user) return <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center font-mono">LOADING PROFILE...</div>
+    if (!userData) return <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center font-mono">LOADING PROFILE...</div>
 
     return (
         <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12 font-sans">
@@ -118,20 +151,20 @@ export default function MyPage() {
                     <div className="md:col-span-4 flex flex-col items-center md:items-start">
                         <div className="w-48 h-48 bg-gray-900 border border-gray-800 p-2 mb-6 relative group">
                             <img
-                                src={user.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(user.name || 'User')}`}
+                                src={userData.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(userData.username || userData.name || 'User')}`}
                                 alt="Profile"
                                 className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
                             />
                             <div className="absolute -bottom-2 -right-2 bg-[#D4FF00] text-black text-xs font-bold px-3 py-1 uppercase tracking-widest">
-                                Grandmaster
+                                {getRatingTier(userData.rating || 1500)}
                             </div>
                         </div>
 
                         <div className="w-full">
                             <div className="text-gray-500 text-xs uppercase tracking-widest mb-3">Standard Rating</div>
                             <RatingDisplay
-                                rating={user.rating || 1500}
-                                rd={user.rd || 350}
+                                rating={userData.rating || 1500}
+                                rd={userData.rd || 350}
                                 variant="detailed"
                                 showProvisional={true}
                             />
@@ -157,7 +190,7 @@ export default function MyPage() {
                                 <div className="group flex items-end gap-6 border-b border-gray-800 pb-8 hover:border-[#D4FF00] transition-colors">
                                     <div>
                                         <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Player Name</div>
-                                        <h1 className="text-5xl md:text-6xl font-serif text-white leading-none">{user.name}</h1>
+                                        <h1 className="text-5xl md:text-6xl font-serif text-white leading-none">{userData.username || userData.name}</h1>
                                     </div>
                                     <button
                                         onClick={() => setIsEditing(true)}
@@ -167,7 +200,7 @@ export default function MyPage() {
                                     </button>
                                 </div>
                             )}
-                            <div className="mt-4 text-gray-500 font-mono text-sm">{user.email}</div>
+                            <div className="mt-4 text-gray-500 font-mono text-sm">{userData.email}</div>
                         </div>
 
                         <div className="grid grid-cols-3 gap-6">
@@ -290,10 +323,6 @@ export default function MyPage() {
 
                                     {Array.from({ length: totalPages }).map((_, i) => {
                                         const pageNum = i + 1;
-                                        // Show limited pages if too many (simple implementation for now: show all, or limit?)
-                                        // User requested "1,2,3,4...", let's show up to 7 or so.
-                                        // For now, let's implement full list but truncated if huge (not expected yet).
-                                        // Let's implement full list for simplicity as per request.
                                         return (
                                             <button
                                                 key={pageNum}
