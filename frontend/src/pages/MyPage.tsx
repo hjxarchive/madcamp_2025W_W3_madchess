@@ -266,7 +266,7 @@ export default function MyPage() {
                                         <div className="col-span-3">
                                             <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Rating</div>
                                             <div className={`font-mono ${game.ratingChange > 0 ? 'text-[#D4FF00]' : 'text-gray-500'}`}>
-                                                {game.ratingChange > 0 ? '+' : ''}{game.ratingChange}
+                                                {game.ratingChange > 0 ? '+' : ''}{Math.round(game.ratingChange)}
                                             </div>
                                         </div>
                                         <div className="col-span-2 flex items-center justify-end gap-2">

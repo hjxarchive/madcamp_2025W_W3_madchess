@@ -259,7 +259,7 @@ export default function HomePage() {
                               <div className="text-lg font-bold text-white truncate">{typeof game.opponent === 'object' ? (game.opponent as any).username : game.opponent}</div>
                             </div>
                             <div className={`text-xl font-mono ${game.ratingChange > 0 ? 'text-[#D4FF00]' : 'text-gray-500'}`}>
-                              {game.ratingChange > 0 ? '+' : ''}{game.ratingChange}
+                              {game.ratingChange > 0 ? '+' : ''}{Math.round(game.ratingChange)}
                             </div>
                           </div>
                           <div className="h-1 w-full bg-gray-900 relative overflow-hidden">
