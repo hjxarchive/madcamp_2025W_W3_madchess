@@ -17,6 +17,8 @@ export interface User {
     email?: string
     picture?: string
     rating: number
+    rd?: number
+    volatility?: number
     createdAt: string
 }
 

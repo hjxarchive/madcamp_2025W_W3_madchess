@@ -365,3 +365,66 @@ export const updateUser = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * @swagger
+ * /api/leaderboard:
+ *   get:
+ *     summary: 리더보드 조회
+ *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: 리더보드 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     players:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           rank:
+ *                             type: number
+ *                           userId:
+ *                             type: number
+ *                           username:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           picture:
+ *                             type: string
+ *                           rating:
+ *                             type: number
+ *                           rd:
+ *                             type: number
+ *                           isProvisional:
+ *                             type: boolean
+ *                           totalGames:
+ *                             type: number
+ *                           winRate:
+ *                             type: number
+ *       500:
+ *         description: 서버 오류
+ */
+export const getLeaderboard = async (req: Request, res: Response) => {
+  try {
+    const players = await userService.getLeaderboard();
+    res.json({ success: true, data: { players } });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Server Error'
+      }
+    });
+  }
+};

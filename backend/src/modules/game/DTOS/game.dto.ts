@@ -41,6 +41,20 @@ export interface GameStateDto {
     black: string[];
   };
   playedAt: Date;
+  ratingChanges?: {
+    white: {
+      oldRating: number;
+      newRating: number;
+      ratingDelta: number;
+      pieceScore: number;
+    };
+    black: {
+      oldRating: number;
+      newRating: number;
+      ratingDelta: number;
+      pieceScore: number;
+    };
+  };
 }
 
 export interface GameHistoryDto {

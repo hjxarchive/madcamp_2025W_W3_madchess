@@ -124,6 +124,7 @@ app.use('/api/users', userRoutes)
 app.use('/api/decks', deckRoutes)
 app.use('/api/pieces', pieceRoutes)
 app.use('/api/games', gameRoutes)
+app.use('/api/leaderboard', userRoutes)
 
 // Setup Socket.IO handlers
 setupSocketHandlers(io)

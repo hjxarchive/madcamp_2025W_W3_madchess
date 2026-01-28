@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { socketService } from '../services/socket'
 import { useAuthStore } from '../stores/authStore'
+import { RatingRange } from '../components/rating/RatingDisplay'
 
 const KING_IMAGES = {
   white: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
@@ -343,9 +344,25 @@ export default function MatchmakingPage() {
                 <div className="text-6xl animate-pulse">🔍</div>
               </div>
               <h2 className="text-3xl font-serif text-white mb-2">Searching for Opponent</h2>
-              <p className="text-gray-500 mb-10 uppercase tracking-widest text-sm">
+              <p className="text-gray-500 mb-4 uppercase tracking-widest text-sm">
                 Time Control: <span className="text-[#D4FF00] font-mono">{selectedTime}</span>
               </p>
+
+              {/* 내 레이팅 및 예상 매칭 범위 */}
+              {user?.rating && (
+                <div className="mb-8 p-4 border border-gray-800 bg-[#0A0A0A] rounded inline-block">
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">예상 상대 레이팅</div>
+                  <RatingRange 
+                    minRating={(user.rating || 1500) - (user.rd || 350) * 2}
+                    maxRating={(user.rating || 1500) + (user.rd || 350) * 2}
+                    className="text-lg"
+                  />
+                  <div className="mt-2 text-xs text-gray-500">
+                    내 레이팅: <span className="text-[#D4FF00]">{Math.round(user.rating)}</span>
+                    {user.rd && user.rd > 100 && <span className="ml-2">(불확실성 높음)</span>}
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={handleCancelQueue}

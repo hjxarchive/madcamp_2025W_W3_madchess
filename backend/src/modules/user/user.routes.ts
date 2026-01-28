@@ -23,4 +23,7 @@ router.get('/:userId/games', gameController.getUserGames);
 // PATCH /api/users/:userId - 사용자 정보 수정 (닉네임)
 router.patch('/:userId', userController.updateUser);
 
+// GET /api/leaderboard - 리더보드 조회
+router.get('/leaderboard', userController.getLeaderboard);
+
 export default router;

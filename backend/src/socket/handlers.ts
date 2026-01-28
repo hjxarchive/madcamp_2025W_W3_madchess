@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io'
 import { GameManager } from '../engine/GameManager.js'
 import * as gameService from '../modules/game/game.service.js'
+import { ratingService } from '../services/RatingService.js'
 
 const gameManager = new GameManager()
 
@@ -228,14 +229,9 @@ export function setupSocketHandlers(io: Server) {
     })
 
     // Client declares game end (checkmate/stalemate backup - when server missed it)
-    socket.on('declare-game-end', (data: { matchId: string; winner: string; reason: string }) => {
+    socket.on('declare-game-end', async (data: { matchId: string; winner: string; reason: string }) => {
       console.log(`🏁 Client ${socket.id} declares game end:`, data)
-      // Broadcast to all players in the match room
-      io.to(data.matchId).emit('game-over', {
-        winner: data.winner,
-        reason: data.reason,
-      })
-
+      
       // DB에 게임 결과 저장 (백업 선언도 저장)
       const match = gameManager.getMatch(data.matchId)
       if (match) {
@@ -250,7 +246,55 @@ export function setupSocketHandlers(io: Server) {
         const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
         const winner = data.winner as 'white' | 'black' | 'draw'
         const pgn = gameManager.getMatchPGN(data.matchId)
-        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner, data.reason, pgn)
+        
+        // Calculate piece scores and update ratings
+        const [whitePieceScore, blackPieceScore] = await Promise.all([
+          ratingService.calculateDeckPieceScore(parseInt(whiteDeckId)),
+          ratingService.calculateDeckPieceScore(parseInt(blackDeckId)),
+        ])
+        
+        // Determine winner ID
+        let winnerId: number | null = null
+        if (data.winner === 'white') {
+          winnerId = parseInt(whiteUserId)
+        } else if (data.winner === 'black') {
+          winnerId = parseInt(blackUserId)
+        }
+        
+        // Update ratings
+        const ratingResult = await ratingService.updateRatingsAfterMatch(
+          data.matchId,
+          winnerId,
+          { userId: parseInt(whiteUserId), pieceScore: whitePieceScore, deckId: parseInt(whiteDeckId) },
+          { userId: parseInt(blackUserId), pieceScore: blackPieceScore, deckId: parseInt(blackDeckId) },
+          pgn
+        )
+        
+        // Broadcast game-over with rating changes
+        io.to(data.matchId).emit('game-over', {
+          winner: data.winner,
+          reason: data.reason,
+          ratingChanges: ratingResult.success ? {
+            white: {
+              oldRating: ratingResult.white.oldRating,
+              newRating: ratingResult.white.newRating,
+              ratingDelta: ratingResult.white.ratingDelta,
+              oldRd: ratingResult.white.oldRd,
+              newRd: ratingResult.white.newRd,
+              pieceScore: whitePieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+            black: {
+              oldRating: ratingResult.black.oldRating,
+              newRating: ratingResult.black.newRating,
+              ratingDelta: ratingResult.black.ratingDelta,
+              oldRd: ratingResult.black.oldRd,
+              newRd: ratingResult.black.newRd,
+              pieceScore: blackPieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+          } : undefined,
+        })
       }
     })
 
@@ -286,7 +330,7 @@ export function setupSocketHandlers(io: Server) {
     })
 
     // Resign - 기권
-    socket.on('resign', (data: { matchId: string }) => {
+    socket.on('resign', async (data: { matchId: string }) => {
       console.log(`🏳️ Player ${socket.id} resigned in match ${data.matchId}`)
       console.log(`📦 Received data:`, JSON.stringify(data))
 
@@ -303,25 +347,60 @@ export function setupSocketHandlers(io: Server) {
 
         gameManager.endGame(data.matchId, { winner, reason: 'resignation' }) // Status Update
 
-        io.to(data.matchId).emit('game-over', {
-          winner,
-          reason: 'resignation',
-        })
-
-        // DB에 게임 결과 저장
+        // DB에 게임 결과 저장 및 레이팅 업데이트
         const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
         const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
         const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
         const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
         const pgn = gameManager.getMatchPGN(data.matchId)
-        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner as 'white' | 'black', 'resignation', pgn)
+        
+        // Calculate piece scores and update ratings
+        const [whitePieceScore, blackPieceScore] = await Promise.all([
+          ratingService.calculateDeckPieceScore(parseInt(whiteDeckId)),
+          ratingService.calculateDeckPieceScore(parseInt(blackDeckId)),
+        ])
+        
+        const winnerId = winner === 'white' ? parseInt(whiteUserId) : parseInt(blackUserId)
+        
+        const ratingResult = await ratingService.updateRatingsAfterMatch(
+          data.matchId,
+          winnerId,
+          { userId: parseInt(whiteUserId), pieceScore: whitePieceScore, deckId: parseInt(whiteDeckId) },
+          { userId: parseInt(blackUserId), pieceScore: blackPieceScore, deckId: parseInt(blackDeckId) },
+          pgn
+        )
+        
+        io.to(data.matchId).emit('game-over', {
+          winner,
+          reason: 'resignation',
+          ratingChanges: ratingResult.success ? {
+            white: {
+              oldRating: ratingResult.white.oldRating,
+              newRating: ratingResult.white.newRating,
+              ratingDelta: ratingResult.white.ratingDelta,
+              oldRd: ratingResult.white.oldRd,
+              newRd: ratingResult.white.newRd,
+              pieceScore: whitePieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+            black: {
+              oldRating: ratingResult.black.oldRating,
+              newRating: ratingResult.black.newRating,
+              ratingDelta: ratingResult.black.ratingDelta,
+              oldRd: ratingResult.black.oldRd,
+              newRd: ratingResult.black.newRd,
+              pieceScore: blackPieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+          } : undefined,
+        })
       } else {
         console.log(`❌ Match not found: ${data.matchId}`)
       }
     })
 
     // Timeout - 시간 초과 패배
-    socket.on('timeout', (data: { matchId: string; loserColor?: 'white' | 'black' }) => {
+    socket.on('timeout', async (data: { matchId: string; loserColor?: 'white' | 'black' }) => {
       console.log(`⏰ Timeout reported by ${socket.id} in match ${data.matchId}`)
 
       const match = gameManager.getMatch(data.matchId)
@@ -363,18 +442,53 @@ export function setupSocketHandlers(io: Server) {
 
         gameManager.endGame(data.matchId, { winner, reason: 'timeout' }) // Status Update
 
-        io.to(data.matchId).emit('game-over', {
-          winner,
-          reason: 'timeout',
-        })
-
-        // DB에 게임 결과 저장
+        // DB에 게임 결과 저장 및 레이팅 업데이트
         const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
         const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
         const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
         const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
         const pgn = gameManager.getMatchPGN(data.matchId)
-        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, winner as 'white' | 'black', 'timeout', pgn)
+        
+        // Calculate piece scores and update ratings
+        const [whitePieceScore, blackPieceScore] = await Promise.all([
+          ratingService.calculateDeckPieceScore(parseInt(whiteDeckId)),
+          ratingService.calculateDeckPieceScore(parseInt(blackDeckId)),
+        ])
+        
+        const winnerId = winner === 'white' ? parseInt(whiteUserId) : parseInt(blackUserId)
+        
+        const ratingResult = await ratingService.updateRatingsAfterMatch(
+          data.matchId,
+          winnerId,
+          { userId: parseInt(whiteUserId), pieceScore: whitePieceScore, deckId: parseInt(whiteDeckId) },
+          { userId: parseInt(blackUserId), pieceScore: blackPieceScore, deckId: parseInt(blackDeckId) },
+          pgn
+        )
+        
+        io.to(data.matchId).emit('game-over', {
+          winner,
+          reason: 'timeout',
+          ratingChanges: ratingResult.success ? {
+            white: {
+              oldRating: ratingResult.white.oldRating,
+              newRating: ratingResult.white.newRating,
+              ratingDelta: ratingResult.white.ratingDelta,
+              oldRd: ratingResult.white.oldRd,
+              newRd: ratingResult.white.newRd,
+              pieceScore: whitePieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+            black: {
+              oldRating: ratingResult.black.oldRating,
+              newRating: ratingResult.black.newRating,
+              ratingDelta: ratingResult.black.ratingDelta,
+              oldRd: ratingResult.black.oldRd,
+              newRd: ratingResult.black.newRd,
+              pieceScore: blackPieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+          } : undefined,
+        })
       }
     })
 
@@ -394,7 +508,7 @@ export function setupSocketHandlers(io: Server) {
     })
 
     // Draw response - 무승부 응답
-    socket.on('respond-draw', (data: { matchId: string; accept: boolean }) => {
+    socket.on('respond-draw', async (data: { matchId: string; accept: boolean }) => {
       console.log(`🤝 Player ${socket.id} ${data.accept ? 'accepted' : 'rejected'} draw in match ${data.matchId}`)
       if (data.accept) {
         const match = gameManager.getMatch(data.matchId)
@@ -403,18 +517,51 @@ export function setupSocketHandlers(io: Server) {
         // Draw accepted - game over
         gameManager.endGame(data.matchId, { winner: 'draw', reason: 'mutual agreement' }) // Status Update
 
-        io.to(data.matchId).emit('game-over', {
-          winner: 'draw',
-          reason: 'mutual agreement',
-        })
-
-        // DB에 게임 결과 저장
+        // DB에 게임 결과 저장 및 레이팅 업데이트
         const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
         const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
         const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
         const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
         const pgn = gameManager.getMatchPGN(data.matchId)
-        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'mutual agreement', pgn)
+        
+        // Calculate piece scores and update ratings
+        const [whitePieceScore, blackPieceScore] = await Promise.all([
+          ratingService.calculateDeckPieceScore(parseInt(whiteDeckId)),
+          ratingService.calculateDeckPieceScore(parseInt(blackDeckId)),
+        ])
+        
+        const ratingResult = await ratingService.updateRatingsAfterMatch(
+          data.matchId,
+          null, // Draw - no winner
+          { userId: parseInt(whiteUserId), pieceScore: whitePieceScore, deckId: parseInt(whiteDeckId) },
+          { userId: parseInt(blackUserId), pieceScore: blackPieceScore, deckId: parseInt(blackDeckId) },
+          pgn
+        )
+        
+        io.to(data.matchId).emit('game-over', {
+          winner: 'draw',
+          reason: 'mutual agreement',
+          ratingChanges: ratingResult.success ? {
+            white: {
+              oldRating: ratingResult.white.oldRating,
+              newRating: ratingResult.white.newRating,
+              ratingDelta: ratingResult.white.ratingDelta,
+              oldRd: ratingResult.white.oldRd,
+              newRd: ratingResult.white.newRd,
+              pieceScore: whitePieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+            black: {
+              oldRating: ratingResult.black.oldRating,
+              newRating: ratingResult.black.newRating,
+              ratingDelta: ratingResult.black.ratingDelta,
+              oldRd: ratingResult.black.oldRd,
+              newRd: ratingResult.black.newRd,
+              pieceScore: blackPieceScore,
+              handicapApplied: whitePieceScore !== blackPieceScore,
+            },
+          } : undefined,
+        })
       }
       // If rejected, no action needed - game continues
     })

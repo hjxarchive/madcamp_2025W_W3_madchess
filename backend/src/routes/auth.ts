@@ -37,7 +37,25 @@ router.get('/logout', (req, res) => {
 // 현재 사용자 정보 확인
 router.get('/user', (req, res) => {
     if (req.isAuthenticated()) {
-        res.json(req.user)
+        const user = req.user as any
+        
+        // Glicko-2 레이팅 정보 추가
+        const rd = user.rd || 350
+        const confidenceMargin = Math.round(1.96 * rd)
+        
+        res.json({
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            name: user.name,
+            picture: user.picture,
+            rating: user.rating || 1500,
+            rd: rd,
+            volatility: user.volatility || 0.06,
+            ratingDisplay: `${Math.round(user.rating || 1500)} ± ${confidenceMargin}`,
+            isProvisional: rd > 100,
+            createdAt: user.created_at
+        })
     } else {
         res.status(401).json({ error: 'Not authenticated' })
     }

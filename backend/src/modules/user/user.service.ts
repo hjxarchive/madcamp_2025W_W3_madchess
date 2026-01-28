@@ -154,3 +154,22 @@ export const updateUser = async (userId: number, username: string): Promise<User
   // 업데이트된 정보 반환
   return await getUserById(userId);
 };
+
+export const getLeaderboard = async () => {
+  const users = await userRepo.findAllUsersOrderedByRating();
+  
+  return users.map((user, index) => ({
+    rank: index + 1,
+    userId: user.id,
+    username: user.username,
+    name: user.name,
+    picture: user.picture,
+    rating: user.rating,
+    rd: user.rd,
+    isProvisional: user.rd > 100,
+    totalGames: user.game_history.length,
+    winRate: user.game_history.length > 0 
+      ? user.game_history.filter((gh: any) => gh.result === 'win').length / user.game_history.length
+      : 0
+  }));
+};

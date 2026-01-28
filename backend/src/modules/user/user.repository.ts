@@ -88,3 +88,18 @@ export const updateUser = async (userId: number, data: { username?: string, pict
     data
   });
 };
+
+export const findAllUsersOrderedByRating = async () => {
+  return await prisma.user.findMany({
+    orderBy: {
+      rating: 'desc'
+    },
+    include: {
+      game_history: {
+        select: {
+          result: true
+        }
+      }
+    }
+  });
+};
