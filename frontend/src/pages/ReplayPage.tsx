@@ -226,6 +226,7 @@ export default function ReplayPage() {
           </div>
           <div className="flex flex-col items-center">
             <ChessBoard
+              key={`${isFlipped ? 'black' : 'white'}-${currentIndex}`}
               board={displayBoard}
               currentTurn={currentState.turn}
               myColor={isFlipped ? 'black' : 'white'}
