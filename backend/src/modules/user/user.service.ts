@@ -95,12 +95,17 @@ export const getUserStats = async (userId: number): Promise<UserStatsDto> => {
     };
   });
 
-  // Calculate Favorite Deck
+  // Calculate Favorite Deck (Only consider currently owned decks)
+  const currentDecks = await userRepo.findDecksByUser(userId);
+  const currentDeckIds = new Set(currentDecks.map(d => d.id));
   const deckCounts: Record<string, number> = {};
+
   gameHistory.forEach((gh: any) => {
     const isWhite = gh.game.white_player_id === userId;
     const deck = isWhite ? gh.game.deck_game_white_deck_idTodeck : gh.game.deck_game_black_deck_idTodeck;
-    if (deck) {
+
+    // Only count if deck exists and is currently owned by the user
+    if (deck && currentDeckIds.has(deck.id)) {
       // Use deck name, fallback to Untitled if null/empty
       const name = deck.name || 'Untitled Deck';
       deckCounts[name] = (deckCounts[name] || 0) + 1;
