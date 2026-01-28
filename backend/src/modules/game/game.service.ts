@@ -390,3 +390,10 @@ export const getGameReplay = async (gameId: number): Promise<any[]> => {
     return [];
   }
 };
+
+export const getDailyStats = async () => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const gamesToday = await gameRepo.countGamesFromDate(today)
+  return { gamesToday }
+}

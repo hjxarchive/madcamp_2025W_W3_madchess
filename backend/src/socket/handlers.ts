@@ -445,6 +445,20 @@ export function setupSocketHandlers(io: Server) {
       console.log(`📺 Sent ${liveGames.length} live games to ${socket.id}`)
     })
 
+    // Get server stats
+    socket.on('get-server-stats', async () => {
+      try {
+        const { gamesToday } = await gameService.getDailyStats()
+        const onlineUsers = io.engine.clientsCount
+        socket.emit('server-stats', {
+          gamesToday,
+          onlineUsers
+        })
+      } catch (error) {
+        console.error('Failed to get server stats:', error)
+      }
+    })
+
     // Join a game as spectator
     socket.on('spectate-game', (data: { matchId: string }) => {
       console.log(`👁️ ${socket.id} requesting to spectate ${data.matchId}`)

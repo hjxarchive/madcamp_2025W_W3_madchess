@@ -21,7 +21,8 @@ export default function HomePage() {
 
   const [recentGames, setRecentGames] = useState<UserGame[]>([])
   const [serverOnline, setServerOnline] = useState<boolean>(true)
-  const [onlineCount, setOnlineCount] = useState<number>(1429)
+  const [onlineCount, setOnlineCount] = useState<number>(0)
+  const [gamesToday, setGamesToday] = useState<number>(0)
   const [liveGames, setLiveGames] = useState<LiveGame[]>([])
   const [showDonation, setShowDonation] = useState(false)
 
@@ -45,14 +46,24 @@ export default function HomePage() {
     socketService.onLiveGames(handleLiveGames)
     socketService.requestLiveGames()
 
-    // Refresh live games every 10 seconds
+    // Handle Server Stats
+    const handleServerStats = (data: { gamesToday: number; onlineUsers: number }) => {
+      setGamesToday(data.gamesToday)
+      setOnlineCount(data.onlineUsers)
+    }
+    socketService.onServerStats(handleServerStats)
+    socketService.requestServerStats()
+
+    // Refresh live games and stats every 10 seconds
     const interval = setInterval(() => {
       socketService.requestLiveGames()
+      socketService.requestServerStats()
     }, 10000)
 
     return () => {
       clearInterval(interval)
       socketService.offLiveGames()
+      socketService.offServerStats()
     }
   }, [])
 
@@ -123,10 +134,10 @@ export default function HomePage() {
         <div className="hidden lg:flex lg:col-span-3 flex-col justify-center px-12 border-r border-gray-900 z-10 bg-[#050505]">
           <div className="mb-16">
             <div className="flex items-start text-[#D4FF00]">
-              <span className="text-8xl font-serif font-light leading-none">53</span>
+              <span className="text-8xl font-serif font-light leading-none">{gamesToday}</span>
               <span className="text-lg mt-2 ml-1">↗</span>
             </div>
-            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Tournaments Today</div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Matches Today</div>
           </div>
 
           <div>
@@ -134,7 +145,7 @@ export default function HomePage() {
               <span className="text-8xl font-serif font-light leading-none">{onlineCount}</span>
               <span className="text-lg mt-2 ml-1 text-[#D4FF00]">↗</span>
             </div>
-            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Grandmasters Online</div>
+            <div className="text-gray-500 text-sm uppercase tracking-widest mt-2 ml-1">Players Online</div>
           </div>
         </div>
 

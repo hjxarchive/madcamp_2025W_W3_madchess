@@ -106,3 +106,13 @@ export const createGameHistory = async (userId: number, gameId: number, role: st
     }
   });
 };
+
+export const countGamesFromDate = async (date: Date) => {
+  return await prisma.game.count({
+    where: {
+      played_at: {
+        gte: date
+      }
+    }
+  });
+};

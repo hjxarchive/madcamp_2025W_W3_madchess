@@ -517,6 +517,25 @@ class SocketService {
       this.socket.off('analysis-error')
     }
   }
+
+  // Server Stats
+  requestServerStats() {
+    if (this.socket) {
+      this.socket.emit('get-server-stats')
+    }
+  }
+
+  onServerStats(callback: (data: { gamesToday: number; onlineUsers: number }) => void) {
+    if (this.socket) {
+      this.socket.on('server-stats', callback)
+    }
+  }
+
+  offServerStats() {
+    if (this.socket) {
+      this.socket.off('server-stats')
+    }
+  }
 }
 
 export const socketService = new SocketService()
