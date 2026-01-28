@@ -239,6 +239,11 @@ export function setupSocketHandlers(io: Server) {
       // DB에 게임 결과 저장 (백업 선언도 저장)
       const match = gameManager.getMatch(data.matchId)
       if (match) {
+        // [FIX] 중복 저장 방지
+        if (match.gameState.status !== 'playing') {
+          return
+        }
+
         const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
         const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
         const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
@@ -321,6 +326,12 @@ export function setupSocketHandlers(io: Server) {
 
       const match = gameManager.getMatch(data.matchId)
       if (match) {
+        // [FIX] 중복 저장 방지: 게임이 이미 종료되었으면 무시
+        if (match.gameState.status !== 'playing') {
+          console.log(`⚠️ Timeout ignored for match ${data.matchId}: Game already finished (${match.gameState.status})`)
+          return
+        }
+
         // loserColor가 지정되면 그 색상이 패배, 아니면 보낸 플레이어가 패배
         let timedOutColor: 'white' | 'black'
         if (data.loserColor) {
@@ -386,6 +397,9 @@ export function setupSocketHandlers(io: Server) {
     socket.on('respond-draw', (data: { matchId: string; accept: boolean }) => {
       console.log(`🤝 Player ${socket.id} ${data.accept ? 'accepted' : 'rejected'} draw in match ${data.matchId}`)
       if (data.accept) {
+        const match = gameManager.getMatch(data.matchId)
+        if (!match || match.gameState.status !== 'playing') return
+
         // Draw accepted - game over
         gameManager.endGame(data.matchId, { winner: 'draw', reason: 'mutual agreement' }) // Status Update
 
@@ -395,15 +409,12 @@ export function setupSocketHandlers(io: Server) {
         })
 
         // DB에 게임 결과 저장
-        const match = gameManager.getMatch(data.matchId)
-        if (match) {
-          const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
-          const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
-          const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
-          const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
-          const pgn = gameManager.getMatchPGN(data.matchId)
-          gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'mutual agreement', pgn)
-        }
+        const whiteUserId = match.player1Color === 'white' ? match.player1.userId : match.player2.userId
+        const blackUserId = match.player1Color === 'black' ? match.player1.userId : match.player2.userId
+        const whiteDeckId = match.player1Color === 'white' ? match.player1.deckId : match.player2.deckId
+        const blackDeckId = match.player1Color === 'black' ? match.player1.deckId : match.player2.deckId
+        const pgn = gameManager.getMatchPGN(data.matchId)
+        gameService.saveGameResult(whiteUserId, blackUserId, whiteDeckId, blackDeckId, 'draw', 'mutual agreement', pgn)
       }
       // If rejected, no action needed - game continues
     })

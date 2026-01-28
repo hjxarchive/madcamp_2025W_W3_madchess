@@ -925,7 +925,7 @@ export class GameManager {
       // Update status so it doesn't show in live games
       match.gameState = {
         ...match.gameState,
-        status: result.winner === 'draw' ? 'draw' : (result.reason === 'resignation' ? 'resignation' : 'checkmate'),
+        status: result.winner === 'draw' ? 'draw' : (result.reason === 'resignation' ? 'resignation' : (result.reason === 'timeout' ? 'timeout' : 'checkmate')),
         // Store result in gameState if needed for reconnects
         winner: result.winner,
         reason: result.reason
