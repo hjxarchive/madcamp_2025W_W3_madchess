@@ -352,13 +352,13 @@ export default function MatchmakingPage() {
               {user?.rating && (
                 <div className="mb-8 p-4 border border-gray-800 bg-[#0A0A0A] rounded inline-block">
                   <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">예상 상대 레이팅</div>
-                  <RatingRange 
-                    minRating={(user.rating || 1500) - (user.rd || 350) * 2}
-                    maxRating={(user.rating || 1500) + (user.rd || 350) * 2}
+                  <RatingRange
+                    minRating={(user.rating ?? 1500) - (user.rd ?? 350) * 2}
+                    maxRating={(user.rating ?? 1500) + (user.rd ?? 350) * 2}
                     className="text-lg"
                   />
                   <div className="mt-2 text-xs text-gray-500">
-                    내 레이팅: <span className="text-[#D4FF00]">{Math.round(user.rating)}</span>
+                    내 레이팅: <span className="text-[#D4FF00]">{user.rating !== undefined ? Math.round(user.rating) : '?'}</span>
                     {user.rd && user.rd > 100 && <span className="ml-2">(불확실성 높음)</span>}
                   </div>
                 </div>

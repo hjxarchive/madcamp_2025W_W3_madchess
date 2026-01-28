@@ -141,11 +141,11 @@ export class GameManager {
           matchId,
           white: {
             username: whitePlayer.username || 'Player',
-            rating: whitePlayer.rating || 1500,
+            rating: whitePlayer.rating ?? 1500,
           },
           black: {
             username: blackPlayer.username || 'Player',
-            rating: blackPlayer.rating || 1500,
+            rating: blackPlayer.rating ?? 1500,
           },
           timeControl: match.timeControl.label,
           spectatorCount: this.spectators.get(matchId)?.size || 0,
@@ -187,11 +187,11 @@ export class GameManager {
       lastMoveTime: match.lastMoveTime,
       white: {
         username: whitePlayer.username || 'Player',
-        rating: whitePlayer.rating || 1500,
+        rating: whitePlayer.rating ?? 1500,
       },
       black: {
         username: blackPlayer.username || 'Player',
-        rating: blackPlayer.rating || 1500,
+        rating: blackPlayer.rating ?? 1500,
       },
       timeControl: match.timeControl.label,
       pgn: match.standardPgn || '',
@@ -300,8 +300,8 @@ export class GameManager {
           chessEngine,
           gameState: this.initializeGame(
             matchId,
-            { userId: player1.userId, username: player1.username || 'Player 1', rating: player1.rating || 1500, deckId: player1.deckId, color: 'white', picture: player1.picture },
-            { userId: player2.userId, username: player2.username || 'Player 2', rating: player2.rating || 1500, deckId: player2.deckId, color: 'black', picture: player2.picture }
+            { userId: player1.userId, username: player1.username || 'Player 1', rating: player1.rating ?? 1500, deckId: player1.deckId, color: 'white', picture: player1.picture },
+            { userId: player2.userId, username: player2.username || 'Player 2', rating: player2.rating ?? 1500, deckId: player2.deckId, color: 'black', picture: player2.picture }
           ),
 
           // Timer Setup
