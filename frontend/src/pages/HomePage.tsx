@@ -90,7 +90,7 @@ export default function HomePage() {
         <div className="flex items-center gap-12">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setShowDonation(false)}>
             <div className="w-8 h-8 bg-white skew-x-12 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+              <div className="absolute inset-0 bg-[url('/logo.jpg')] bg-cover bg-center opacity-80"></div>
             </div>
             <div>
               <div className="font-serif text-2xl leading-none tracking-tight text-[#D4FF00]">MAD</div>
