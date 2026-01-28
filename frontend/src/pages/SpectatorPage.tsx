@@ -177,7 +177,7 @@ export default function SpectatorPage() {
         return () => {
             if (timerRef.current) clearInterval(timerRef.current)
         }
-    }, [currentTurn, gameOver, navigate])
+    }, [currentTurn, gameOver, navigate, lastMoveTime, serverWhiteTime, serverBlackTime])
 
     const formatTime = (ms: number) => {
         const totalSeconds = Math.floor(ms / 1000)
