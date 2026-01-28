@@ -164,7 +164,8 @@ export default function ReplayPage() {
         let chess: Chess | null = null
         try {
           // Sanitize FEN
-          let fenToUse = (gameInfo as any)?.initialFen
+          // Fallback to history[0].fen if gameInfo is missing
+          let fenToUse = (gameInfo as any)?.initialFen || history[0]?.fen
           if (fenToUse) {
             const parts = fenToUse.split(' ')
             if (parts.length >= 3) {
@@ -238,7 +239,7 @@ export default function ReplayPage() {
       }
       return movedList
     }
-  }, [(gameInfo as any)?.initialFen])
+  }, [(gameInfo as any)?.initialFen, history])
 
   if (isLoading) {
     return (
