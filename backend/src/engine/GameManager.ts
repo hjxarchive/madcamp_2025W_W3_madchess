@@ -114,6 +114,9 @@ export class GameManager {
     spectatorCount: number;
     currentTurn: 'white' | 'black';
     board: any;
+    whiteTime: number;
+    blackTime: number;
+    lastMoveTime?: number;
   }> {
     const liveGames: Array<{
       matchId: string;
@@ -123,6 +126,9 @@ export class GameManager {
       spectatorCount: number;
       currentTurn: 'white' | 'black';
       board: any;
+      whiteTime: number;
+      blackTime: number;
+      lastMoveTime?: number;
     }> = []
 
     for (const [matchId, match] of this.matches.entries()) {
@@ -145,6 +151,9 @@ export class GameManager {
           spectatorCount: this.spectators.get(matchId)?.size || 0,
           currentTurn: match.gameState.currentTurn,
           board: match.gameState.board,
+          whiteTime: match.whiteTime,
+          blackTime: match.blackTime,
+          lastMoveTime: match.lastMoveTime
         })
       }
     }
@@ -163,6 +172,7 @@ export class GameManager {
     black: { username: string; rating: number };
     timeControl: string;
     pgn: string;
+    lastMoveTime?: number;
   } | null {
     const match = this.matches.get(matchId)
     if (!match) return null
@@ -174,6 +184,7 @@ export class GameManager {
       gameState: match.gameState,
       whiteTime: match.whiteTime,
       blackTime: match.blackTime,
+      lastMoveTime: match.lastMoveTime,
       white: {
         username: whitePlayer.username || 'Player',
         rating: whitePlayer.rating || 1500,
