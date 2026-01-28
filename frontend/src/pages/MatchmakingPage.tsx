@@ -220,8 +220,10 @@ export default function MatchmakingPage() {
             <span className="text-xl group-hover:-translate-x-1 transition-transform">←</span>
             <span className="uppercase tracking-widest text-xs font-bold">Back to Arena</span>
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-white skew-x-12"></div>
+          <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/')}>
+            <div className="w-6 h-6 bg-white skew-x-12 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('/logo.jpg')] bg-cover bg-center opacity-80"></div>
+            </div>
             <div className="font-serif text-lg">
               <span className="text-[#D4FF00]">MAD</span>
               <span className="text-white">CHESS</span>
@@ -239,7 +241,7 @@ export default function MatchmakingPage() {
 
           {/* 모드 선택 */}
           {mode === 'select' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <button
                 onClick={() => setMode('quick')}
                 className="group border border-gray-800 hover:border-[#D4FF00] bg-transparent p-8 text-left transition-all duration-300 relative overflow-hidden"
