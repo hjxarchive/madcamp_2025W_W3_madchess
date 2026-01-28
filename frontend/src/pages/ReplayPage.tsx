@@ -397,7 +397,7 @@ export default function ReplayPage() {
             )}
           </div>
 
-          <div className="border-t border-gray-800 py-8">
+          <div className="border-t border-gray-800 py-6">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center">
               {/* Left: Label */}
               <div className="text-gray-500 text-xs uppercase tracking-widest justify-self-start">Move</div>
