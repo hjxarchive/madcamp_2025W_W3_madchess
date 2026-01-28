@@ -1231,6 +1231,7 @@ export default function GamePage() {
         // Initialize chess engine for SAN generation
         let chess: Chess | null = null
         try {
+          console.log('DEBUG: parseMoves initialFen:', gameState?.initialFen)
           chess = new Chess(gameState?.initialFen || undefined)
         } catch (e) {
           console.warn('Initial FEN invalid or chess.js error', e)
@@ -1603,7 +1604,7 @@ export default function GamePage() {
             {/* 대국 기록 */}
             <div className="flex-1 border border-gray-900 bg-[#0A0A0A] p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History</h2>
+                <h2 className="text-xs uppercase tracking-widest text-[#D4FF00] font-bold">Move History (SAN)</h2>
               </div>
 
               <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-sm">
