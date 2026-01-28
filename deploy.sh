@@ -5,7 +5,7 @@ PEM_KEY=~/Downloads/Madchess.pem
 SERVER_USER=ubuntu
 SERVER_IP=3.35.93.217
 PROJECT_DIR=madcamp_2025W_W3_madchess
-BRANCH=${1:-feature/recovery} # Default to feature/recovery if not provided
+BRANCH=${1:-feature/hanjin12} # Default to feature/recovery if not provided
 
 echo "🚀 Starting Deployment to $SERVER_IP on branch $BRANCH..."
 

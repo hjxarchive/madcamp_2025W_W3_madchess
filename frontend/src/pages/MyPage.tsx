@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { getUserGames, getUserStats, updateUser } from '../services/userApi'
-import type { UserGame, UserStats } from '../types/api.types'
+import { getUserGames, getUserStats, updateUser, getUserDecks } from '../services/userApi'
+import type { UserGame, UserStats, DeckWithStats } from '../types/api.types'
 
 export default function MyPage() {
     const navigate = useNavigate()
     const { user, logout, setUser } = useAuthStore()
     const [matchHistory, setMatchHistory] = useState<UserGame[]>([])
     const [stats, setStats] = useState<UserStats | null>(null)
+    const [userDecks, setUserDecks] = useState<DeckWithStats[]>([])
     const [isEditing, setIsEditing] = useState(false)
     const [editName, setEditName] = useState('')
 
@@ -33,6 +34,13 @@ export default function MyPage() {
             getUserStats(user.id).then((res) => {
                 if (res.success && res.data) {
                     setStats(res.data)
+                }
+            })
+
+            // Fetch user decks
+            getUserDecks(user.id).then((res) => {
+                if (res.success && res.data) {
+                    setUserDecks(res.data)
                 }
             })
         }
@@ -121,7 +129,7 @@ export default function MyPage() {
                         <div className="w-full">
                             <div className="text-gray-500 text-xs uppercase tracking-widest mb-1">Standard Rating</div>
                             <div className="text-6xl font-serif font-light text-white leading-none flex items-start gap-2">
-                                {1500}
+                                {user.rating}
                                 <span className="text-lg text-[#D4FF00] mt-1">●</span>
                             </div>
                         </div>
@@ -167,29 +175,7 @@ export default function MyPage() {
                             <div className="border-l border-gray-800 pl-6">
                                 <div className="text-gray-500 text-xs uppercase tracking-widest mb-2">Win Rate</div>
                                 <div className="text-3xl font-light text-[#D4FF00]">
-                                    {/* Win rate currently calculated from fetched history which is partial. 
-                                        Ideally backend should provide stats. For now, let's stick to using totalGames if possible or keep logic.
-                                        Wait, stats object from `getUserStats` has win/loss/draw? 
-                                        game.repository `countGamesByUserId` doesn't differentiate result.
-                                        Let's rely on stats if available, otherwise fallback (which might be inaccurate for pagination).
-                                        Actually `getUserStats` backend implementation returns { totalGames, wins, losses, draws }? 
-                                        I'll assume `stats` has it or use inaccurate calculation for now. 
-                                        Let's use `matchHistory` for now but note it's only current page.
-                                        Actually `stats` state is set from `getUserStats`. Let's see what that returns.
-                                        It likely returns full stats. Let's assume stats.winRate exists or similar.
-                                        If not, the previous code calculated it from local array. 
-                                        Let's keep the local calculation but mark it as "Recent Win Rate" effectively? 
-                                        Or keep it as is, knowing it's flawed for pagination but acceptable for now.
-                                     */}
-                                    {stats ?
-                                        // If stats has winRate, use it. If not, fallback to partial calculation?
-                                        // The backend service for stats returns whatever userRepo.getUserStats returns.
-                                        // Let's stick to partial calculation or fix backend later. 
-                                        // The user only asked for pagination of list.
-                                        (matchHistory.length > 0
-                                            ? Math.round((matchHistory.filter(m => m.result === 'WIN').length / matchHistory.length) * 100)
-                                            : 0)
-                                        : 0}%
+                                    {stats ? Math.round(stats.winRate * 100) : 0}%
                                 </div>
                             </div>
                             <div className="border-l border-gray-800 pl-6">
@@ -197,6 +183,48 @@ export default function MyPage() {
                                 <div className="text-lg leading-tight truncate">{stats?.favoriteDeck || '-'}</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                {/* Decks Section */}
+                <div className="mb-16">
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-2xl font-serif text-white flex items-center gap-4">
+                            <span className="w-2 h-2 bg-[#D4FF00]"></span>
+                            Your Collection
+                        </h2>
+                        <button
+                            onClick={() => navigate('/deck')}
+                            className="text-xs font-bold text-[#D4FF00] hover:text-white uppercase tracking-widest transition-colors"
+                        >
+                            Open Deck Builder →
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {userDecks.map(deck => (
+                            <div key={deck.id} className="border border-gray-800 bg-[#0A0A0A] p-6 hover:border-[#D4FF00] transition-colors group">
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className="font-serif text-xl group-hover:text-[#D4FF00] transition-colors line-clamp-1">{deck.name}</h3>
+                                    <span className="text-[10px] font-mono text-gray-600 bg-gray-900 px-2 py-1 uppercase whitespace-nowrap">{deck.totalCost} PTS</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Win Rate</div>
+                                        <div className="text-xl font-light">{Math.round((deck.winRate || 0) * 100)}%</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Record</div>
+                                        <div className="text-xl font-light">{deck.winCnt}W / {deck.loseCnt}L</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {userDecks.length === 0 && (
+                            <div className="col-span-full py-12 border border-dashed border-gray-800 text-center text-gray-600">
+                                NO DECKS FOUND. START BUILDING YOUR ARSENAL.
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -268,8 +296,8 @@ export default function MyPage() {
                                                 key={pageNum}
                                                 onClick={() => setCurrentPage(pageNum)}
                                                 className={`w-10 h-10 flex items-center justify-center font-mono text-sm transition-all ${currentPage === pageNum
-                                                        ? 'bg-[#D4FF00] text-black font-bold'
-                                                        : 'border border-gray-800 text-gray-500 hover:text-white hover:border-gray-600'
+                                                    ? 'bg-[#D4FF00] text-black font-bold'
+                                                    : 'border border-gray-800 text-gray-500 hover:text-white hover:border-gray-600'
                                                     }`}
                                             >
                                                 {pageNum}

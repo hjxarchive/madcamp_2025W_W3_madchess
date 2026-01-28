@@ -1,5 +1,6 @@
 import * as gameRepo from './game.repository';
 import * as userRepo from '../user/user.repository';
+import * as deckRepo from '../deck/deck.repository';
 import { CreateGameDto, GameResponseDto, GameStateDto, UserGameHistoryDto, ResignResponseDto } from './DTOS/game.dto';
 import { ChessService } from '../../engine/ChessService';
 
@@ -290,6 +291,13 @@ export const saveGameResult = async (
         blackUser.rd,
         blackUser.volatility
       );
+    }
+
+    // 6. 덱 승패 통계 업데이트
+    if (winner !== 'draw') {
+      const whiteWon = winner === 'white';
+      await deckRepo.updateDeckStats(whiteDeckFinal, whiteWon);
+      await deckRepo.updateDeckStats(blackDeckFinal, !whiteWon);
     }
 
     console.log(`✅ Game ${game.id} saved: ${gameResult} by ${reason}`);
