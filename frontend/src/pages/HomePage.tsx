@@ -108,7 +108,7 @@ export default function HomePage() {
             <button onClick={() => navigate('/mypage')} className="flex items-center gap-3 group">
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-bold text-white group-hover:text-[#D4FF00] transition-colors">{authUser.name}</div>
-                <div className="text-xs text-gray-500 font-mono">{authUser.rating || 1500} ELO</div>
+                <div className="text-xs text-gray-500 font-mono">{authUser.rating !== undefined ? Math.round(authUser.rating) : '?'} ELO</div>
               </div>
               <img
                 src={authUser.picture || `https://api.dicebear.com/8.x/identicon/svg?seed=${encodeURIComponent(authUser.name || 'User')}`}

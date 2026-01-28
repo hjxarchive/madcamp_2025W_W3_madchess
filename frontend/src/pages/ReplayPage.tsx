@@ -334,11 +334,11 @@ export default function ReplayPage() {
             <div className="flex items-center gap-8 text-sm">
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${gameInfo.result === 'white_win' ? 'bg-[#D4FF00]' : 'bg-gray-700'}`}></div>
-                <span>{typeof gameInfo.player1.username === 'string' ? gameInfo.player1.username : (gameInfo.player1 as any).username} (White)</span>
+                <span>{typeof gameInfo.player1.username === 'string' ? gameInfo.player1.username : (gameInfo.player1 as any).username} ({gameInfo.player1.rating || '?'})</span>
               </div>
               <div className="text-gray-600">VS</div>
               <div className="flex items-center gap-2">
-                <span>{typeof gameInfo.player2.username === 'string' ? gameInfo.player2.username : (gameInfo.player2 as any).username} (Black)</span>
+                <span>{typeof gameInfo.player2.username === 'string' ? gameInfo.player2.username : (gameInfo.player2 as any).username} ({gameInfo.player2.rating || '?'})</span>
                 <div className={`w-3 h-3 rounded-full ${gameInfo.result === 'black_win' ? 'bg-[#D4FF00]' : 'bg-gray-700'}`}></div>
               </div>
             </div>

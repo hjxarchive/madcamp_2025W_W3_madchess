@@ -248,7 +248,7 @@ export default function GamePage() {
       // 내 정보 (auth store에서)
       const myUserId = user?.id ? String(user.id) : 'me'
       const myUsername = user?.name || 'You'
-      const myRating = user?.rating || 1500
+      const myRating = user?.rating !== undefined ? user.rating : 1500
       const myPicture = user?.picture
 
       // 상대 정보 (sessionStorage에서)
@@ -263,7 +263,7 @@ export default function GamePage() {
         try {
           const opponentInfo = JSON.parse(opponentInfoStr)
           opponentUsername = opponentInfo.username || opponentInfo.name || 'Opponent'
-          opponentRating = opponentInfo.rating || 1500
+          opponentRating = opponentInfo.rating !== undefined ? opponentInfo.rating : 1500
           opponentUserId = opponentInfo.userId || 'opponent'
           opponentDeckId = opponentInfo.deckId || 'deck-2'
           opponentPicture = opponentInfo.picture
