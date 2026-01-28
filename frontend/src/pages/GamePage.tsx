@@ -1231,8 +1231,21 @@ export default function GamePage() {
         // Initialize chess engine for SAN generation
         let chess: Chess | null = null
         try {
-          console.log('DEBUG: parseMoves initialFen:', gameState?.initialFen)
-          chess = new Chess(gameState?.initialFen || undefined)
+          // Sanitize FEN: chess.js only accepts KQkq for castling. Strip Shredder-FEN characters (e.g. A-H)
+          // FEN: placement turn castling ep half full
+          let fenToUse = gameState?.initialFen
+          if (fenToUse) {
+            const parts = fenToUse.split(' ')
+            if (parts.length >= 3) {
+              // Keep only standard chars
+              let castling = parts[2].replace(/[^KQkq-]/g, '')
+              if (!castling) castling = '-'
+              parts[2] = castling
+              fenToUse = parts.join(' ')
+            }
+          }
+          console.log('DEBUG: parseMoves sanitized FEN:', fenToUse)
+          chess = new Chess(fenToUse || undefined)
         } catch (e) {
           console.warn('Initial FEN invalid or chess.js error', e)
           try { chess = new Chess() } catch (err) { chess = null }
