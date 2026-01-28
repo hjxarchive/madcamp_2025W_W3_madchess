@@ -3,6 +3,7 @@ import * as userRepo from '../user/user.repository';
 import * as deckRepo from '../deck/deck.repository';
 import { CreateGameDto, GameResponseDto, GameStateDto, UserGameHistoryDto, ResignResponseDto } from './DTOS/game.dto';
 import { ChessService } from '../../engine/ChessService';
+import { ratingService } from '../../services/RatingService';
 
 export const createGame = async (dto: CreateGameDto): Promise<GameResponseDto> => {
   const game = await gameRepo.createGame(
@@ -181,54 +182,34 @@ export const resignGame = async (gameId: number, userId: number): Promise<Resign
   // 게임 결과 업데이트
   await gameRepo.updateGameResult(gameId, result);
 
-  // 레이팅 변경 계산 (간단한 고정값, 실제로는 Glicko-2 사용)
-  const whiteRatingChange = isWhite ? -12 : 12;
-  const blackRatingChange = isWhite ? 12 : -12;
+  // 1. Calculate piece scores
+  const [whitePieceScore, blackPieceScore] = await Promise.all([
+    ratingService.calculateDeckPieceScore(game.white_deck_id),
+    ratingService.calculateDeckPieceScore(game.black_deck_id),
+  ]);
 
-  // 게임 히스토리 생성
-  await gameRepo.createGameHistory(
-    game.white_player_id,
-    gameId,
-    'white',
-    isWhite ? 'lose' : 'win',
-    whiteRatingChange
+  // 2. Determine winner ID
+  const winnerId = isWhite ? game.black_player_id : game.white_player_id;
+
+  // 3. Update ratings using Glicko-2 service
+  // Note: We don't have PGN here for resign, or we could fetch it if needed. Leaving it undefined for now.
+  const ratingResult = await ratingService.updateRatingsAfterMatch(
+    game.id.toString(),
+    winnerId,
+    { userId: game.white_player_id, pieceScore: whitePieceScore, deckId: game.white_deck_id },
+    { userId: game.black_player_id, pieceScore: blackPieceScore, deckId: game.black_deck_id }
   );
 
-  await gameRepo.createGameHistory(
-    game.black_player_id,
-    gameId,
-    'black',
-    isWhite ? 'win' : 'lose',
-    blackRatingChange
-  );
-
-  // 사용자 레이팅 업데이트
-  const whiteUser = await userRepo.findUserById(game.white_player_id);
-  const blackUser = await userRepo.findUserById(game.black_player_id);
-
-  if (whiteUser) {
-    await userRepo.updateUserRating(
-      game.white_player_id,
-      whiteUser.rating + whiteRatingChange,
-      whiteUser.rd,
-      whiteUser.volatility
-    );
-  }
-
-  if (blackUser) {
-    await userRepo.updateUserRating(
-      game.black_player_id,
-      blackUser.rating + blackRatingChange,
-      blackUser.rd,
-      blackUser.volatility
-    );
-  }
+  // 4. Update deck stats
+  const whiteWon = winnerId === game.white_player_id;
+  await deckRepo.updateDeckStats(game.white_deck_id, whiteWon);
+  await deckRepo.updateDeckStats(game.black_deck_id, !whiteWon);
 
   return {
     result,
     reason: 'resignation',
-    whiteRatingChange,
-    blackRatingChange
+    whiteRatingChange: ratingResult.white.ratingDelta,
+    blackRatingChange: ratingResult.black.ratingDelta
   };
 };
 
@@ -285,40 +266,34 @@ export const saveGameResult = async (
     // 2. 게임 결과 업데이트 (PGN 포함)
     await gameRepo.updateGameResult(game.id, gameResult, pgn);
 
-    // 3. 레이팅 변화 계산 (간단한 고정값)
-    const whiteRatingChange = winner === 'white' ? 12 : winner === 'black' ? -12 : 0;
-    const blackRatingChange = winner === 'black' ? 12 : winner === 'white' ? -12 : 0;
+    // 1. Calculate piece scores
+    const [whitePieceScore, blackPieceScore] = await Promise.all([
+      ratingService.calculateDeckPieceScore(whiteDeckFinal),
+      ratingService.calculateDeckPieceScore(blackDeckFinal),
+    ]);
 
-    // 4. 게임 히스토리 생성 (각 플레이어별)
-    const whiteResult = winner === 'white' ? 'win' : winner === 'black' ? 'lose' : 'draw';
-    const blackResult = winner === 'black' ? 'win' : winner === 'white' ? 'lose' : 'draw';
-
-    await gameRepo.createGameHistory(whiteId, game.id, 'white', whiteResult, whiteRatingChange);
-    await gameRepo.createGameHistory(blackId, game.id, 'black', blackResult, blackRatingChange);
-
-    // 5. 사용자 레이팅 업데이트
-    const whiteUser = await userRepo.findUserById(whiteId);
-    const blackUser = await userRepo.findUserById(blackId);
-
-    if (whiteUser) {
-      await userRepo.updateUserRating(
-        whiteId,
-        whiteUser.rating + whiteRatingChange,
-        whiteUser.rd,
-        whiteUser.volatility
-      );
+    // 2. Determine winner ID
+    let winnerId: number | null = null;
+    if (winner === 'white') {
+      winnerId = whiteId;
+    } else if (winner === 'black') {
+      winnerId = blackId;
     }
 
-    if (blackUser) {
-      await userRepo.updateUserRating(
-        blackId,
-        blackUser.rating + blackRatingChange,
-        blackUser.rd,
-        blackUser.volatility
-      );
+    // 3. Update ratings using Glicko-2 service
+    const ratingResult = await ratingService.updateRatingsAfterMatch(
+      game.id.toString(),
+      winnerId,
+      { userId: whiteId, pieceScore: whitePieceScore, deckId: whiteDeckFinal },
+      { userId: blackId, pieceScore: blackPieceScore, deckId: blackDeckFinal },
+      pgn
+    );
+
+    if (!ratingResult.success) {
+      console.error('❌ Failed to update ratings via service');
     }
 
-    // 6. 덱 승패 통계 업데이트
+    // 4. Update deck stats
     if (winner !== 'draw') {
       const whiteWon = winner === 'white';
       await deckRepo.updateDeckStats(whiteDeckFinal, whiteWon);
@@ -326,7 +301,7 @@ export const saveGameResult = async (
     }
 
     console.log(`✅ Game ${game.id} saved: ${gameResult} by ${reason}`);
-    console.log(`📊 Rating changes: White ${whiteRatingChange > 0 ? '+' : ''}${whiteRatingChange}, Black ${blackRatingChange > 0 ? '+' : ''}${blackRatingChange}`);
+    console.log(`📊 Rating changes: White ${ratingResult.white.ratingDelta > 0 ? '+' : ''}${ratingResult.white.ratingDelta.toFixed(1)}, Black ${ratingResult.black.ratingDelta > 0 ? '+' : ''}${ratingResult.black.ratingDelta.toFixed(1)}`);
 
     return { success: true, gameId: game.id };
   } catch (error) {
