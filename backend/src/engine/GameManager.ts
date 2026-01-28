@@ -424,6 +424,7 @@ export class GameManager {
       currentTurn: 'white',
       board: frontendBoard,
       status: 'playing',
+      initialFen: match.chessEngine.getFEN(),
       capturedPieces: { white: [], black: [] }
     }
 

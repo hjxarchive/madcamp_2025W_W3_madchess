@@ -829,13 +829,13 @@ export class ChessService {
             const step = 1 // Loop direction doesn't strictly matter if we pick outermost, but let's iterate outward-in or inward-out?
 
             // Iterate from outermost inward to find the primary rook for that side
-            // Actually, usually the outermost rook is the castling one.
             if (side === 'kingside') {
                 for (let f = 7; f > kingFile; f--) {
                     const p = this.board[rank][f]
                     if (p?.type === 'r' && p?.color === color) {
-                        // Check if specific rook moved (if tracked) - simplified logic relies on global flag + existence
-                        // For FEN compatibility with Stockfish 960, we need the file letter
+                        // For Standard Chess compatibility (chess.js), use K/Q if on standard files
+                        if (f === 7) return color === 'white' ? 'K' : 'k'
+                        // Fallback to Shredder-FEN (File letters) for 960 positions
                         return String.fromCharCode((color === 'white' ? 'A' : 'a').charCodeAt(0) + f)
                     }
                 }
@@ -843,6 +843,7 @@ export class ChessService {
                 for (let f = 0; f < kingFile; f++) {
                     const p = this.board[rank][f]
                     if (p?.type === 'r' && p?.color === color) {
+                        if (f === 0) return color === 'white' ? 'Q' : 'q'
                         return String.fromCharCode((color === 'white' ? 'A' : 'a').charCodeAt(0) + f)
                     }
                 }
