@@ -398,12 +398,12 @@ export default function ReplayPage() {
           </div>
 
           <div className="border-t border-gray-800 py-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center">
               {/* Left: Label */}
-              <div className="text-gray-500 text-xs uppercase tracking-widest shrink-0">Move</div>
+              <div className="text-gray-500 text-xs uppercase tracking-widest justify-self-start">Move</div>
 
               {/* Center: Controls */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 justify-self-center">
                 <button
                   onClick={handlePrev}
                   disabled={currentIndex === 0}
@@ -427,7 +427,7 @@ export default function ReplayPage() {
               </div>
 
               {/* Right: Counter */}
-              <div className="text-xl font-mono text-[#D4FF00] shrink-0">
+              <div className="text-xl font-mono text-[#D4FF00] justify-self-end">
                 {currentIndex} <span className="text-gray-600 text-base">/ {history.length - 1}</span>
               </div>
             </div>
