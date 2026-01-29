@@ -231,7 +231,15 @@ export const saveGameResult = async (
   winner: 'white' | 'black' | 'draw',
   reason: string,
   pgn?: string
-): Promise<{ success: boolean; gameId?: number; error?: string }> => {
+): Promise<{
+  success: boolean;
+  gameId?: number;
+  error?: string;
+  ratingChanges?: {
+    white: any; // Using any for simplicity as it matches RatingUpdateResult sub-objects
+    black: any;
+  }
+}> => {
   try {
     // userId와 deckId를 숫자로 변환
     const whiteId = typeof whiteUserId === 'string' ? parseInt(whiteUserId) : whiteUserId;
@@ -296,7 +304,20 @@ export const saveGameResult = async (
     console.log(`✅ Game ${ratingResult.gameId} saved: ${gameResult} by ${reason}`);
     console.log(`📊 Rating changes: White ${ratingResult.white.ratingDelta > 0 ? '+' : ''}${ratingResult.white.ratingDelta.toFixed(1)}, Black ${ratingResult.black.ratingDelta > 0 ? '+' : ''}${ratingResult.black.ratingDelta.toFixed(1)}`);
 
-    return { success: true, gameId: ratingResult.gameId };
+    return {
+      success: true,
+      gameId: ratingResult.gameId,
+      ratingChanges: {
+        white: {
+          ...ratingResult.white,
+          pieceScore: whitePieceScore
+        },
+        black: {
+          ...ratingResult.black,
+          pieceScore: blackPieceScore
+        }
+      }
+    };
   } catch (error) {
     console.error('❌ Error saving game result:', error);
     return { success: false, error: String(error) };
