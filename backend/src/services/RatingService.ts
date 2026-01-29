@@ -140,8 +140,8 @@ export class RatingService {
         await tx.user.update({
           where: { id: whitePlayer.userId },
           data: {
-            rating: whiteChange.newRating,
-            rd: whiteChange.newRd,
+            rating: Math.round(whiteChange.newRating),
+            rd: Math.round(whiteChange.newRd),
             volatility: whiteChange.newVolatility,
             last_game_at: now,
           },
@@ -151,8 +151,8 @@ export class RatingService {
         await tx.user.update({
           where: { id: blackPlayer.userId },
           data: {
-            rating: blackChange.newRating,
-            rd: blackChange.newRd,
+            rating: Math.round(blackChange.newRating),
+            rd: Math.round(blackChange.newRd),
             volatility: blackChange.newVolatility,
             last_game_at: now,
           },

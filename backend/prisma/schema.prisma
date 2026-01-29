@@ -86,8 +86,8 @@ model piece {
 model user {
   id                              Int            @id @default(autoincrement())
   username                        String         @unique @db.VarChar(255)
-  rating                          Float          @default(1500.0)
-  rd                              Float          @default(350.0)
+  rating                          Int            @default(1500)
+  rd                              Int            @default(350)
   volatility                      Float          @default(0.06)
   last_game_at                    DateTime?      @db.Timestamp(6)
   email                           String?        @unique @db.VarChar(255)
