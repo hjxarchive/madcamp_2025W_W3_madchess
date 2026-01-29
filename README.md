@@ -7,7 +7,8 @@
 
 ---
 ## 🎮 플레이
-(메인 페이지 사진)
+<img width="1942" height="1462" alt="madcamp cloud_" src="https://github.com/user-attachments/assets/9cc6c273-2ceb-4bf6-bd8e-d6cc7d00312f" />
+
 
 🔗 Play Live: [https://madcamp.cloud](https://madcamp.cloud/)
 
